@@ -1,0 +1,174 @@
+mod schema;
+
+pub mod accounts;
+pub mod categories;
+pub mod institutions;
+pub mod scenarios;
+pub mod transaction_accounts;
+pub mod transactions;
+pub mod users;
+
+pub use accounts::upsert_account;
+pub use categories::upsert_category;
+pub use institutions::upsert_institution;
+pub use scenarios::upsert_scenario;
+pub use transaction_accounts::upsert_transaction_account;
+pub use transactions::upsert_transaction;
+pub use users::upsert_user;
+
+use anyhow::{Context, Result};
+use rusqlite::Connection;
+
+pub fn initialize(path: &str) -> Result<Connection> {
+    let conn = Connection::open(path).context("Failed to open database")?;
+
+    conn.execute_batch("PRAGMA journal_mode = WAL;")?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
+
+    Ok(conn)
+}
+
+pub fn initialize_in_memory() -> Result<Connection> {
+    let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    conn.execute_batch(schema::SCHEMA)?;
+    Ok(conn)
+}
+
+#[cfg(test)]
+pub(crate) mod test_helpers {
+    use super::*;
+    use crate::models::*;
+
+    pub fn test_db() -> Connection {
+        initialize_in_memory().unwrap()
+    }
+
+    pub fn make_user(id: i64, name: &str) -> User {
+        User {
+            id,
+            login: Some("testlogin".into()),
+            name: Some(name.into()),
+            email: Some("test@example.com".into()),
+            avatar_url: None,
+            beta_user: Some(false),
+            time_zone: Some("UTC".into()),
+            week_start_day: Some(1),
+            is_reviewing_transactions: Some(false),
+            base_currency_code: Some("NZD".into()),
+            always_show_base_currency: Some(false),
+            using_multiple_currencies: Some(false),
+            available_accounts: Some(10),
+            available_budgets: Some(5),
+            forecast_last_updated_at: None,
+            forecast_last_accessed_at: None,
+            forecast_start_date: None,
+            forecast_end_date: None,
+            forecast_defer_recalculate: Some(false),
+            forecast_needs_recalculate: Some(false),
+            last_logged_in_at: None,
+            last_activity_at: None,
+            created_at: Some("2020-01-01T00:00:00Z".into()),
+            updated_at: Some("2024-01-01T00:00:00Z".into()),
+        }
+    }
+
+    pub fn make_institution(id: i64, title: &str) -> Institution {
+        Institution {
+            id,
+            title: Some(title.into()),
+            currency_code: Some("NZD".into()),
+            created_at: Some("2020-01-01T00:00:00Z".into()),
+            updated_at: Some("2024-01-01T00:00:00Z".into()),
+        }
+    }
+
+    pub fn make_transaction_account(id: i64, name: &str) -> TransactionAccount {
+        TransactionAccount {
+            id,
+            name: Some(name.into()),
+            number: Some("12-3456-7890".into()),
+            currency_code: Some("NZD".into()),
+            account_type: Some("bank".into()),
+            current_balance: Some(1000.0),
+            current_balance_date: Some("2024-01-01".into()),
+            current_balance_in_base_currency: Some(1000.0),
+            current_balance_exchange_rate: Some(1.0),
+            safe_balance: Some(900.0),
+            safe_balance_in_base_currency: Some(900.0),
+            starting_balance: Some(0.0),
+            starting_balance_date: Some("2020-01-01".into()),
+            institution: None,
+            created_at: Some("2020-01-01T00:00:00Z".into()),
+            updated_at: Some("2024-01-01T00:00:00Z".into()),
+        }
+    }
+
+    pub fn make_category(id: i64, title: &str) -> Category {
+        Category {
+            id,
+            title: Some(title.into()),
+            colour: Some("#ff0000".into()),
+            children: None,
+            parent_id: None,
+            is_transfer: Some(false),
+            is_bill: Some(false),
+            roll_up: Some(false),
+            refund_behaviour: None,
+            created_at: Some("2020-01-01T00:00:00Z".into()),
+            updated_at: Some("2024-01-01T00:00:00Z".into()),
+        }
+    }
+
+    pub fn make_transaction(id: i64, payee: &str) -> Transaction {
+        Transaction {
+            id,
+            transaction_type: Some("debit".into()),
+            payee: Some(payee.into()),
+            amount: Some(-50.0),
+            amount_in_base_currency: Some(-50.0),
+            date: Some("2024-06-15".into()),
+            cheque_number: None,
+            memo: None,
+            is_transfer: Some(false),
+            category: None,
+            note: None,
+            labels: None,
+            original_payee: None,
+            upload_source: None,
+            closing_balance: None,
+            transaction_account: None,
+            status: Some("posted".into()),
+            needs_review: Some(false),
+            created_at: Some("2024-06-15T00:00:00Z".into()),
+            updated_at: Some("2024-06-15T00:00:00Z".into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_helpers::*;
+
+    #[test]
+    fn test_initialize_creates_all_tables() {
+        let conn = test_db();
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert!(tables.contains(&"users".to_string()));
+        assert!(tables.contains(&"institutions".to_string()));
+        assert!(tables.contains(&"scenarios".to_string()));
+        assert!(tables.contains(&"transaction_accounts".to_string()));
+        assert!(tables.contains(&"accounts".to_string()));
+        assert!(tables.contains(&"categories".to_string()));
+        assert!(tables.contains(&"transactions".to_string()));
+    }
+}
