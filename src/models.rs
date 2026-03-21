@@ -180,6 +180,23 @@ pub struct TransactionUpdate {
     pub labels: Option<String>,
 }
 
+#[derive(Debug, Serialize, Default)]
+pub struct TransactionCreate {
+    pub payee: String,
+    pub amount: f64,
+    pub date: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_transfer: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub labels: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

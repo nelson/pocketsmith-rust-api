@@ -1,11 +1,8 @@
-mod client;
-mod db;
-mod models;
-
 use anyhow::{Context, Result};
 
-use client::PocketSmithClient;
-use models::TransactionParams;
+use pocketsmith_sync::client::PocketSmithClient;
+use pocketsmith_sync::db;
+use pocketsmith_sync::models::TransactionParams;
 
 fn main() -> Result<()> {
     let api_key = std::env::var("POCKETSMITH_API_KEY")
