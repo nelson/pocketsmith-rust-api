@@ -39,6 +39,50 @@ impl PocketSmithClient {
             .with_context(|| format!("Failed to parse response from GET {}", url))
     }
 
+    fn post<T: serde::de::DeserializeOwned, B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let url = format!("{}{}", BASE_URL, path);
+        let resp = self
+            .http
+            .post(&url)
+            .header("X-Developer-Key", &self.api_key)
+            .header("Accept", "application/json")
+            .json(body)
+            .send()
+            .with_context(|| format!("POST {}", url))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().unwrap_or_default();
+            anyhow::bail!("POST {} returned {}: {}", url, status, body);
+        }
+
+        let resp_text = resp.text()?;
+        serde_json::from_str(&resp_text)
+            .with_context(|| format!("Failed to parse response from POST {}", url))
+    }
+
+    fn delete_request(&self, path: &str) -> Result<()> {
+        let url = format!("{}{}", BASE_URL, path);
+        let resp = self
+            .http
+            .delete(&url)
+            .header("X-Developer-Key", &self.api_key)
+            .send()
+            .with_context(|| format!("DELETE {}", url))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().unwrap_or_default();
+            anyhow::bail!("DELETE {} returned {}: {}", url, status, body);
+        }
+
+        Ok(())
+    }
+
     pub fn get_me(&self) -> Result<User> {
         self.get("/me")
     }
@@ -161,5 +205,23 @@ impl PocketSmithClient {
         }
 
         resp.json().context("Failed to parse update response")
+    }
+
+    pub fn create_transaction(
+        &self,
+        transaction_account_id: i64,
+        create: &TransactionCreate,
+    ) -> Result<Transaction> {
+        self.post(
+            &format!(
+                "/transaction_accounts/{}/transactions",
+                transaction_account_id
+            ),
+            create,
+        )
+    }
+
+    pub fn delete_transaction(&self, id: i64) -> Result<()> {
+        self.delete_request(&format!("/transactions/{}", id))
     }
 }
