@@ -1,17 +1,11 @@
 mod schema;
 
-pub mod accounts;
 pub mod categories;
-pub mod institutions;
-pub mod scenarios;
 pub mod transaction_accounts;
 pub mod transactions;
 pub mod users;
 
-pub use accounts::upsert_account;
 pub use categories::upsert_category;
-pub use institutions::upsert_institution;
-pub use scenarios::upsert_scenario;
 pub use transaction_accounts::upsert_transaction_account;
 pub use transactions::upsert_transaction;
 pub use users::upsert_user;
@@ -74,16 +68,6 @@ pub(crate) mod test_helpers {
         }
     }
 
-    pub fn make_institution(id: i64, title: &str) -> Institution {
-        Institution {
-            id,
-            title: Some(title.into()),
-            currency_code: Some("NZD".into()),
-            created_at: Some("2020-01-01T00:00:00Z".into()),
-            updated_at: Some("2024-01-01T00:00:00Z".into()),
-        }
-    }
-
     pub fn make_transaction_account(id: i64, name: &str) -> TransactionAccount {
         TransactionAccount {
             id,
@@ -99,7 +83,6 @@ pub(crate) mod test_helpers {
             safe_balance_in_base_currency: Some(900.0),
             starting_balance: Some(0.0),
             starting_balance_date: Some("2020-01-01".into()),
-            institution: None,
             created_at: Some("2020-01-01T00:00:00Z".into()),
             updated_at: Some("2024-01-01T00:00:00Z".into()),
         }
@@ -164,10 +147,7 @@ mod tests {
             .collect();
 
         assert!(tables.contains(&"users".to_string()));
-        assert!(tables.contains(&"institutions".to_string()));
-        assert!(tables.contains(&"scenarios".to_string()));
         assert!(tables.contains(&"transaction_accounts".to_string()));
-        assert!(tables.contains(&"accounts".to_string()));
         assert!(tables.contains(&"categories".to_string()));
         assert!(tables.contains(&"transactions".to_string()));
     }

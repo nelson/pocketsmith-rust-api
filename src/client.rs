@@ -91,10 +91,6 @@ impl PocketSmithClient {
         self.get(&format!("/users/{}", id))
     }
 
-    pub fn get_accounts(&self, user_id: i64) -> Result<Vec<Account>> {
-        self.get(&format!("/users/{}/accounts", user_id))
-    }
-
     pub fn get_transaction_accounts(&self, user_id: i64) -> Result<Vec<TransactionAccount>> {
         self.get(&format!("/users/{}/transaction_accounts", user_id))
     }

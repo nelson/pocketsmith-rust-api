@@ -29,28 +29,6 @@ pub struct User {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Account {
-    pub id: i64,
-    pub title: Option<String>,
-    pub currency_code: Option<String>,
-    #[serde(rename = "type")]
-    pub account_type: Option<String>,
-    pub is_net_worth: Option<bool>,
-    pub primary_transaction_account: Option<TransactionAccount>,
-    pub primary_scenario: Option<Scenario>,
-    pub transaction_accounts: Option<Vec<TransactionAccount>>,
-    pub scenarios: Option<Vec<Scenario>>,
-    pub current_balance: Option<f64>,
-    pub current_balance_date: Option<String>,
-    pub current_balance_in_base_currency: Option<f64>,
-    pub current_balance_exchange_rate: Option<f64>,
-    pub safe_balance: Option<f64>,
-    pub safe_balance_in_base_currency: Option<f64>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct TransactionAccount {
     pub id: i64,
     pub name: Option<String>,
@@ -66,16 +44,6 @@ pub struct TransactionAccount {
     pub safe_balance_in_base_currency: Option<f64>,
     pub starting_balance: Option<f64>,
     pub starting_balance_date: Option<String>,
-    pub institution: Option<Institution>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Institution {
-    pub id: i64,
-    pub title: Option<String>,
-    pub currency_code: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -116,31 +84,6 @@ pub struct Transaction {
     pub transaction_account: Option<TransactionAccount>,
     pub status: Option<String>,
     pub needs_review: Option<bool>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Scenario {
-    pub id: i64,
-    pub title: Option<String>,
-    #[serde(rename = "type")]
-    pub scenario_type: Option<String>,
-    pub minimum_value: Option<f64>,
-    pub maximum_value: Option<f64>,
-    pub achieve_date: Option<String>,
-    pub starting_balance: Option<f64>,
-    pub starting_balance_date: Option<String>,
-    pub closing_balance: Option<f64>,
-    pub closing_balance_date: Option<String>,
-    pub current_balance: Option<f64>,
-    pub current_balance_date: Option<String>,
-    pub current_balance_in_base_currency: Option<f64>,
-    pub current_balance_exchange_rate: Option<f64>,
-    pub safe_balance: Option<f64>,
-    pub safe_balance_in_base_currency: Option<f64>,
-    pub interest_rate: Option<f64>,
-    pub interest_rate_repeat_id: Option<i64>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -267,59 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_account_with_type_rename() {
-        let json = r#"{
-            "id": 100,
-            "title": "Savings",
-            "currency_code": "NZD",
-            "type": "bank",
-            "is_net_worth": true,
-            "current_balance": 1234.56,
-            "current_balance_in_base_currency": 1234.56,
-            "created_at": "2020-01-01T00:00:00Z",
-            "updated_at": "2024-01-01T00:00:00Z"
-        }"#;
-
-        let account: Account = serde_json::from_str(json).unwrap();
-        assert_eq!(account.id, 100);
-        assert_eq!(account.title.as_deref(), Some("Savings"));
-        assert_eq!(account.account_type.as_deref(), Some("bank"));
-        assert_eq!(account.is_net_worth, Some(true));
-        assert_eq!(account.current_balance, Some(1234.56));
-    }
-
-    #[test]
-    fn test_deserialize_account_with_nested_transaction_accounts() {
-        let json = r#"{
-            "id": 100,
-            "title": "Main Account",
-            "type": "bank",
-            "transaction_accounts": [
-                {
-                    "id": 200,
-                    "name": "Checking",
-                    "type": "bank",
-                    "current_balance": 500.0
-                },
-                {
-                    "id": 201,
-                    "name": "Savings",
-                    "type": "bank",
-                    "current_balance": 1000.0
-                }
-            ]
-        }"#;
-
-        let account: Account = serde_json::from_str(json).unwrap();
-        let tas = account.transaction_accounts.unwrap();
-        assert_eq!(tas.len(), 2);
-        assert_eq!(tas[0].id, 200);
-        assert_eq!(tas[0].name.as_deref(), Some("Checking"));
-        assert_eq!(tas[1].id, 201);
-    }
-
-    #[test]
-    fn test_deserialize_transaction_account_with_institution() {
+    fn test_deserialize_transaction_account() {
         let json = r#"{
             "id": 300,
             "name": "Daily Account",
@@ -327,11 +218,6 @@ mod tests {
             "currency_code": "NZD",
             "type": "bank",
             "current_balance": 2500.00,
-            "institution": {
-                "id": 50,
-                "title": "ANZ Bank",
-                "currency_code": "NZD"
-            },
             "created_at": "2020-01-01T00:00:00Z",
             "updated_at": "2024-01-01T00:00:00Z"
         }"#;
@@ -339,9 +225,7 @@ mod tests {
         let ta: TransactionAccount = serde_json::from_str(json).unwrap();
         assert_eq!(ta.id, 300);
         assert_eq!(ta.number.as_deref(), Some("12-3456-7890123-00"));
-        let inst = ta.institution.unwrap();
-        assert_eq!(inst.id, 50);
-        assert_eq!(inst.title.as_deref(), Some("ANZ Bank"));
+        assert_eq!(ta.account_type.as_deref(), Some("bank"));
     }
 
     #[test]
@@ -438,23 +322,6 @@ mod tests {
         assert!(txn.transaction_type.is_none());
         assert!(txn.category.is_none());
         assert!(txn.labels.is_none());
-    }
-
-    #[test]
-    fn test_deserialize_scenario() {
-        let json = r#"{
-            "id": 5,
-            "title": "Main scenario",
-            "type": "no_budget",
-            "current_balance": 1500.0,
-            "safe_balance": 1200.0
-        }"#;
-
-        let scenario: Scenario = serde_json::from_str(json).unwrap();
-        assert_eq!(scenario.id, 5);
-        assert_eq!(scenario.title.as_deref(), Some("Main scenario"));
-        assert_eq!(scenario.scenario_type.as_deref(), Some("no_budget"));
-        assert_eq!(scenario.current_balance, Some(1500.0));
     }
 
     #[test]

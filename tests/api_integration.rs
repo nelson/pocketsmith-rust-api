@@ -33,16 +33,6 @@ fn test_get_user() {
 
 #[test]
 #[ignore]
-fn test_get_accounts() {
-    let client = make_client();
-    let user_id = get_user_id(&client);
-    let accounts = client.get_accounts(user_id).unwrap();
-    assert!(!accounts.is_empty(), "expected at least one account");
-    assert!(accounts[0].id > 0);
-}
-
-#[test]
-#[ignore]
 fn test_get_transaction_accounts() {
     let client = make_client();
     let user_id = get_user_id(&client);

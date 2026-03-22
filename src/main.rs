@@ -18,23 +18,15 @@ fn main() -> Result<()> {
     db::upsert_user(&conn, &user)?;
     let user_id = user.id;
 
-    // 2. Fetch accounts
-    println!("Fetching accounts...");
-    let accounts = client.get_accounts(user_id)?;
-    println!("  {} accounts", accounts.len());
-    for account in &accounts {
-        db::upsert_account(&conn, account)?;
-    }
-
-    // 3. Fetch transaction accounts
+    // 2. Fetch transaction accounts
     println!("Fetching transaction accounts...");
     let ta_list = client.get_transaction_accounts(user_id)?;
     println!("  {} transaction accounts", ta_list.len());
     for ta in &ta_list {
-        db::upsert_transaction_account(&conn, ta, None)?;
+        db::upsert_transaction_account(&conn, ta)?;
     }
 
-    // 4. Fetch categories
+    // 3. Fetch categories
     println!("Fetching categories...");
     let categories = client.get_categories(user_id)?;
     println!("  {} top-level categories", categories.len());
@@ -42,7 +34,7 @@ fn main() -> Result<()> {
         db::upsert_category(&conn, cat)?;
     }
 
-    // 5. Fetch all transactions (paginated)
+    // 4. Fetch all transactions (paginated)
     println!("Fetching transactions...");
     let transactions = client.get_all_transactions(user_id, &TransactionParams::default())?;
     println!("  {} total transactions", transactions.len());
@@ -56,7 +48,6 @@ fn main() -> Result<()> {
 
     println!("Sync complete!");
     println!("  Users: 1");
-    println!("  Accounts: {}", accounts.len());
     println!("  Transaction accounts: {}", ta_list.len());
     println!("  Categories: {}", categories.len());
     println!("  Transactions: {}", transactions.len());
