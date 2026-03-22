@@ -14,7 +14,7 @@ pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
 
     // Upsert embedded transaction account
     if let Some(ref ta) = t.transaction_account {
-        upsert_transaction_account(conn, ta, None)?;
+        upsert_transaction_account(conn, ta)?;
     }
 
     let labels_json = t
@@ -166,8 +166,7 @@ mod tests {
     #[test]
     fn test_upsert_transaction_full_with_nested() {
         let conn = test_db();
-        let mut ta = make_transaction_account(300, "Daily");
-        ta.institution = Some(make_institution(50, "ANZ"));
+        let ta = make_transaction_account(300, "Daily");
 
         let mut txn = make_transaction(1, "Supermarket");
         txn.category = Some(make_category(10, "Food"));
@@ -176,11 +175,6 @@ mod tests {
         txn.note = Some("Weekly shop".into());
 
         upsert_transaction(&conn, &txn).unwrap();
-
-        let inst_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM institutions", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(inst_count, 1);
 
         let cat_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))

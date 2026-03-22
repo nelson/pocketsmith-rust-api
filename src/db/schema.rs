@@ -26,40 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at                  TEXT
 );
 
-CREATE TABLE IF NOT EXISTS institutions (
-    id              INTEGER PRIMARY KEY,
-    title           TEXT,
-    currency_code   TEXT,
-    created_at      TEXT,
-    updated_at      TEXT
-);
-
-CREATE TABLE IF NOT EXISTS scenarios (
-    id                                  INTEGER PRIMARY KEY,
-    title                               TEXT,
-    scenario_type                       TEXT,
-    minimum_value                       REAL,
-    maximum_value                       REAL,
-    achieve_date                        TEXT,
-    starting_balance                    REAL,
-    starting_balance_date               TEXT,
-    closing_balance                     REAL,
-    closing_balance_date                TEXT,
-    current_balance                     REAL,
-    current_balance_date                TEXT,
-    current_balance_in_base_currency    REAL,
-    current_balance_exchange_rate       REAL,
-    safe_balance                        REAL,
-    safe_balance_in_base_currency       REAL,
-    interest_rate                       REAL,
-    interest_rate_repeat_id             INTEGER,
-    created_at                          TEXT,
-    updated_at                          TEXT
-);
-
 CREATE TABLE IF NOT EXISTS transaction_accounts (
     id                                  INTEGER PRIMARY KEY,
-    account_id                          INTEGER,
     name                                TEXT,
     number                              TEXT,
     currency_code                       TEXT,
@@ -72,30 +40,8 @@ CREATE TABLE IF NOT EXISTS transaction_accounts (
     safe_balance_in_base_currency       REAL,
     starting_balance                    REAL,
     starting_balance_date               TEXT,
-    institution_id                      INTEGER,
     created_at                          TEXT,
-    updated_at                          TEXT,
-    FOREIGN KEY (institution_id) REFERENCES institutions(id)
-);
-
-CREATE TABLE IF NOT EXISTS accounts (
-    id                                  INTEGER PRIMARY KEY,
-    title                               TEXT,
-    currency_code                       TEXT,
-    account_type                        TEXT,
-    is_net_worth                        INTEGER,
-    primary_transaction_account_id      INTEGER,
-    primary_scenario_id                 INTEGER,
-    current_balance                     REAL,
-    current_balance_date                TEXT,
-    current_balance_in_base_currency    REAL,
-    current_balance_exchange_rate       REAL,
-    safe_balance                        REAL,
-    safe_balance_in_base_currency       REAL,
-    created_at                          TEXT,
-    updated_at                          TEXT,
-    FOREIGN KEY (primary_transaction_account_id) REFERENCES transaction_accounts(id),
-    FOREIGN KEY (primary_scenario_id) REFERENCES scenarios(id)
+    updated_at                          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS categories (
