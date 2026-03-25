@@ -1,0 +1,173 @@
+# Stage 2: Type classification rules
+# Applied to the ORIGINAL payee (before stage 1 stripping) for reliable pattern matching.
+# First match wins.
+
+classification_rules:
+  # Salary patterns
+  - pattern: "(?i)^Salary [Ff]rom "
+    type: salary
+    extract: "employer"
+    extract_pattern: "(?i)^Salary [Ff]rom (.+?)(?:\\s*-\\s*.+)?$"
+
+  - pattern: "(?i)^PAY/SALARY FROM "
+    type: salary
+    extract: "employer"
+    extract_pattern: "(?i)^PAY/SALARY FROM (.+?)(?:\\s+SALARY)?$"
+
+  - pattern: "(?i)^Employer Contribution From "
+    type: salary
+    extract: "employer"
+    extract_pattern: "(?i)^Employer Contribution From (.+)$"
+
+  - pattern: "^Salary AFES"
+    type: salary
+    extract: "employer"
+    extract_pattern: "^Salary (AFES).*$"
+
+  # Osko payments (person-to-person, classify as transfer)
+  - pattern: "- Osko Payment - Receipt"
+    type: transfer_in
+    extract: "person"
+    extract_pattern: "^(.+?)\\s+\\S+\\s*-\\s*Osko Payment.*$"
+
+  - pattern: "- Osko Payment to"
+    type: transfer_out
+    extract: "person"
+    extract_pattern: "^(.+?)\\s*-\\s*Osko Payment to.*$"
+
+  # Incoming transfers
+  - pattern: "(?i)^Fast Transfer From "
+    type: transfer_in
+    extract: "person"
+    extract_pattern: "(?i)^Fast Transfer From ([^,]+)"
+
+  - pattern: "(?i)^From "
+    type: transfer_in
+    extract: "entity"
+    extract_pattern: "(?i)^From (.+?)(?:\\s*-\\s*.+)?$"
+
+  - pattern: "(?i)^TRANSFER FROM "
+    type: transfer_in
+    extract: "entity"
+    extract_pattern: "(?i)^TRANSFER FROM (.+?)(?:\\s+/.+)?$"
+
+  - pattern: "(?i)^Transfer From "
+    type: transfer_in
+    extract: "entity"
+    extract_pattern: "(?i)^Transfer From (.+?)(?:\\s+.+)?$"
+
+  - pattern: "^ANZ MOBILE BANKING PAYMENT \\d+ TO "
+    type: transfer_in
+    extract: "person"
+    extract_pattern: "^ANZ MOBILE BANKING PAYMENT \\d+ TO (.+)$"
+
+  # Outgoing transfers
+  - pattern: "(?i)^Transfer To "
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)^Transfer To (.+?)(?:\\s+CommBank|\\s*,).*$"
+
+  - pattern: "(?i)^To "
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)^To (.+?)(?:\\s*-\\s*.+)?$"
+
+  - pattern: "(?i)^Fast Transfer To "
+    type: transfer_out
+    extract: "person"
+    extract_pattern: "(?i)^Fast Transfer To ([^,]+)"
+
+  - pattern: "(?i)^Mortgage\\s*-?\\s*Transfer"
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)Transfer to (.+?)(?:\\s*-\\s*Receipt).*$"
+
+  - pattern: "(?i)^Amex - Transfer"
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)Transfer to (.+?)(?:\\s*-\\s*Receipt).*$"
+
+  - pattern: "(?i)^Transfer\\s*-?\\s*Transfer to"
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)Transfer to (.+?)(?:\\s*-\\s*Receipt).*$"
+
+  - pattern: "(?i)^Transfer to "
+    type: transfer_out
+    extract: "entity"
+    extract_pattern: "(?i)^Transfer to (.+?)(?:\\s*-\\s*Receipt).*$"
+
+  # Banking operations (including CBA "Cafes -" prefixed variants)
+  - pattern: "^Cafes - Direct Credit "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "Cafes - Direct Credit (?:Pension )?(?:XX)?\\d+ (.+?)(?:[\\s,].*)?$"
+
+  - pattern: "^Cafes - Direct Debit "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "Cafes - Direct Debit (?:XX)?\\d+ (.+?)(?:[\\s,].*)?$"
+
+  - pattern: "^Cafes - AFES"
+    type: banking_operation
+
+  - pattern: "^Return \\d{2}/\\d{2}/\\d{2},?\\s*Direct"
+    type: banking_operation
+
+  - pattern: "^Reversal,.*Transfer To"
+    type: banking_operation
+
+  - pattern: "^Direct Credit "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "^Direct Credit (?:Pension )?\\d+ (.+?)(?:[\\s,].*)?$"
+
+  - pattern: "^Direct Debit "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "^Direct Debit \\d+ (.+?)(?:[\\s,].*)?$"
+
+  - pattern: "(?i)^Wdl ATM"
+    type: banking_operation
+
+  - pattern: "(?i)^CASH DEPOSIT"
+    type: banking_operation
+
+  - pattern: "(?i)^Credit Card$"
+    type: banking_operation
+
+  - pattern: "(?i)^Funds transfer$"
+    type: banking_operation
+
+  - pattern: "(?i)^ACCOUNT SERVICING FEE$"
+    type: banking_operation
+
+  - pattern: "(?i)^GOVERNMENT SEARCH FEE$"
+    type: banking_operation
+
+  - pattern: "(?i)^ONLINE PAYMENT"
+    type: banking_operation
+
+  - pattern: "(?i)^PAYMENT FROM "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "(?i)^PAYMENT FROM (.+)$"
+
+  - pattern: "(?i)^PAYMENT TO "
+    type: banking_operation
+    extract: "entity"
+    extract_pattern: "(?i)^PAYMENT TO (.+)$"
+
+  - pattern: "(?i)^from account"
+    type: banking_operation
+
+  - pattern: "(?i)^to account"
+    type: banking_operation
+
+  - pattern: "(?i)^Reversal,"
+    type: banking_operation
+
+  - pattern: "(?i)^Return \\d{2}/\\d{2}/\\d{2}"
+    type: banking_operation
+
+  # Everything else defaults to merchant (handled in code)

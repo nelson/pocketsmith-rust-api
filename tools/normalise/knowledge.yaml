@@ -1,0 +1,54 @@
+version: 1
+
+merchants:
+  Amazon Marketplace:
+    category: Shopping
+    aliases: [AMAZON AU, AMAZON MKTPL, AMAZON MARKETPLACE, AMAZON RETA]
+  Amazon Prime Video:
+    category: Entertainment/Streaming
+    aliases: [AMAZON PRIME VIDEO]
+  Amazon.com:
+    category: Shopping
+    aliases: [AMAZON.COM]
+  Apple Store:
+    category: Electronics
+    aliases: [APPLE STORE]
+    locations: [Sydney, Broadway, Cupertino]
+  Apple.com:
+    category: Digital Services
+    aliases: [APPLE.COM/BILL, APPLE.COM/AU, APPLE.COM/HK, APPLE.COM/US]
+  7-Eleven:
+    category: Convenience Store
+  Aldi:
+    category: Supermarket
+  Coles:
+    category: Supermarket
+  Woolworths:
+    category: Supermarket
+  AFES Kingsford:
+    category: Non-profit/Donation
+    note: Card charges at AFES Kingsford office
+  Gong Cha:
+    category: Bubble Tea
+  SchoolsOnline:
+    category: Education
+    note: School payments platform
+
+persons:
+  Nelson Tam:
+    aliases: [LOK SUN NELSON TAM, NELSON TAM, Lok Sun Nelson Tam, Lok Sun Nelson T]
+    relationship: self
+  Sophia Tam:
+    aliases: [SOPHIA S TAM, Sophia S Tam, Sophia Tam]
+    relationship: spouse
+
+employers:
+  Apple:
+    employee: Nelson
+    patterns: [APPLE PTY LTD, Apple Pty Ltd, Apple Computers, Apple Computer Australia]
+    canonical_payee: "Apple (Salary)"
+  AFES:
+    employee: Sophia
+    patterns: [AFES]
+    canonical_payee: "AFES (Sophia Salary)"
+    note: "From AFES with numeric refs = salary. Direct Debit AFES = donation."

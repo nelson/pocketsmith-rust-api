@@ -1,0 +1,71 @@
+# Stage 5: Final cleanup rules
+
+# Words/acronyms to keep uppercase in title case
+uppercase_exceptions:
+  - ATM
+  - NSW
+  - AUS
+  - AU
+  - UTS
+  - KFC
+  - CBD
+  - QVB
+  - BWS
+  - BHP
+  - ANZ
+  - CBA
+  - NAB
+  - NDIS
+  - HCF
+  - BUPA
+  - AFES
+  - AMEB
+  - ALDI
+  - IKEA
+  - MYER
+  - ZARA
+  - ASOS
+  - LEGO
+  - UFC
+  - ATO
+  - ABN
+  - ACN
+  - PTY
+  - LTD
+  - USA
+  - UK
+  - NZ
+  - JP
+  - ID
+  - SG
+  - PS
+  - TFNSW
+  - UBER
+  - PEXA
+
+# Words to keep lowercase in title case
+lowercase_exceptions:
+  - the
+  - and
+  - of
+  - in
+  - at
+  - for
+  - to
+  - by
+  - "on"
+  - "or"
+  - "a"
+  - "an"
+  - pty
+  - ltd
+
+# Trailing patterns to remove in final cleanup
+trailing_noise:
+  - pattern: "\\s+NS$"
+  - pattern: "\\s+AU$"
+  - pattern: "\\s+AUS$"
+  - pattern: "\\s+NSWAU$"
+  - pattern: "\\s+XX\\d+$"
+  - pattern: "\\s+X\\d+$"
+  - pattern: "\\s+\\d{6}$"

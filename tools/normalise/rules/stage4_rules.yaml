@@ -1,0 +1,318 @@
+# Stage 4: Identity-based normalisation rules
+# Applied after type classification and truncation expansion.
+
+# Person name canonicalisation (maps known name variants to canonical form)
+persons:
+  "LOK SUN NELSON TAM": "Nelson Tam"
+  "LOK SUN NELSON T": "Nelson Tam"
+  "NELSON TAM": "Nelson Tam"
+  "Nelson Tam": "Nelson Tam"
+  "Lok Sun Nelson Tam": "Nelson Tam"
+  "Lok Sun Nelson T": "Nelson Tam"
+  "TAM LOK SUN NELSON": "Nelson Tam"
+  "Tam Lok Sun Nelson": "Nelson Tam"
+  "SOPHIA S TAM": "Sophia Tam"
+  "Sophia S Tam": "Sophia Tam"
+  "Sophia Tam": "Sophia Tam"
+  "Lok Sun Tam": "Nelson Tam"
+
+# Employer canonicalisation (for salary/transfer_in types)
+employers:
+  - patterns:
+      - "APPLE PTY LTD"
+      - "Apple Pty Ltd"
+      - "APPLE COMPUTERS"
+      - "Apple Computers"
+      - "Apple Computer Australia Pty Ltd"
+    canonical: "Apple (Salary)"
+
+  - patterns:
+      - "AFES"
+      - "Afes"
+      - "AUSTRALIAN FELLO"
+    canonical: "AFES (Sophia Salary)"
+
+# Banking operations that map to specific entities
+banking_identity_mappings:
+  # AFES direct debits = donations, not salary
+  - pattern: "Direct Debit \\d+ (?:AUSTRALIAN FELLO|AFES)"
+    canonical: "AFES (Donation)"
+  - pattern: "Direct Debit XX\\d+ AFES"
+    canonical: "AFES (Donation)"
+  # To AFES = donation/transfer
+  - pattern: "^To AFES"
+    canonical: "AFES (Donation)"
+  - pattern: "^Transfer To AFES"
+    canonical: "AFES (Donation)"
+  # Return on AFES direct debit
+  - pattern: "Return.*Direct Debit \\d+ AFES"
+    canonical: "AFES (Donation Return)"
+  # Direct Credit AFES = Sophia salary
+  - pattern: "Direct Credit \\d+ AFES"
+    canonical: "AFES (Sophia Salary)"
+  - pattern: "Direct Credit XX\\d+ AFES"
+    canonical: "AFES (Sophia Salary)"
+  # Medicare
+  - pattern: "Direct Credit \\d+ MCARE BENEFITS"
+    canonical: "Medicare Benefits"
+  - pattern: "Direct Credit XX\\d+ MCARE BENEFITS"
+    canonical: "Medicare Benefits"
+  # ATO
+  - pattern: "Direct Credit \\d+ ATO"
+    canonical: "ATO"
+  # CommInsure
+  - pattern: "Direct Debit \\d+ CommInsure"
+    canonical: "CommInsure"
+  # Centrelink / child support / pension
+  - pattern: "Direct Credit (?:Pension )?\\d+ CHILDASSISTPYMT"
+    canonical: "Child Assist Payment"
+  - pattern: "Direct Credit Pension \\d+"
+    canonical: "Centrelink Pension"
+  - pattern: "Direct Credit (?:Pension )?XX\\d+ CHILDASSISTPYMT"
+    canonical: "Child Assist Payment"
+  - pattern: "Direct Credit (?:Pension )?XX\\d+"
+    canonical: "Centrelink Pension"
+  - pattern: "Direct Credit \\d+ ECONOMIC SUPPORT"
+    canonical: "Economic Support Payment"
+  - pattern: "Direct Credit XX\\d+ COST OF LIVING"
+    canonical: "Cost of Living Payment"
+  # NDIS
+  - pattern: "Direct Credit \\d+ NDIS NSW"
+    canonical: "NDIS Payment"
+  - pattern: "Direct Credit XX\\d+ NDIS NSW"
+    canonical: "NDIS Payment"
+  # HCF
+  - pattern: "Direct Credit \\d+ HCF"
+    canonical: "HCF Health"
+  - pattern: "Direct Credit XX\\d+ HCF"
+    canonical: "HCF Health"
+  # BUPA
+  - pattern: "Direct Credit \\d+ BUPA"
+    canonical: "BUPA"
+  - pattern: "Direct Credit XX\\d+ BUPA"
+    canonical: "BUPA"
+  # American Express payment
+  - pattern: "Direct Debit \\d+ AMERICAN EXPRESS"
+    canonical: "American Express Payment"
+
+# Merchant identity mappings (regex pattern -> canonical form)
+# {location} is a placeholder replaced with the extracted location
+merchant_mappings:
+  # Amazon variants
+  - pattern: "^AMAZON MKTPL\\*.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON MKTPLC.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON MARKETPLACE.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON AU.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON RETA\\*.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON\\.COM\\*.*"
+    canonical: "Amazon.com"
+  - pattern: "^AMAZON PRIME VIDEO.*"
+    canonical: "Amazon Prime Video"
+
+  # Apple variants (non-salary)
+  - pattern: "^APPLE STORE R\\d+ R\\d+ (.+)"
+    canonical: "Apple Store {1}"
+  - pattern: "^APPLE\\.COM/BILL.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/AU.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/HK.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/US.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE CAFFE (.+)"
+    canonical: "Apple Cafe {1}"
+  - pattern: "^APPLE ESPR BAR (.+)"
+    canonical: "Apple Espresso Bar {1}"
+  - pattern: "^APPLE PARK (.+)"
+    canonical: "Apple Park {1}"
+  - pattern: "^APPLE FITNESS.*"
+    canonical: "Apple Fitness Center"
+
+  # AFES (non-salary: spending/donation)
+  - pattern: "^AFES KINGSFORD.*"
+    canonical: "AFES Kingsford"
+  - pattern: "^AFES OFFICE.*"
+    canonical: "AFES Office Kingsford"
+
+  # 7-Eleven: strip store ID, keep location
+  - pattern: "^7-ELEVEN \\d+ (.+)"
+    canonical: "7-Eleven {1}"
+  - pattern: "^7-ELEVEN XXXXX.*"
+    canonical: "7-Eleven"
+  - pattern: "^7-Eleven$"
+    canonical: "7-Eleven"
+
+  # Chain stores: strip codes, keep location
+  - pattern: "^ALDI STORES - (.+)"
+    canonical: "Aldi {1}"
+
+  - pattern: "^COLES \\d+ (.+)"
+    canonical: "Coles {1}"
+  - pattern: "^COLES EXPRESS \\d+ (.+)"
+    canonical: "Coles Express {1}"
+
+  - pattern: "^BWS \\d+ (.+)"
+    canonical: "BWS {1}"
+
+  - pattern: "^WW METRO \\d+ (.+)"
+    canonical: "Woolworths Metro {1}"
+
+  - pattern: "^WOOLWORTHS \\d+ (.+)"
+    canonical: "Woolworths {1}"
+
+  # KFC: strip prefix store numbers
+  - pattern: "^\\d+_[A-Z_]+_KFC (.+)"
+    canonical: "KFC {1}"
+  - pattern: "^\\d+_KFC (.+)"
+    canonical: "KFC {1}"
+
+  # Schools
+  - pattern: "^0SCHOOLSONLINE \\d+ (.+)"
+    canonical: "SchoolsOnline {1}"
+  - pattern: "^0STRATHFLD S PS \\d+ (.+)"
+    canonical: "Strathfield South PS {1}"
+  - pattern: "^0SUMMER HILL PS \\d+ (.+)"
+    canonical: "Summer Hill PS {1}"
+
+  # Gong Cha: keep location
+  - pattern: "^GONG CHA STRATHFIELD.*"
+    canonical: "Gong Cha Strathfield"
+  - pattern: "^GONG CHA AUSTRALIA.*"
+    canonical: "Gong Cha"
+  - pattern: "^GONG CHA AND HOTSTAR.*"
+    canonical: "Gong Cha Burwood"
+
+  # ATM withdrawals: extract location
+  - pattern: "^CBA ATM (.+?) NSW \\d+"
+    canonical: "ATM {1}"
+  - pattern: "^Wdl ATM CBA ATM (.+?) NSW \\d+"
+    canonical: "ATM {1}"
+
+  # Transport NSW
+  - pattern: "^\\d+ TFNSW.*"
+    canonical: "Transport NSW"
+
+  # Airbnb: strip booking codes
+  - pattern: "^AIRBNB \\* [A-Z0-9]+ (.+)"
+    canonical: "Airbnb {1}"
+  - pattern: "^AIRBNB PAYMENTS.*"
+    canonical: "Airbnb"
+
+  # Grab: strip trip codes
+  - pattern: "^GRAB\\.COM \\*[A-Z0-9-]+ (.+)"
+    canonical: "Grab {1}"
+
+  # eBay: strip order codes
+  - pattern: "^eBay O\\*[\\dX-]+ (.+)"
+    canonical: "eBay {1}"
+  - pattern: "^eBay Commerce.*"
+    canonical: "eBay"
+  - pattern: "^eBay$"
+    canonical: "eBay"
+
+  # Google
+  - pattern: "^GOOGLE\\*YOUTUBE.*"
+    canonical: "YouTube Premium"
+
+  # Adairs: normalise variants
+  - pattern: "^ADAIRS RETAILS GROUP.*"
+    canonical: "Adairs Online"
+  - pattern: "^ADAIRS ONLINE.*"
+    canonical: "Adairs Online"
+  - pattern: "^ADAIRS (.+)"
+    canonical: "Adairs {1}"
+
+# Patterns to strip from merchant names
+strip_patterns:
+  # PTY LTD variants
+  - pattern: "\\s+PTY\\.?\\s*LTD?\\.?\\s*$"
+    name: "PTY LTD suffix"
+  - pattern: "\\s+PTY\\.?\\s*$"
+    name: "PTY suffix"
+  - pattern: "\\s+P/L\\s*$"
+    name: "P/L suffix"
+  - pattern: "\\s+Pty\\.?\\s*Ltd?\\.?\\s*$"
+    name: "Pty Ltd suffix"
+  - pattern: "\\s+pty\\.?\\s*ltd?\\.?\\s*$"
+    name: "pty ltd suffix"
+
+# For transfers: extract the person/entity name
+transfer_entity_extraction:
+  # Fast Transfer From PERSON, to PayID Phone, MEMO
+  - pattern: "^Fast Transfer From (.+?),\\s*to PayID.*$"
+    group: 1
+  # Fast Transfer From PERSON, MEMO, MEMO
+  - pattern: "^Fast Transfer From (.+?),\\s*(.+)$"
+    group: 1
+  # From ENTITY - REFERENCE
+  - pattern: "^From (.+?)\\s*-\\s*.*$"
+    group: 1
+  # From Account
+  - pattern: "^From Account (.+)$"
+    group: 1
+  # Transfer To ENTITY CommBank App MEMO
+  - pattern: "^Transfer To (.+?)\\s+CommBank App.*$"
+    group: 1
+  # Transfer To ENTITY, CommBank App MEMO
+  - pattern: "^Transfer To (.+?),\\s*CommBank App.*$"
+    group: 1
+  # Transfer To ENTITY, PayID ... from CommBank App, MEMO
+  - pattern: "^Transfer To (.+?),\\s*PayID.*$"
+    group: 1
+  # To ENTITY - MEMO
+  - pattern: "^To (.+?)\\s*-\\s*.*$"
+    group: 1
+  # Transfer to PERSON - Receipt NNN To NUMBERS
+  - pattern: "^Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # Mortgage - Transfer to PERSON - Receipt
+  - pattern: "^Mortgage.*Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # Amex - Transfer to PERSON
+  - pattern: "^Amex.*Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # TRANSFER FROM ENTITY REF
+  - pattern: "^TRANSFER FROM (.+?)\\s+/REF/.*$"
+    group: 1
+  # Transfer From PERSON MEMO
+  - pattern: "^Transfer From (.+?)\\s+(.+)$"
+    group: 1
+  # Transfer from PERSON NetBank MEMO
+  - pattern: "^Transfer from (.+?)\\s+NetBank.*$"
+    group: 1
+  # ANZ MOBILE BANKING PAYMENT NNN TO Person
+  - pattern: "^ANZ MOBILE BANKING PAYMENT \\d+ TO (.+)$"
+    group: 1
+  # PERSON Name - Osko Payment to (outgoing, capture name before " - Osko")
+  - pattern: "^(.+?)\\s*-\\s*Osko Payment to\\s.*$"
+    group: 1
+  # PERSON Name [MEMO] - Osko Payment - Receipt (incoming)
+  # Person names are typically ALL CAPS or Title Case; memo follows
+  - pattern: "^((?:[A-Z][A-Z ]+[A-Z])|(?:[A-Z][a-z]+(?: [A-Z][a-z]+)*))\\s+.+?\\s*-\\s*Osko Payment\\s*-\\s*Receipt.*$"
+    group: 1
+  # PERSON Name - Osko Payment - Receipt (incoming, no memo)
+  - pattern: "^(.+?)\\s+-\\s*Osko Payment\\s*-\\s*Receipt.*$"
+    group: 1
+
+# For banking operations: extract the entity name
+banking_entity_extraction:
+  # Direct Credit NNNNNN ENTITY, REFERENCE
+  - pattern: "^Direct Credit (?:Pension )?(?:XX)?\\d+ (.+?)(?:[\\s,]\\s*(?:\\d|[A-Z]{3,}|\\w+\\d).*)$"
+    group: 1
+  # Direct Debit NNNNNN ENTITY, REFERENCE
+  - pattern: "^Direct Debit (?:XX)?\\d+ (.+?)(?:[\\s,]\\s*(?:\\d|[A-Z]{3,}).*)$"
+    group: 1
+  # Wdl ATM CBA ATM LOCATION
+  - pattern: "^Wdl ATM CBA ATM (.+?)\\s+NSW.*$"
+    group: 1
+    prefix: "ATM"
+  # CASH DEPOSIT, CBA ATM LOCATION
+  - pattern: "^CASH DEPOSIT,\\s*CBA ATM (.+?)\\s+NSW.*$"
+    group: 1
+    prefix: "ATM Deposit"

@@ -1,0 +1,135 @@
+# Hard disambiguation test cases.
+# Each test case asserts that two groups of payees must normalise to DIFFERENT values.
+# S_disambig = 100 means all test cases pass.
+
+test_cases:
+  - name: "Apple salary vs Apple Store"
+    group_a:
+      label: "Apple (Salary)"
+      patterns:
+        - "From APPLE PTY LTD"
+        - "From Apple Pty Ltd"
+        - "TRANSFER FROM APPLE PTY LTD"
+    group_b:
+      label: "Apple Store"
+      patterns:
+        - "APPLE STORE R238"
+        - "APPLE STORE R523"
+
+  - name: "Apple salary vs Apple.com subscriptions"
+    group_a:
+      label: "Apple (Salary)"
+      patterns:
+        - "From APPLE PTY LTD"
+    group_b:
+      label: "Apple.com"
+      patterns:
+        - "APPLE.COM/BILL SYDNEY"
+
+  - name: "Apple salary vs Apple Campus cafes"
+    group_a:
+      label: "Apple (Salary)"
+      patterns:
+        - "From APPLE PTY LTD"
+    group_b:
+      label: "Apple Campus"
+      patterns:
+        - "APPLE CAFFE"
+        - "APPLE ESPR BAR"
+        - "APPLE PARK CAFFE"
+
+  - name: "Apple salary vs Apple Computers salary"
+    group_a:
+      label: "Apple (Salary - transfer)"
+      patterns:
+        - "From APPLE PTY LTD"
+    group_b:
+      label: "Apple (Salary - payslip)"
+      patterns:
+        - "Salary from Apple Computers"
+        - "PAY/SALARY FROM APPLE COMPUTERS"
+    must_match: true  # These SHOULD normalise to the same value
+
+  - name: "AFES salary vs AFES Kingsford spending"
+    group_a:
+      label: "AFES (Sophia Salary)"
+      patterns:
+        - "From AFES - 43640421585"
+        - "From AFES - 56097436209"
+        - "Salary from AFES"
+    group_b:
+      label: "AFES Kingsford"
+      patterns:
+        - "AFES KINGSFORD"
+        - "AFES OFFICE Kingsford"
+
+  - name: "AFES salary vs AFES donation"
+    group_a:
+      label: "AFES (Sophia Salary)"
+      patterns:
+        - "From AFES - 43640421585"
+    group_b:
+      label: "AFES (Donation)"
+      patterns:
+        - "Direct Debit 065593 AUSTRALIAN FELLO"
+        - "Direct Debit 065593 AFES"
+        - "To AFES - WT00040391"
+
+  - name: "Amazon Marketplace vs Prime Video"
+    group_a:
+      label: "Amazon Marketplace"
+      patterns:
+        - "AMAZON MKTPL*LY3JK3I03 AMZN.COM/BILL"
+        - "AMAZON MARKETPLACE AU SYDNEY"
+        - "AMAZON AU SYDNEY"
+    group_b:
+      label: "Amazon Prime Video"
+      patterns:
+        - "AMAZON PRIME VIDEO AU"
+
+  - name: "Woolworths Strathfield vs Woolworths Burwood"
+    group_a:
+      label: "Woolworths Strathfield"
+      patterns:
+        - "WOOLWORTHS.*STRATHFIELD"
+    group_b:
+      label: "Woolworths Burwood"
+      patterns:
+        - "WOOLWORTHS.*BURWOOD"
+
+  - name: "Nelson Tam identity consolidation (Osko)"
+    group_a:
+      label: "Nelson Tam (Osko in)"
+      patterns:
+        - "^LOK SUN NELSON TAM \\w+ - Osko Payment"
+    group_b:
+      label: "Nelson Tam (Osko out)"
+      patterns:
+        - "^Lok Sun Nelson Tam - Osko Payment to"
+    must_match: true  # Both should normalise to "Nelson Tam"
+
+  - name: "Nelson Tam identity consolidation (transfers)"
+    group_a:
+      label: "Nelson Tam (from)"
+      patterns:
+        - "^From LOK SUN NELSON TAM"
+        - "^From Lok Sun Nelson Tam"
+        - "^From LOK SUN NELSON T "
+        - "^From Lok Sun Nelson T "
+    group_b:
+      label: "Nelson Tam (to)"
+      patterns:
+        - "^To Nelson Tam"
+        - "^Transfer To Nelson Tam"
+        - "^Transfer To Lok Sun Tam"
+    must_match: true  # All should normalise to "Nelson Tam"
+
+  - name: "7-Eleven locations stay distinct"
+    group_a:
+      label: "7-Eleven Strathfield"
+      patterns:
+        - "7-ELEVEN 2281 STRATHFIELD"
+    group_b:
+      label: "7-Eleven Burwood"
+      patterns:
+        - "7-ELEVEN 2201 BURWOOD"

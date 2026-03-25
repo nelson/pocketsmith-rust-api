@@ -1,0 +1,502 @@
+[
+  {
+    "original": "RAMAN RAYS PTY LTD BURWOOD",
+    "final": "Raman Rays PTY LTD Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "RAMAN RAYS PTY LTD BURWOOD",
+      "s3": "RAMAN RAYS PTY LTD BURWOOD",
+      "s4": "RAMAN RAYS PTY LTD BURWOOD"
+    }
+  },
+  {
+    "original": "Fast Transfer From SAIDGANI MUSAEV, to PayID Phone, Lunch",
+    "final": "Saidgani Musaev",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Fast Transfer From SAIDGANI MUSAEV, to PayID Phone, Lunch",
+      "s3": "Fast Transfer From SAIDGANI MUSAEV, to PayID Phone, Lunch",
+      "s4": "SAIDGANI MUSAEV"
+    }
+  },
+  {
+    "original": "JIMMY`S CHICKEN BURWOOD NS AUS, Card xx1737, Value date: 21/12/2022",
+    "final": "Jimmy`S Chicken Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "JIMMY`S CHICKEN BURWOOD",
+      "s3": "JIMMY`S CHICKEN BURWOOD",
+      "s4": "JIMMY`S CHICKEN BURWOOD"
+    }
+  },
+  {
+    "original": "HEINEMANN - 8730 DEPART MASCOT",
+    "final": "Heinemann - 8730 Depart Mascot",
+    "type": "merchant",
+    "stages": {
+      "s1": "HEINEMANN - 8730 DEPART MASCOT",
+      "s3": "HEINEMANN - 8730 DEPART MASCOT",
+      "s4": "HEINEMANN - 8730 DEPART MASCOT"
+    }
+  },
+  {
+    "original": "Transfer To Lok Sun Tam CommBank App Transfer",
+    "final": "Nelson Tam",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer To Lok Sun Tam CommBank App Transfer",
+      "s3": "Transfer To Lok Sun Tam CommBank App Transfer",
+      "s4": "Nelson Tam"
+    }
+  },
+  {
+    "original": "U Bar North Ryde NS AUS Card xx3772 Value Date: 22/02/2022",
+    "final": "U Bar North Ryde",
+    "type": "merchant",
+    "stages": {
+      "s1": "U Bar North Ryde",
+      "s3": "U Bar North Ryde",
+      "s4": "U Bar North Ryde"
+    }
+  },
+  {
+    "original": "HANARO MART STRATHFIELD AUS, Card xx1737, Value date: 25/02/2023",
+    "final": "Hanaro Mart Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "HANARO MART STRATHFIELD",
+      "s3": "HANARO MART STRATHFIELD",
+      "s4": "HANARO MART STRATHFIELD"
+    }
+  },
+  {
+    "original": "SEPHORA AUSTRALIA - PAR PARRAMATTA",
+    "final": "Sephora Australia - Par Parramatta",
+    "type": "merchant",
+    "stages": {
+      "s1": "SEPHORA AUSTRALIA - PAR PARRAMATTA",
+      "s3": "SEPHORA AUSTRALIA - PAR PARRAMATTA",
+      "s4": "SEPHORA AUSTRALIA - PAR PARRAMATTA"
+    }
+  },
+  {
+    "original": "From AFES - 2 HILLCREST AVE",
+    "final": "AFES (Sophia Salary)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "From AFES - 2 HILLCREST AVE",
+      "s3": "From AFES - 2 HILLCREST AVE",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "NAYAXAU*INNOVATIVE RETA BOX HILL SOUTH",
+    "final": "Nayaxau*Innovative Retail Box Hill South",
+    "type": "merchant",
+    "stages": {
+      "s1": "NAYAXAU*INNOVATIVE RETA BOX HILL SOUTH",
+      "s3": "NAYAXAU*INNOVATIVE RETAIL BOX HILL SOUTH",
+      "s4": "NAYAXAU*INNOVATIVE RETAIL BOX HILL SOUTH"
+    }
+  },
+  {
+    "original": "PAYMENT TO AMERICAN EXPRESS 1000",
+    "final": "American Express 1000",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "PAYMENT TO AMERICAN EXPRESS 1000",
+      "s3": "PAYMENT TO AMERICAN EXPRESS 1000",
+      "s4": "AMERICAN EXPRESS 1000"
+    }
+  },
+  {
+    "original": "Transfer To Peng Xu, CommBank App Light",
+    "final": "Peng Xu",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer To Peng Xu, CommBank App Light",
+      "s3": "Transfer To Peng Xu, CommBank App Light",
+      "s4": "Peng Xu"
+    }
+  },
+  {
+    "original": "DAN MURPHYS 1233 STH ST STH STRATHFIELD",
+    "final": "Dan Murphys 1233 Sth St Sth Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "DAN MURPHYS 1233 STH ST STH STRATHFIELD",
+      "s3": "DAN MURPHYS 1233 STH ST STH STRATHFIELD",
+      "s4": "DAN MURPHYS 1233 STH ST STH STRATHFIELD"
+    }
+  },
+  {
+    "original": "ZLR*MONKEY HOUSE CAFE M STRATHFIELD",
+    "final": "Monkey House Cafe M Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "MONKEY HOUSE CAFE M STRATHFIELD",
+      "s3": "MONKEY HOUSE CAFE M STRATHFIELD",
+      "s4": "MONKEY HOUSE CAFE M STRATHFIELD"
+    }
+  },
+  {
+    "original": "LS KNIGHTS COFFEE AND HAYMARKET",
+    "final": "Ls Knights Coffee and Haymarket",
+    "type": "merchant",
+    "stages": {
+      "s1": "LS KNIGHTS COFFEE AND HAYMARKET",
+      "s3": "LS KNIGHTS COFFEE AND HAYMARKET",
+      "s4": "LS KNIGHTS COFFEE AND HAYMARKET"
+    }
+  },
+  {
+    "original": "HERITAGE COFFEE SUMM SUMMER HILL NS AUS Card xx0008 Value Date: 04/11/2021",
+    "final": "Heritage Coffee Summ Summer Hill",
+    "type": "merchant",
+    "stages": {
+      "s1": "HERITAGE COFFEE SUMM SUMMER HILL",
+      "s3": "HERITAGE COFFEE SUMM SUMMER HILL",
+      "s4": "HERITAGE COFFEE SUMM SUMMER HILL"
+    }
+  },
+  {
+    "original": "Transfer To J YANG, PayID Phone from CommBank App, Massage",
+    "final": "J YANG, PayID Phone from",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer To J YANG, PayID Phone from CommBank App, Massage",
+      "s3": "Transfer To J YANG, PayID Phone from CommBank App, Massage",
+      "s4": "J YANG, PayID Phone from"
+    }
+  },
+  {
+    "original": "KIM SUN YOUNG HAIR PTY SYDNEY",
+    "final": "Kim Sun Young Hair PTY Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "KIM SUN YOUNG HAIR PTY SYDNEY",
+      "s3": "KIM SUN YOUNG HAIR PTY SYDNEY",
+      "s4": "KIM SUN YOUNG HAIR PTY SYDNEY"
+    }
+  },
+  {
+    "original": "AXES ICECREAMS PTY L LANSVALE NS AUS, Card xx0993, Value date: 23/12/2024",
+    "final": "Axes Icecreams PTY L Lansvale",
+    "type": "merchant",
+    "stages": {
+      "s1": "AXES ICECREAMS PTY L LANSVALE",
+      "s3": "AXES ICECREAMS PTY L LANSVALE",
+      "s4": "AXES ICECREAMS PTY L LANSVALE"
+    }
+  },
+  {
+    "original": "PHEONIX BEAUTY EASTWOOD NS AUS Tap and Pay xx9084 Value Date: 25/11/2020",
+    "final": "Pheonix Beauty Eastwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "PHEONIX BEAUTY EASTWOOD",
+      "s3": "PHEONIX BEAUTY EASTWOOD",
+      "s4": "PHEONIX BEAUTY EASTWOOD"
+    }
+  },
+  {
+    "original": "POINTPARKING-BURWOODPLA BURWOOD",
+    "final": "Pointparking-Burwoodpla Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "POINTPARKING-BURWOODPLA BURWOOD",
+      "s3": "POINTPARKING-BURWOODPLA BURWOOD",
+      "s4": "POINTPARKING-BURWOODPLA BURWOOD"
+    }
+  },
+  {
+    "original": "O'UCHI SYDNEY",
+    "final": "O'Uchi Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "O'UCHI SYDNEY",
+      "s3": "O'UCHI SYDNEY",
+      "s4": "O'UCHI SYDNEY"
+    }
+  },
+  {
+    "original": "LS W BURWOOD NSW PTY BURWOOD",
+    "final": "Ls W Burwood NSW PTY Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "LS W BURWOOD NSW PTY BURWOOD",
+      "s3": "LS W BURWOOD NSW PTY BURWOOD",
+      "s4": "LS W BURWOOD NSW PTY BURWOOD"
+    }
+  },
+  {
+    "original": "PARKNPAY NSW*BURWOOD ST LEONARDS",
+    "final": "Parknpay Nsw*Burwood St Leonards",
+    "type": "merchant",
+    "stages": {
+      "s1": "PARKNPAY NSW*BURWOOD ST LEONARDS",
+      "s3": "PARKNPAY NSW*BURWOOD ST LEONARDS",
+      "s4": "PARKNPAY NSW*BURWOOD ST LEONARDS"
+    }
+  },
+  {
+    "original": "Salary from Apple Computers - SALARY",
+    "final": "Apple (Salary)",
+    "type": "salary",
+    "stages": {
+      "s1": "Salary from Apple Computers - SALARY",
+      "s3": "Salary from Apple Computers - SALARY",
+      "s4": "Apple (Salary)"
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Tam S & Tam L N",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s3": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s4": "Tam S S & Tam L N"
+    }
+  },
+  {
+    "original": "From JOHNNY TAM - Beijing Xi\u2019an trip Expenses Part 1",
+    "final": "Johnny Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "From JOHNNY TAM - Beijing Xi\u2019an trip Expenses Part 1",
+      "s3": "From JOHNNY TAM - Beijing Xi\u2019an trip Expenses Part 1",
+      "s4": "JOHNNY TAM"
+    }
+  },
+  {
+    "original": "STRATHFIELD KIOSK HURSTVILLE NS AUS Tap and Pay xx9084 Value Date: 04/05/2021",
+    "final": "Strathfield Kiosk Hurstville",
+    "type": "merchant",
+    "stages": {
+      "s1": "STRATHFIELD KIOSK HURSTVILLE",
+      "s3": "STRATHFIELD KIOSK HURSTVILLE",
+      "s4": "STRATHFIELD KIOSK HURSTVILLE"
+    }
+  },
+  {
+    "original": "COMPASSION AUSTRALIA WARABROOK NS AUS Card xx1737 Value Date: 22/05/2021",
+    "final": "Compassion Australia Warabrook",
+    "type": "merchant",
+    "stages": {
+      "s1": "COMPASSION AUSTRALIA WARABROOK",
+      "s3": "COMPASSION AUSTRALIA WARABROOK",
+      "s4": "COMPASSION AUSTRALIA WARABROOK"
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Tam S & Tam L N",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s3": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s4": "Tam S S & Tam L N"
+    }
+  },
+  {
+    "original": "COSTIS FISH AND CHIPS 1 SYDNEY",
+    "final": "Costis Fish and Chips 1 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "COSTIS FISH AND CHIPS 1 SYDNEY",
+      "s3": "COSTIS FISH AND CHIPS 1 SYDNEY",
+      "s4": "COSTIS FISH AND CHIPS 1 SYDNEY"
+    }
+  },
+  {
+    "original": "Nintendo - paypal_nal@nintendo.co.jp",
+    "final": "Nintendo",
+    "type": "merchant",
+    "stages": {
+      "s1": "Nintendo",
+      "s3": "Nintendo",
+      "s4": "Nintendo"
+    }
+  },
+  {
+    "original": "ENERGYAUSTRALIA PTY LT MELBOURNE",
+    "final": "Energyaustralia PTY Lt Melbourne",
+    "type": "merchant",
+    "stages": {
+      "s1": "ENERGYAUSTRALIA PTY LT MELBOURNE",
+      "s3": "ENERGYAUSTRALIA PTY LT MELBOURNE",
+      "s4": "ENERGYAUSTRALIA PTY LT MELBOURNE"
+    }
+  },
+  {
+    "original": "ENFIELD AQUATIC CENTRE ENFIELD AUS, Card xx3772, Value date: 04/10/2023",
+    "final": "Enfield Aquatic Centre Enfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "ENFIELD AQUATIC CENTRE ENFIELD",
+      "s3": "ENFIELD AQUATIC CENTRE ENFIELD",
+      "s4": "ENFIELD AQUATIC CENTRE ENFIELD"
+    }
+  },
+  {
+    "original": "EDITION ROASTERS WYN 99 SYDNEY",
+    "final": "Edition Roasters Wyn 99 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s3": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s4": "EDITION ROASTERS WYN 99 SYDNEY"
+    }
+  },
+  {
+    "original": "Transfer to xx8820 CommBank app",
+    "final": "Xx8820",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer to xx8820 CommBank app",
+      "s3": "Transfer to xx8820 CommBank app",
+      "s4": "xx8820"
+    }
+  },
+  {
+    "original": "Transfer From MR KUAN-HORNG LAI Dim sum",
+    "final": "Mr",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Transfer From MR KUAN-HORNG LAI Dim sum",
+      "s3": "Transfer From MR KUAN-HORNG LAI Dim sum",
+      "s4": "MR"
+    }
+  },
+  {
+    "original": "SMP*Hero Sushi Strathf Strathfield02 AU",
+    "final": "Hero Sushi STRATHFIELD Strathfield02",
+    "type": "merchant",
+    "stages": {
+      "s1": "Hero Sushi Strathf Strathfield02",
+      "s3": "Hero Sushi STRATHFIELD Strathfield02",
+      "s4": "Hero Sushi STRATHFIELD Strathfield02"
+    }
+  },
+  {
+    "original": "Transfer From Tam S S & Tam L N piano",
+    "final": "Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Transfer From Tam S S & Tam L N piano",
+      "s3": "Transfer From Tam S S & Tam L N piano",
+      "s4": "Tam"
+    }
+  },
+  {
+    "original": "Direct Debit 062246 HollardIns, 3791272--166851795",
+    "final": "HollardIns",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "Direct Debit 062246 HollardIns, 3791272--166851795",
+      "s3": "Direct Debit 062246 HollardIns, 3791272--166851795",
+      "s4": "HollardIns"
+    }
+  },
+  {
+    "original": "To American Express Australia -",
+    "final": "American Express Australia",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "To American Express Australia -",
+      "s3": "To American Express Australia -",
+      "s4": "American Express Australia"
+    }
+  },
+  {
+    "original": "Transfer to xx8005 CommBank app",
+    "final": "Xx8005",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer to xx8005 CommBank app",
+      "s3": "Transfer to xx8005 CommBank app",
+      "s4": "xx8005"
+    }
+  },
+  {
+    "original": "Salary From Afes - Tam Afes Apy",
+    "final": "AFES (Sophia Salary)",
+    "type": "salary",
+    "stages": {
+      "s1": "Salary From Afes - Tam Afes Apy",
+      "s3": "Salary From Afes - Tam Afes Apy",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "RYDGES GOLD COAST AIRP BILINGA AUS Card xx3772 Value Date: 15/06/2022",
+    "final": "Rydges Gold Coast Airp Bilinga",
+    "type": "merchant",
+    "stages": {
+      "s1": "RYDGES GOLD COAST AIRP BILINGA",
+      "s3": "RYDGES GOLD COAST AIRP BILINGA",
+      "s4": "RYDGES GOLD COAST AIRP BILINGA"
+    }
+  },
+  {
+    "original": "MACQUARIE UNIVERSITY - Visa Purchase - Receipt 192054In NORTH RYDE Date 19 Jan 2021 Card 462263xxxxxx9172",
+    "final": "Macquarie University",
+    "type": "merchant",
+    "stages": {
+      "s1": "MACQUARIE UNIVERSITY",
+      "s3": "MACQUARIE UNIVERSITY",
+      "s4": "MACQUARIE UNIVERSITY"
+    }
+  },
+  {
+    "original": "MADE IN ITALY YORK LANE SYDNEY",
+    "final": "Made in Italy York Lane Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "MADE IN ITALY YORK LANE SYDNEY",
+      "s3": "MADE IN ITALY YORK LANE SYDNEY",
+      "s4": "MADE IN ITALY YORK LANE SYDNEY"
+    }
+  },
+  {
+    "original": "CULT EATERY NORTH RYDE",
+    "final": "Cult Eatery North Ryde",
+    "type": "merchant",
+    "stages": {
+      "s1": "CULT EATERY NORTH RYDE",
+      "s3": "CULT EATERY NORTH RYDE",
+      "s4": "CULT EATERY NORTH RYDE"
+    }
+  },
+  {
+    "original": "MCDONALDS ENFIELD 0314 STRATHFIELD SOU",
+    "final": "Mcdonalds Enfield 0314 Strathfield Sou",
+    "type": "merchant",
+    "stages": {
+      "s1": "MCDONALDS ENFIELD 0314 STRATHFIELD SOU",
+      "s3": "MCDONALDS ENFIELD 0314 STRATHFIELD SOU",
+      "s4": "MCDONALDS ENFIELD 0314 STRATHFIELD SOU"
+    }
+  },
+  {
+    "original": "Little West Sydney AU AUS, Card xx3772, Value date: 14/12/2022",
+    "final": "Little West Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "Little West Sydney",
+      "s3": "Little West Sydney",
+      "s4": "Little West Sydney"
+    }
+  },
+  {
+    "original": "MAMAKSMLC XX2906 SYDNEY",
+    "final": "Mamaksmlc Xx2906 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "MAMAKSMLC XX2906 SYDNEY",
+      "s3": "MAMAKSMLC XX2906 SYDNEY",
+      "s4": "MAMAKSMLC XX2906 SYDNEY"
+    }
+  }
+]

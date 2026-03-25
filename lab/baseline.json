@@ -1,0 +1,126 @@
+{
+  "composite_score": 41.82,
+  "sub_scores": {
+    "S_disambig": 72.73,
+    "S_dedup": 0,
+    "S_entity": 100.0,
+    "S_noise": 0.0,
+    "S_truncation": 0.0
+  },
+  "stats": {
+    "total_transactions": 21353,
+    "unique_original": 10190,
+    "unique_normalised": 10190,
+    "reduction_pct": 0.0,
+    "type_distribution": {
+      "merchant": 21353
+    }
+  },
+  "disambig_failures": [
+    {
+      "name": "Apple salary vs Apple Computers salary",
+      "expected": "match",
+      "group_a": [
+        "From APPLE PTY LTD - /REF/2012765443",
+        "From Apple Pty Ltd - /ref/2011331978",
+        "From APPLE PTY LTD - /REF/2012775118",
+        "From Apple Pty Ltd - /ref/2009846940",
+        "From Apple Pty Ltd - /ref/2011720772",
+        "From APPLE PTY LTD - /REF/2012603620",
+        "From APPLE PTY LTD - /REF/2013242092",
+        "TRANSFER FROM APPLE PTY LTD /REF/2013700410",
+        "From APPLE PTY LTD - /REF/2012220033",
+        "From Apple Pty Ltd - /ref/2011428522",
+        "From APPLE PTY LTD - /REF/2013003964",
+        "From Apple Pty Ltd - /ref/2011237115",
+        "From APPLE PTY LTD - /REF/2012083023",
+        "From APPLE PTY LTD - /REF/2013300654",
+        "From APPLE PTY LTD - /REF/2012371058",
+        "From APPLE PTY LTD - /REF/2013236809",
+        "TRANSFER FROM APPLE PTY LTD /REF/2013988452",
+        "From APPLE PTY LTD - /REF/2012997413",
+        "TRANSFER FROM APPLE PTY LTD /REF/2013701115",
+        "From APPLE PTY LTD - /REF/2012069636"
+      ],
+      "group_b": [
+        "PAY/SALARY FROM APPLE COMPUTERS SALARY",
+        "Salary From Apple Computers - Salary",
+        "Salary from Apple Computers - SALARY",
+        "Salary from Apple Computers"
+      ]
+    },
+    {
+      "name": "Nelson Tam identity consolidation (Osko)",
+      "expected": "match",
+      "group_a": [
+        "LOK SUN NELSON TAM Ok - Osko Payment - Receipt 691960",
+        "LOK SUN NELSON TAM R - Osko Payment - Receipt 326648",
+        "LOK SUN NELSON TAM Ok - Osko Payment - Receipt 389663",
+        "LOK SUN NELSON TAM Shanghai - Osko Payment - Receipt 495045",
+        "LOK SUN NELSON TAM Transfer - Osko Payment - Receipt 55939",
+        "LOK SUN NELSON TAM Too - Osko Payment - Receipt 693768",
+        "LOK SUN NELSON TAM Ok - Osko Payment - Receipt 811723",
+        "LOK SUN NELSON TAM Use - Osko Payment - Receipt 398265",
+        "LOK SUN NELSON TAM Pay - Osko Payment - Receipt 258747"
+      ],
+      "group_b": [
+        "Lok Sun Nelson Tam - Osko Payment to 062692 26748005 - Receipt 125732",
+        "Lok Sun Nelson Tam - Osko Payment to 062859 10008636 - Receipt 776714",
+        "Lok Sun Nelson Tam - Osko Payment to 062692 26748005 - Receipt 380107",
+        "Lok Sun Nelson Tam - Osko Payment to XXXXXX XXXXXX05 - Receipt XX6184"
+      ]
+    },
+    {
+      "name": "Nelson Tam identity consolidation (transfers)",
+      "expected": "match",
+      "group_a": [
+        "From Lok Sun Nelson T -",
+        "From Lok Sun Nelson Tam - Centrelink",
+        "From Lok Sun Nelson T - TAM LOK SUN NELSON",
+        "From LOK SUN NELSON TAM - Transfer",
+        "From Lok Sun Nelson Tam - CREDIT TO ACCOUNT",
+        "From LOK SUN NELSON T - Transfer",
+        "From Lok Sun Nelson Tam - Tax Return",
+        "From Lok Sun Nelson T - LOK SUN NELSON TAM",
+        "From Lok Sun Nelson T - Tam Lok Sun Nelson",
+        "From Lok Sun Nelson T - Transfer"
+      ],
+      "group_b": [
+        "To Nelson Tam - Cruise",
+        "To Nelson Tam - Passport",
+        "To Nelson Tam - Brain tutoring",
+        "Transfer To Lok Sun Tam, CommBank App Centrelink",
+        "To Nelson Tam - Chloe Piano",
+        "Transfer to Nelson Tam - Receipt 258704 To 182182 6513758",
+        "To Nelson Tam - Transfer For Piano",
+        "To Nelson Tam - Musec",
+        "To Nelson Tam - Readingt And Spend",
+        "Transfer To Nelson Tam CommBank App Transfer",
+        "To Nelson Tam - Proed",
+        "Transfer To Lok Sun Tam, CommBank App Tax return",
+        "Transfer To Nelson Tam CommBank App R",
+        "To Nelson Tam - Ballet and regular",
+        "Transfer To Nelson Tam CommBank App Pay",
+        "Transfer To Nelson Tam CommBank App Too",
+        "To Nelson Tam - Tutoring",
+        "To Nelson Tam - Piano Chess Spend",
+        "Transfer To Lok Sun Tam CommBank App Transfer",
+        "To Nelson Tam - piano",
+        "Transfer To Nelson Tam CommBank App Car service",
+        "To Nelson Tam - Lina",
+        "To Nelson Tam - King Living",
+        "To Nelson Tam - Musec term 1",
+        "Transfer To Nelson Tam CommBank App Shanghai",
+        "To Nelson Tam - Piano",
+        "To Nelson Tam - Funds Transfer",
+        "Transfer To Nelson Tam CommBank App Ok",
+        "To Nelson Tam - Dr du",
+        "Transfer To Nelson Tam CommBank App Use",
+        "Transfer to Nelson Tam - Receipt XX8704 To XXXXXX XXXXX58 - Transfer to Nelson Tam - Receipt XX8704 To XXXXXX XXX3758",
+        "To Nelson Tam - The brain ethan",
+        "To Nelson Tam - Funds transfer",
+        "To Nelson Tam - Brain english tut"
+      ]
+    }
+  ]
+}

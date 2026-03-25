@@ -1,0 +1,124 @@
+# Stage 1: Prefix and suffix removal rules
+# Applied in order. First matching prefix/suffix wins per category.
+
+prefixes:
+  # Payment gateway prefixes (strip, keep remainder)
+  - pattern: "^SMP\\*"
+    name: "Square Marketplace"
+  - pattern: "^SQ \\*"
+    name: "Square"
+  - pattern: "^ZLR\\*"
+    name: "Zeller"
+  - pattern: "^TST\\*\\s*"
+    name: "Toast"
+  - pattern: "^DBS\\*"
+    name: "DBS"
+  - pattern: "^DOORDASH\\*"
+    name: "DoorDash"
+  - pattern: "^ALI\\*"
+    name: "AliExpress"
+
+  # CBA scheduled payment prefix
+  - pattern: "^Cafes - "
+    name: "CBA auto-pay"
+
+  # Return indicator (strip, flag as return)
+  - pattern: "^Return\\s+"
+    name: "return"
+    set_flag: "is_return"
+  - pattern: "^Return "
+    name: "return"
+    set_flag: "is_return"
+
+  # Weixin / Alipay
+  - pattern: "^Weixin "
+    name: "Weixin"
+  - pattern: "^Alipay "
+    name: "Alipay"
+
+  # Misc prefixes
+  - pattern: "^-([A-Z]+-)*"
+    name: "dashed prefix (e.g. -THE-ICONIC-)"
+  - pattern: "^SP "
+    name: "SP prefix"
+  - pattern: "^% "
+    name: "percent prefix"
+  - pattern: "^GLOBAL-E\\* "
+    name: "Global-E"
+
+suffixes:
+  # Card + value date (most common pattern, ~3774 unique payees)
+  - pattern: ",?\\s*Card xx\\d{4}.*$"
+    name: "Card value date"
+  - pattern: "\\s+Card xx\\d{4}.*$"
+    name: "Card value date (space)"
+
+  # Tap and Pay
+  - pattern: "\\s+Tap and Pay xx\\d{4}.*$"
+    name: "Tap and Pay"
+
+  # Visa Purchase / Refund receipts
+  - pattern: "\\s*-?\\s*Visa Purchase\\s*-\\s*Receipt\\s+\\w+\\s*In\\s+.*$"
+    name: "Visa Purchase receipt"
+  - pattern: "\\s*-?\\s*Visa Refund\\s*-\\s*Receipt\\s+.*$"
+    name: "Visa Refund receipt"
+
+  # Osko Payment
+  - pattern: "\\s*-?\\s*Osko Payment.*Receipt\\s+\\d+.*$"
+    name: "Osko Payment receipt"
+  - pattern: "\\s*-?\\s*Osko Payment to\\s+\\d{6}\\s+\\d+\\s*-\\s*Receipt\\s+\\d+.*$"
+    name: "Osko Payment to receipt"
+
+  # Deposit receipt
+  - pattern: "\\s*-\\s*Deposit\\s*-\\s*Receipt\\s+.*$"
+    name: "Deposit receipt"
+
+  # Alipay suffix
+  - pattern: "\\s*-\\s*Alipay$"
+    name: "Alipay suffix"
+
+  # Card number in receipt format (462263xxxxxx9172 etc)
+  - pattern: "\\s+Card\\s+\\d{6}x{6}\\d{4}$"
+    name: "Full card number"
+
+  # Value Date without Card prefix
+  - pattern: "\\s+Value [Dd]ate:?\\s+\\d{2}/\\d{2}/\\d{4}$"
+    name: "Standalone value date"
+
+  # Country/state trailing codes (applied after other suffixes)
+  - pattern: "\\s+NSWAU$"
+    name: "NSWAU suffix"
+  - pattern: "\\s+NS AUS$"
+    name: "NS AUS suffix"
+  - pattern: "\\s+AU AUS$"
+    name: "AU AUS suffix"
+  - pattern: "\\s+AUS$"
+    name: "AUS suffix"
+  - pattern: "\\s+AU$"
+    name: "AU suffix"
+  - pattern: "\\s+NLD$"
+    name: "NLD suffix"
+  - pattern: "\\s+SGP$"
+    name: "SGP suffix"
+  - pattern: "\\s+USA$"
+    name: "USA suffix"
+  - pattern: "\\s+IDN$"
+    name: "IDN suffix"
+  - pattern: "\\s+GBR$"
+    name: "GBR suffix"
+
+  # Foreign currency amount suffix (e.g. "IDR 183000.00")
+  - pattern: "\\s+[A-Z]{3}\\s+\\d+\\.\\d{2}$"
+    name: "Foreign currency amount"
+
+  # Trailing comma + digits (e.g. ", 0505" or ", 1005")
+  - pattern: "\\s*,\\s*\\d{4}$"
+    name: "Trailing code"
+
+  # Negative amount suffix (e.g. "- negative $520.98")
+  - pattern: "\\s*-\\s*negative\\s+\\$[\\d.]+.*$"
+    name: "Negative amount"
+
+  # Email suffix (e.g. "- paypal-aud@airbnb.com")
+  - pattern: "\\s*-\\s*[\\w.+-]+@[\\w.-]+$"
+    name: "Email suffix"
