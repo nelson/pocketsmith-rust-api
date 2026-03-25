@@ -10,6 +10,8 @@ persons_strip_memo:
   - "Mrs Stephanie Wong"
   - "Stephan Hoermann"
   - "Lok Sun Nelson Tam"
+  - "Saidgani Musaev"
+  - "Tam S & Tam L N"
 
 persons:
   "LOK SUN NELSON TAM": "Nelson Tam"
@@ -82,7 +84,7 @@ banking_identity_mappings:
   - pattern: "Direct Credit \\d+ ATO"
     canonical: "ATO"
   # CommInsure
-  - pattern: "Direct Debit \\d+ CommInsure"
+  - pattern: "Direct Debit (?:XX)?\\d+ CommInsure"
     canonical: "CommInsure"
   # Centrelink / child support / pension
   - pattern: "Direct Credit (?:Pension )?\\d+ CHILDASSISTPYMT"
@@ -129,7 +131,7 @@ banking_identity_mappings:
   # IFTTT Strava
   - pattern: "^Ifttt Strava Activity.*$"
     canonical: "IFTTT Strava"
-  # International Transaction Fee
+  # International Transaction Fee (including Rebate)
   - pattern: "^International Transaction Fee.*$"
     canonical: "International Transaction Fee"
   # Salary Deposit via receipt
@@ -1020,6 +1022,62 @@ merchant_mappings:
   # Coles Broadway: strip store number
   - pattern: "^Coles Broadway \\d*$"
     canonical: "Coles Broadway"
+
+  # --- Cluster-derived consolidation (iter 024) ---
+
+  # International Transaction Fee: consolidate (typed as merchant, not banking_operation)
+  - pattern: "^International Transaction Fee.*"
+    canonical: "International Transaction Fee"
+
+  # Papparich: consolidate truncated locations
+  - pattern: "^Papparich Macquarie.*"
+    canonical: "Papparich Macquarie Park"
+  - pattern: "^Papparich (.+)"
+    canonical: "Papparich {1}"
+
+  # ATM Burwood: strip terminal letter (comes through banking_entity_extraction as "210 BURWOOD X")
+  - pattern: "^ATM 210 Burwood [A-Za-z]$"
+    canonical: "ATM Burwood"
+
+  # Jason Hui: truncation
+  - pattern: "^Jason Hu$"
+    canonical: "Jason Hui"
+
+  # Airport Retail Enterprises: truncation
+  - pattern: "^Airport Retail Enter?p?r?i?s?e?s? (.+)"
+    canonical: "Airport Retail Enterprises {1}"
+
+  # McDonald's: Dt (drive-through) variant
+  - pattern: "^McDonald'?s? Dt \\d+ (.+)"
+    canonical: "McDonald's {1}"
+  - pattern: "^Mcdonald'?s? \\d+ (.+)"
+    canonical: "McDonald's {1}"
+
+  # Burwood Discount Chemist: with/without location
+  - pattern: "^Burwood Discount Chemist.*Burwood.*"
+    canonical: "Burwood Discount Chemist Burwood"
+  - pattern: "^Burwood Discount Chemist$"
+    canonical: "Burwood Discount Chemist Burwood"
+
+  # PayPal BudgetPetProducts: truncation
+  - pattern: "^PayPal \\*Budgetpetpr.*"
+    canonical: "PayPal Budget Pet Products"
+
+  # Cash Deposit Beem It: strip receipt
+  - pattern: "^Cash Deposit.*Beem It.*"
+    canonical: "Cash Deposit Beem It"
+
+  # Saidgani Musaev: strip memo from transfer
+  - pattern: "^Saidgani Musaev.*"
+    canonical: "Saidgani Musaev"
+
+  # Mrs Stephanie Wong Deposit: strip receipt
+  - pattern: "^Mrs Stephanie Wong Deposit.*"
+    canonical: "Mrs Stephanie Wong"
+
+  # Tam S & Tam L N Deposit: strip receipt
+  - pattern: "^(?:Tam S & Tam L N|Joint Account \\(Tam\\)) Deposit.*"
+    canonical: "Joint Account (Tam)"
 
 # Patterns to strip from merchant names (case-insensitive, applied with re.sub)
 strip_patterns:

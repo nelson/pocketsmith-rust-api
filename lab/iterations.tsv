@@ -22,3 +22,4 @@ iteration	score	delta	hypothesis	outcome
 021	93.04	+0.02	Leading date prefix + leading asterisk stripping	kept
 022	93.17	+0.13	Merchant consolidation from cluster output (80 new rules)	kept
 023	93.19	+0.02	Fix remaining cluster misses (Duo, Cornerstone, West Ryde, Greenaway)	kept
+024	93.23	+0.04	Final cluster cleanup (CommInsure, Intl Txn Fee, Papparich, ATM, etc.)	kept
