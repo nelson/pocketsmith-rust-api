@@ -42,6 +42,13 @@ uppercase_exceptions:
   - TFNSW
   - UBER
   - PEXA
+  - VIC
+  - QLD
+  - WA
+  - SA
+  - TAS
+  - ACT
+  - NT
 
 # Words to keep lowercase in title case
 lowercase_exceptions:
@@ -69,3 +76,8 @@ trailing_noise:
   - pattern: "\\s+XX\\d+$"
   - pattern: "\\s+X\\d+$"
   - pattern: "\\s+\\d{6}$"
+  - pattern: "\\s+\\d{7,}$"
+  - pattern: "\\s+VISA$"
+  - pattern: "\\s+BANK$"
+  - pattern: "\\s+DEBIT$"
+  - pattern: "\\s+CREDIT$"
