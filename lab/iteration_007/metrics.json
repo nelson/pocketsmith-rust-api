@@ -1,0 +1,24 @@
+{
+  "composite_score": 92.42,
+  "sub_scores": {
+    "S_disambig": 100.0,
+    "S_dedup": 69.98,
+    "S_entity": 100.0,
+    "S_noise": 99.5,
+    "S_truncation": 100.0
+  },
+  "stats": {
+    "total_transactions": 21353,
+    "unique_original": 10190,
+    "unique_normalised": 4760,
+    "reduction_pct": 53.3,
+    "type_distribution": {
+      "salary": 220,
+      "merchant": 16890,
+      "banking_operation": 913,
+      "transfer_out": 1914,
+      "transfer_in": 1416
+    }
+  },
+  "disambig_failures": []
+}

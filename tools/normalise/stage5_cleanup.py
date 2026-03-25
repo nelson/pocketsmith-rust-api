@@ -64,15 +64,18 @@ def apply(payee: str, metadata: dict, rules: dict) -> tuple[str, dict]:
     for pattern in rules["_trailing"]:
         result = pattern.sub("", result).strip()
 
-    # Smart title case
-    if result == result.upper() and len(result) > 3:
-        # All caps: apply title case
-        result = _smart_title_case(result, rules["_upper_set"], rules["_lower_set"])
-    elif any(c.islower() for c in result) and any(c.isupper() for c in result):
-        # Mixed case: leave as-is (already has intentional casing)
-        pass
-    else:
-        result = _smart_title_case(result, rules["_upper_set"], rules["_lower_set"])
+    # Smart title case — always apply for consistency across variants
+    # Preserve known mixed-case brand names first
+    brand_preserves = {
+        "ebay": "eBay", "iphone": "iPhone", "ipad": "iPad",
+        "youtube": "YouTube", "paypal": "PayPal", "doordash": "DoorDash",
+        "pocketsmith": "PocketSmith", "commbank": "CommBank",
+        "netbank": "NetBank",
+    }
+    result = _smart_title_case(result, rules["_upper_set"], rules["_lower_set"])
+    # Restore brand casing
+    for lower_brand, correct in brand_preserves.items():
+        result = re.sub(re.escape(correct.title()), correct, result, flags=re.IGNORECASE)
 
     # Final trim
     result = result.strip()

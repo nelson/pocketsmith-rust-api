@@ -1,2 +1,12 @@
 iteration	score	delta	hypothesis	outcome
 001	91.22	49.40	Initial rules for all 5 stages	kept
+002	91.28	0.06	Consolidate Transport NSW variants into single payee	kept
+003	91.42	0.14	Always apply smart title case to fix 45 case-variant clusters	kept
+004	91.69	0.27	Strip EFTPOS receipts, Visa Debit prefix, card digits suffix	kept
+005	92.17	0.48	Banking identity mappings (BPAY, online payment, IFTTT) + merchant consolidation (Beem It, Aussie BB)	kept
+006	92.24	0.07	Fix PTY LTD stripping (mid-string) + internal account transfers (Xx payees)	kept
+007	92.42	0.18	Merchant consolidation: Edition Roasters, Hero Sushi, Vodafone, Uber, McDonalds, etc	kept
+008	92.61	0.19	More merchants (Revolut, Canva, Kim Sun, Sephora, Uniqlo etc) + person memo stripping	kept
+009	92.80	0.19	Fix classifications (BPAY, loan, interest) + chain consolidation + joint account mapping	kept
+010	92.85	0.05	Utilities consolidation (Strathfield Council, Sydney Water, EnergyAustralia) + more chains	kept
+011	92.87	0.02	Fix case variants (Netflix, Powershop) + more merchant consolidation (Microsoft, Scan QR)	kept

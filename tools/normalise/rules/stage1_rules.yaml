@@ -36,7 +36,13 @@ prefixes:
   - pattern: "^Alipay "
     name: "Alipay"
 
+  # Visa Debit Purchase prefix (strip card number, keep merchant)
+  - pattern: "^Visa Debit Purchase Card \\d{4}\\s+"
+    name: "Visa Debit Purchase"
+
   # Misc prefixes
+  - pattern: "^\\s*-\\s+(?=[A-Z])"
+    name: "leading dash-space"
   - pattern: "^-([A-Z]+-)*"
     name: "dashed prefix (e.g. -THE-ICONIC-)"
   - pattern: "^SP "
@@ -118,6 +124,32 @@ suffixes:
   # Negative amount suffix (e.g. "- negative $520.98")
   - pattern: "\\s*-\\s*negative\\s+\\$[\\d.]+.*$"
     name: "Negative amount"
+
+  # EFTPOS Purchase/Cash Out receipt details (various formats)
+  - pattern: "\\s*-?\\s*Eftpos (?:Purchase|Cash Out)\\s*-\\s*Receipt\\s+.*$"
+    name: "EFTPOS receipt"
+  - pattern: "\\s+Eftpos Purchase\\s*-\\s*Receipt\\s+.*$"
+    name: "EFTPOS Purchase receipt"
+  - pattern: "\\s*-\\s*Eftpos Purchase\\s*-\\s*Receipt\\s+\\d+Date.*$"
+    name: "EFTPOS receipt (no space before Date)"
+  - pattern: "\\s*,\\s*\\d{4}\\s+Last 4 Card Digits\\s+\\d{4}$"
+    name: "Last 4 Card Digits (with comma)"
+
+  # Foreign Currency Amount in receipt format (e.g. "Foreign Currency Amount: 0In 4029357733 Date...")
+  - pattern: "\\s*Foreign Currency Amount:?\\s+\\d+In\\s+.*$"
+    name: "Foreign currency receipt"
+
+  # Last 4 Card Digits pattern (e.g. ", 0515 Last 4 Card Digits 0812")
+  - pattern: "\\s*,?\\s*\\d{4}\\s+Last\\s+4\\s+Card\\s+Digits\\s+\\d{4}$"
+    name: "Last 4 card digits"
+
+  # Internal Transfer receipt (e.g. "- Internal Transfer - Receipt 121541 Savings Maximiser 0083463484")
+  - pattern: "\\s*-\\s*Internal Transfer\\s*-\\s*Receipt\\s+\\d+.*$"
+    name: "Internal Transfer receipt"
+
+  # Masked card/reference patterns (e.g. "Card 4X2263Xxxxxx9172")
+  - pattern: "\\s+Card\\s+\\d[A-Z]\\d{4}[A-Za-z]{6}\\d{4}$"
+    name: "Masked card number"
 
   # Email suffix (e.g. "- paypal-aud@airbnb.com")
   - pattern: "\\s*-\\s*[\\w.+-]+@[\\w.-]+$"

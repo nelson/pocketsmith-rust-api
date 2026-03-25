@@ -20,6 +20,10 @@ def load_rules(rules_dir: str) -> dict:
     for s in rules.get("strip_patterns", []):
         s["_re"] = re.compile(s["pattern"], re.IGNORECASE)
 
+    # Pre-compile internal account mappings
+    for m in rules.get("internal_account_mappings", []):
+        m["_re"] = re.compile(m["pattern"], re.IGNORECASE)
+
     # Pre-compile transfer entity patterns
     for t in rules.get("transfer_entity_extraction", []):
         t["_re"] = re.compile(t["pattern"], re.IGNORECASE)
@@ -75,6 +79,10 @@ def _canonicalise_person(name: str, rules: dict) -> str:
     stripped = " ".join(name.split())
     if stripped in persons:
         return persons[stripped]
+    # Check if name starts with a known person (strip memo)
+    for person in rules.get("persons_strip_memo", []):
+        if name.upper().startswith(person.upper()) and len(name) > len(person):
+            return person
     return name
 
 
@@ -123,8 +131,12 @@ def apply(payee: str, original_payee: str, payee_type: str, metadata: dict, rule
         metadata["identity"] = canonical
         return canonical, metadata
 
-    # Handle transfers: extract person name, but check for known employers first
+    # Handle transfers: check for internal account transfers first
     if payee_type in ("transfer_in", "transfer_out"):
+        for m in rules.get("internal_account_mappings", []):
+            if m["_re"].search(original_payee):
+                metadata["identity"] = m["canonical"]
+                return m["canonical"], metadata
         entity = _extract_transfer_entity(original_payee, rules)
         if not entity:
             entity = metadata.get("extracted_entity", payee)

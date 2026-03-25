@@ -1,0 +1,503 @@
+Dry run: would update 20519 of 21353 transactions
+[
+  {
+    "original": "Nintendo - paypal_nal@nintendo.co.jp",
+    "final": "Nintendo",
+    "type": "merchant",
+    "stages": {
+      "s1": "Nintendo",
+      "s3": "Nintendo",
+      "s4": "Nintendo"
+    }
+  },
+  {
+    "original": "MAD WHOLEFOODS PL SUMMER HILL AUS Tap and Pay xx9084 Value Date: 25/02/2021",
+    "final": "Mad Wholefoods Pl Summer Hill",
+    "type": "merchant",
+    "stages": {
+      "s1": "MAD WHOLEFOODS PL SUMMER HILL",
+      "s3": "MAD WHOLEFOODS PL SUMMER HILL",
+      "s4": "MAD WHOLEFOODS PL SUMMER HILL"
+    }
+  },
+  {
+    "original": "Fresh Catering Rookwood NS AUS Tap and Pay xx9084 Value Date: 03/07/2021",
+    "final": "Fresh Catering Rookwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "Fresh Catering Rookwood",
+      "s3": "Fresh Catering Rookwood",
+      "s4": "Fresh Catering Rookwood"
+    }
+  },
+  {
+    "original": "TRANSFER FROM LOK SUN NELSON T LOK SUN NELSON TAM",
+    "final": "Lok",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM LOK SUN NELSON T LOK SUN NELSON TAM",
+      "s3": "TRANSFER FROM LOK SUN NELSON T LOK SUN NELSON TAM",
+      "s4": "LOK"
+    }
+  },
+  {
+    "original": "LOWES BANKSTOWN BANKSTOWN",
+    "final": "Lowes Bankstown",
+    "type": "merchant",
+    "stages": {
+      "s1": "LOWES BANKSTOWN BANKSTOWN",
+      "s3": "LOWES BANKSTOWN BANKSTOWN",
+      "s4": "LOWES BANKSTOWN BANKSTOWN"
+    }
+  },
+  {
+    "original": "THE LOCAL ENFIELD Croydon Park",
+    "final": "The Local Enfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "THE LOCAL ENFIELD Croydon Park",
+      "s3": "THE LOCAL ENFIELD Croydon Park",
+      "s4": "The Local Enfield"
+    }
+  },
+  {
+    "original": "DOPA DONBURI - MARTIN ALLAWAH",
+    "final": "Dopa Donburi - Martin Allawah",
+    "type": "merchant",
+    "stages": {
+      "s1": "DOPA DONBURI - MARTIN ALLAWAH",
+      "s3": "DOPA DONBURI - MARTIN ALLAWAH",
+      "s4": "DOPA DONBURI - MARTIN ALLAWAH"
+    }
+  },
+  {
+    "original": "Direct Credit Pension 015884, 441S0NXN203440184S",
+    "final": "Centrelink Pension",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "Direct Credit Pension 015884, 441S0NXN203440184S",
+      "s3": "Direct Credit Pension 015884, 441S0NXN203440184S",
+      "s4": "Centrelink Pension"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+    "final": "Woolworths Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+      "s3": "WOOLWORTHS 1624 STRATHFIELD STRATHFIELD",
+      "s4": "Woolworths STRATHFIELD STRATHFIELD"
+    }
+  },
+  {
+    "original": "REGIMENT SPECIALITY CAF Sydney",
+    "final": "Regiment Coffee",
+    "type": "merchant",
+    "stages": {
+      "s1": "REGIMENT SPECIALITY CAF Sydney",
+      "s3": "REGIMENT SPECIALITY CAF Sydney",
+      "s4": "Regiment Coffee"
+    }
+  },
+  {
+    "original": "APPLE.COM/BILL SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/BILL SYDNEY",
+      "s3": "APPLE.COM/BILL SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "POCKETSMITH POCKETSMITH DUNEDIN",
+    "final": "PocketSmith Dunedin",
+    "type": "merchant",
+    "stages": {
+      "s1": "POCKETSMITH POCKETSMITH DUNEDIN",
+      "s3": "POCKETSMITH POCKETSMITH DUNEDIN",
+      "s4": "POCKETSMITH POCKETSMITH DUNEDIN"
+    }
+  },
+  {
+    "original": "DIGGY DOOS COFFEE Sydney",
+    "final": "Diggy Doos Coffee Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "DIGGY DOOS COFFEE Sydney",
+      "s3": "DIGGY DOOS COFFEE Sydney",
+      "s4": "DIGGY DOOS COFFEE Sydney"
+    }
+  },
+  {
+    "original": "PAYMENT TO TAM LOK SUN NELSON",
+    "final": "Tam Lok Sun Nelson",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "PAYMENT TO TAM LOK SUN NELSON",
+      "s3": "PAYMENT TO TAM LOK SUN NELSON",
+      "s4": "TAM LOK SUN NELSON"
+    }
+  },
+  {
+    "original": "PILLAR Burwood",
+    "final": "Pillar Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "PILLAR Burwood",
+      "s3": "PILLAR Burwood",
+      "s4": "PILLAR Burwood"
+    }
+  },
+  {
+    "original": "Transfer To focus CommBank App Soph dinner",
+    "final": "Focus",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer To focus CommBank App Soph dinner",
+      "s3": "Transfer To focus CommBank App Soph dinner",
+      "s4": "focus"
+    }
+  },
+  {
+    "original": "EG FUELCO 1460 STRATHF - Visa Purchase - Receipt 173090In STRATHFIELD Date 26 Oct 2020 Card 462263xxxxxx9172",
+    "final": "Eg Fuelco Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "EG FUELCO 1460 STRATHF",
+      "s3": "EG FUELCO 1460 STRATHFIELD",
+      "s4": "EG Fuelco Strathfield"
+    }
+  },
+  {
+    "original": "Sydney Water Corporation - billingsupport@sydneywater.com.au",
+    "final": "Sydney Water Corporation",
+    "type": "merchant",
+    "stages": {
+      "s1": "Sydney Water Corporation",
+      "s3": "Sydney Water Corporation",
+      "s4": "Sydney Water Corporation"
+    }
+  },
+  {
+    "original": "Transfer From GILLIAN LI Bridonies cake",
+    "final": "Gillian",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Transfer From GILLIAN LI Bridonies cake",
+      "s3": "Transfer From GILLIAN LI Bridonies cake",
+      "s4": "GILLIAN"
+    }
+  },
+  {
+    "original": "NETFLIX.COM MELBOURNE",
+    "final": "Netflix",
+    "type": "merchant",
+    "stages": {
+      "s1": "NETFLIX.COM MELBOURNE",
+      "s3": "NETFLIX.COM MELBOURNE",
+      "s4": "Netflix"
+    }
+  },
+  {
+    "original": "Vodafone Australia North Sydney AU AUS, Card xx3772, Value date: 11/01/2024",
+    "final": "Vodafone Australia",
+    "type": "merchant",
+    "stages": {
+      "s1": "Vodafone Australia North Sydney",
+      "s3": "Vodafone Australia North Sydney",
+      "s4": "Vodafone Australia"
+    }
+  },
+  {
+    "original": "TRANSPORT FOR NSW-OPAL HAYMARKET",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORT FOR NSW-OPAL HAYMARKET",
+      "s3": "TRANSPORT FOR NSW-OPAL HAYMARKET",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "YO-CHI BARANGAROO X8660 BARANGAROO",
+    "final": "Yo-Chi Barangaroo X8660 Barangaroo",
+    "type": "merchant",
+    "stages": {
+      "s1": "YO-CHI BARANGAROO X8660 BARANGAROO",
+      "s3": "YO-CHI BARANGAROO X8660 BARANGAROO",
+      "s4": "YO-CHI BARANGAROO X8660 BARANGAROO"
+    }
+  },
+  {
+    "original": "THANTARA THAI MASSAGE Strathfield AU AUS, Card xx0723, Value date: 28/08/2024",
+    "final": "Thantara Thai Massage Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "THANTARA THAI MASSAGE Strathfield",
+      "s3": "THANTARA THAI MASSAGE Strathfield",
+      "s4": "THANTARA THAI MASSAGE Strathfield"
+    }
+  },
+  {
+    "original": "Z COSME PTY LTD Z COSME BURWOOD",
+    "final": "Z Cosme Z Cosme Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "Z COSME PTY LTD Z COSME BURWOOD",
+      "s3": "Z COSME PTY LTD Z COSME BURWOOD",
+      "s4": "Z COSME Z COSME BURWOOD"
+    }
+  },
+  {
+    "original": " - Fast Transfer From CURTIS MILLAR, to PayID Phone, Ippudo",
+    "final": "Fast Transfer From Curtis Millar, to PayID Phone, Ippudo",
+    "type": "merchant",
+    "stages": {
+      "s1": "Fast Transfer From CURTIS MILLAR, to PayID Phone, Ippudo",
+      "s3": "Fast Transfer From CURTIS MILLAR, to PayID Phone, Ippudo",
+      "s4": "Fast Transfer From CURTIS MILLAR, to PayID Phone, Ippudo"
+    }
+  },
+  {
+    "original": "TYRH *1HEALTH Physio Melbourne AU AUS, Card xx0993, Value date: 02/05/2024",
+    "final": "Tyrh *1Health Physio Melbourne",
+    "type": "merchant",
+    "stages": {
+      "s1": "TYRH *1HEALTH Physio Melbourne",
+      "s3": "TYRH *1HEALTH Physio Melbourne",
+      "s4": "TYRH *1HEALTH Physio Melbourne"
+    }
+  },
+  {
+    "original": "JIMMY'S FALAFEL SYDNEY",
+    "final": "Jimmy'S Falafel Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "JIMMY'S FALAFEL SYDNEY",
+      "s3": "JIMMY'S FALAFEL SYDNEY",
+      "s4": "JIMMY'S FALAFEL SYDNEY"
+    }
+  },
+  {
+    "original": "AMAZON MARKETPLACE AU SYDNEY",
+    "final": "Amazon Marketplace",
+    "type": "merchant",
+    "stages": {
+      "s1": "AMAZON MARKETPLACE AU SYDNEY",
+      "s3": "AMAZON MARKETPLACE AU SYDNEY",
+      "s4": "Amazon Marketplace"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+    "final": "Woolworths Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+      "s3": "WOOLWORTHS 1624 STRATHFIELD STRATHFIELD",
+      "s4": "Woolworths STRATHFIELD STRATHFIELD"
+    }
+  },
+  {
+    "original": "Transferwise Australia Sydney AU AUS Card xx1737 Value Date: 25/08/2022",
+    "final": "Transferwise Australia Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "Transferwise Australia Sydney",
+      "s3": "Transferwise Australia Sydney",
+      "s4": "Transferwise Australia Sydney"
+    }
+  },
+  {
+    "original": "DUO DUO STRATHFIELD Strathfield",
+    "final": "Duo Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "DUO DUO STRATHFIELD Strathfield",
+      "s3": "DUO DUO STRATHFIELD Strathfield",
+      "s4": "DUO DUO STRATHFIELD Strathfield"
+    }
+  },
+  {
+    "original": "EasyCloudPOS_AFP PUNCHBOWL AU",
+    "final": "EasyCloudPOS_AFP Punchbowl",
+    "type": "merchant",
+    "stages": {
+      "s1": "EasyCloudPOS_AFP PUNCHBOWL",
+      "s3": "EasyCloudPOS_AFP PUNCHBOWL",
+      "s4": "EasyCloudPOS_AFP PUNCHBOWL"
+    }
+  },
+  {
+    "original": "SYD036 SXX7368 Sydney",
+    "final": "Syd036 Sxx7368 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "SYD036 SXX7368 Sydney",
+      "s3": "SYD036 SXX7368 Sydney",
+      "s4": "SYD036 SXX7368 Sydney"
+    }
+  },
+  {
+    "original": "MRS STEPHANIE WONG 570 for course and... - Deposit - Receipt XXXXXX 570 for course and 50 for kallax",
+    "final": "Mrs Stephanie Wong 570 for Course and",
+    "type": "merchant",
+    "stages": {
+      "s1": "MRS STEPHANIE WONG 570 for course and...",
+      "s3": "MRS STEPHANIE WONG 570 for course and...",
+      "s4": "MRS STEPHANIE WONG 570 for course and..."
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Joint Account (Tam)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s3": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+      "s4": "Joint Account (Tam)"
+    }
+  },
+  {
+    "original": "BEST MART STRATHFIELD P STRATHFIELD",
+    "final": "Best Mart Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s3": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s4": "Best Mart Strathfield"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1905 BROADWA BROADWAY",
+    "final": "Woolworths Broadwa Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1905 BROADWA BROADWAY",
+      "s3": "WOOLWORTHS 1905 BROADWA BROADWAY",
+      "s4": "Woolworths BROADWA BROADWAY"
+    }
+  },
+  {
+    "original": "INDUSTRIE BURWOOD BURWOOD",
+    "final": "Industrie Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "INDUSTRIE BURWOOD BURWOOD",
+      "s3": "INDUSTRIE BURWOOD BURWOOD",
+      "s4": "INDUSTRIE BURWOOD BURWOOD"
+    }
+  },
+  {
+    "original": "BEST MART STRATHFIELD P STRATHFIELD",
+    "final": "Best Mart Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s3": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s4": "Best Mart Strathfield"
+    }
+  },
+  {
+    "original": "Direct Debit 314011 Pioneers of Aust PAYWAY2939325937",
+    "final": "Pioneers of",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "Direct Debit 314011 Pioneers of Aust PAYWAY2939325937",
+      "s3": "Direct Debit 314011 Pioneers of Aust PAYWAY2939325937",
+      "s4": "Pioneers of"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+    "final": "Woolworths Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+      "s3": "WOOLWORTHS 1624 STRATHFIELD STRATHFIELD",
+      "s4": "Woolworths STRATHFIELD STRATHFIELD"
+    }
+  },
+  {
+    "original": "OAKBERRY MARTIN PLACE 1 SYDNEY",
+    "final": "Oakberry Martin Place 1 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "OAKBERRY MARTIN PLACE 1 SYDNEY",
+      "s3": "OAKBERRY MARTIN PLACE 1 SYDNEY",
+      "s4": "OAKBERRY MARTIN PLACE 1 SYDNEY"
+    }
+  },
+  {
+    "original": "GREENWAY MEAT AND FD STRATHFIELD NS AUS, Card xx3772, Value date: 18/07/2023",
+    "final": "Greenway Meat and Fd Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "GREENWAY MEAT AND FD STRATHFIELD",
+      "s3": "GREENWAY MEAT AND FD STRATHFIELD",
+      "s4": "GREENWAY MEAT AND FD STRATHFIELD"
+    }
+  },
+  {
+    "original": "The Avenue Visa Purchase - Receipt 190175 In Newington Date 30 Jun 2022 Card 462263xxxxxx9172",
+    "final": "The Avenue",
+    "type": "merchant",
+    "stages": {
+      "s1": "The Avenue",
+      "s3": "The Avenue",
+      "s4": "The Avenue"
+    }
+  },
+  {
+    "original": "Transfer to xx8005 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "Transfer to xx8005 CommBank app",
+      "s3": "Transfer to xx8005 CommBank app",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "Cafes - AFES KINGSFORD AUS, Card xx0723, Value date: 17/05/2025",
+    "final": "AFES Kingsford",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "AFES KINGSFORD",
+      "s3": "AFES KINGSFORD",
+      "s4": "AFES KINGSFORD"
+    }
+  },
+  {
+    "original": "UNITED SUTTON SUTTON",
+    "final": "United Sutton",
+    "type": "merchant",
+    "stages": {
+      "s1": "UNITED SUTTON SUTTON",
+      "s3": "UNITED SUTTON SUTTON",
+      "s4": "UNITED SUTTON SUTTON"
+    }
+  },
+  {
+    "original": "MONKEY HOUSE STRATHF STRATHFIELD NS AUS, Card xx3772, Value date: 14/04/2023",
+    "final": "Monkey House Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "MONKEY HOUSE STRATHF STRATHFIELD",
+      "s3": "MONKEY HOUSE STRATHFIELD STRATHFIELD",
+      "s4": "Monkey House Strathfield"
+    }
+  },
+  {
+    "original": "Little Duck Broadway Glebe NS AUS, Card xx0723, Value date: 19/12/2025",
+    "final": "Little Duck Broadway Glebe",
+    "type": "merchant",
+    "stages": {
+      "s1": "Little Duck Broadway Glebe",
+      "s3": "Little Duck Broadway Glebe",
+      "s4": "Little Duck Broadway Glebe"
+    }
+  }
+]

@@ -97,6 +97,12 @@ classification_rules:
     extract: "entity"
     extract_pattern: "(?i)^Transfer to (.+?)(?:\\s*-\\s*Receipt).*$"
 
+  # Salary Deposit via receipt
+  - pattern: "^Salary - Salary Deposit"
+    type: salary
+    extract: "employer"
+    extract_pattern: "Salary Deposit.*?(\\w[\\w ]+?)\\s+(?:Salary|salary).*$"
+
   # Banking operations (including CBA "Cafes -" prefixed variants)
   - pattern: "^Cafes - Direct Credit "
     type: banking_operation
@@ -168,6 +174,22 @@ classification_rules:
     type: banking_operation
 
   - pattern: "(?i)^Return \\d{2}/\\d{2}/\\d{2}"
+    type: banking_operation
+
+  # BPAY Payment
+  - pattern: "(?i)^BPAY PAYMENT"
+    type: banking_operation
+
+  # Loan Repayment
+  - pattern: "(?i)^Loan Repayment"
+    type: banking_operation
+
+  # Interest
+  - pattern: "(?i)^Interest Charge"
+    type: banking_operation
+  - pattern: "(?i)^Interest Adjustment"
+    type: banking_operation
+  - pattern: "(?i)^Interest Correction"
     type: banking_operation
 
   # Everything else defaults to merchant (handled in code)

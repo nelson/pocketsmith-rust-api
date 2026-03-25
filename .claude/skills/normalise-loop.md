@@ -60,9 +60,31 @@ python3 -m tools.normalise.pipeline --db pocketsmith.db --rules tools/normalise/
 ```
 
 ### Phase 5: Decide
-- **Keep**: Score improved → commit rule changes, continue
-- **Discard**: Score regressed → revert rule changes via git
-- **Note**: Interesting but not better → log insight, try different approach
+- **Keep**: Score improved → commit rule changes with git (see below), then continue
+- **Discard**: Score regressed → revert rule changes via `git checkout -- tools/normalise/`
+- **Note**: Interesting but not better → revert, log insight, try different approach
+
+#### Committing a kept iteration
+
+Every kept iteration MUST get its own git commit so the history is bisectable:
+
+```bash
+# Stage only the rule/pipeline files that changed (never stage pocketsmith.db or lab/)
+git add tools/normalise/rules/ tools/normalise/*.py lab/iterations.tsv lab/iteration_NNN/
+
+git commit -m "$(cat <<'EOF'
+normalise iter NNN: <one-line hypothesis summary>
+
+Q: XX.XX → YY.YY (+Z.ZZ)
+S_dedup: XX.XX → YY.YY | S_noise: XX.XX → YY.YY
+Unique payees: AAAA → BBBB
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+This makes it easy to revert a single iteration later with `git revert`.
 
 ### Phase 6: Log
 Append to `lab/iterations.tsv`:
@@ -79,7 +101,7 @@ If stopped: apply final rules to `pocketsmith.db` (not the working copy).
 
 ## Discipline rules
 
-1. **Commit before running** — git commit rule changes before applying
+1. **Commit every kept iteration** — each kept iteration gets its own git commit with metrics in the message
 2. **Measure after** — always score after applying
 3. **Log every result** — even failed experiments teach something
 4. **Revert on discard** — don't accumulate bad changes
