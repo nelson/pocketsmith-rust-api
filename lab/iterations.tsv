@@ -19,3 +19,4 @@ iteration	score	delta	hypothesis	outcome
 018	92.98	+0.00	Build + run Rust clusterer (113 clusters found, diagnostic)	kept
 019	93.01	+0.03	Suburb truncation expansions from cluster output	kept
 020	93.02	+0.01	Word truncation expansions from cluster output	kept
+021	93.04	+0.02	Leading date prefix + leading asterisk stripping	kept
