@@ -24,10 +24,17 @@ def load_all_rules(rules_dir: str) -> dict:
 
 def normalise_payee(original_payee: str, rules: dict) -> tuple[str, dict]:
     """Run a single payee through all 5 stages. Returns (normalised, metadata)."""
-    # Stage 1: Strip prefixes and suffixes
-    s1_out, s1_meta = stage1_strip.apply(original_payee, rules["stage1"])
+    # Stage 1: Strip prefixes and suffixes (repeat until stable, max 5)
+    s1_out = original_payee
+    s1_meta = {}
+    for s1_rep in range(1, 6):
+        prev = s1_out
+        s1_out, s1_meta = stage1_strip.apply(s1_out, rules["stage1"])
+        if s1_out == prev:
+            break
     metadata = {"original": original_payee, **s1_meta}
     metadata["after_stage1"] = s1_out
+    metadata["stage1_repeats"] = s1_rep
 
     # Stage 2: Classify type (uses original for pattern matching)
     payee_type, metadata = stage2_classify.apply(original_payee, s1_out, metadata, rules["stage2"])
@@ -41,8 +48,14 @@ def normalise_payee(original_payee: str, rules: dict) -> tuple[str, dict]:
     s4_out, metadata = stage4_identity.apply(s3_out, original_payee, payee_type, metadata, rules["stage4"])
     metadata["after_stage4"] = s4_out
 
-    # Stage 5: Final cleanup
-    s5_out, metadata = stage5_cleanup.apply(s4_out, metadata, rules["stage5"])
+    # Stage 5: Final cleanup (repeat until stable, max 5)
+    s5_out = s4_out
+    for s5_rep in range(1, 6):
+        prev = s5_out
+        s5_out, metadata = stage5_cleanup.apply(s5_out, metadata, rules["stage5"])
+        if s5_out == prev:
+            break
+    metadata["stage5_repeats"] = s5_rep
     metadata["final"] = s5_out
 
     return s5_out, metadata
