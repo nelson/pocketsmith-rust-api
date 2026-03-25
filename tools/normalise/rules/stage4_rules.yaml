@@ -6,6 +6,7 @@
 persons_strip_memo:
   - "Johnny Tam"
   - "David Greenaway"
+  - "Mr David James Greenaway"
   - "Mrs Stephanie Wong"
   - "Stephan Hoermann"
   - "Lok Sun Nelson Tam"
@@ -27,6 +28,14 @@ persons:
   "Tam S S & Tam L": "Joint Account (Tam)"
   "Tam S & Tam L N": "Joint Account (Tam)"
   "TAM S S & TAM L N": "Joint Account (Tam)"
+  "MR DAVID JAMES GREENAWAY": "David Greenaway"
+  "MR DAVID JAMES GREENA": "David Greenaway"
+  "Mr David James Greenaway": "David Greenaway"
+  "Mr David James Greena": "David Greenaway"
+  "CORNERSTONE PRESBYTERIAN CHU": "Cornerstone Presbyterian Church"
+  "CORNERSTONE PRESBYTERIAN COM": "Cornerstone Presbyterian Church"
+  "Cornerstone Presbyterian Chu": "Cornerstone Presbyterian Church"
+  "Cornerstone Presbyterian Com": "Cornerstone Presbyterian Church"
 
 # Employer canonicalisation (for salary/transfer_in types)
 employers:
@@ -209,6 +218,8 @@ merchant_mappings:
   - pattern: "^WW METRO \\d+ (.+)"
     canonical: "Woolworths Metro {1}"
 
+  - pattern: "^WOOLWORTHS \\d+ WEST RYDE.*"
+    canonical: "Woolworths West Ryde"
   - pattern: "^WOOLWORTHS \\d+ (.+)"
     canonical: "Woolworths {1}"
 
@@ -942,10 +953,10 @@ merchant_mappings:
   - pattern: "^Estimated Investment Returns Since \\d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) Xx\\d{2} - (.+)"
     canonical: "Estimated Investment Returns - {1}"
 
-  # Duo Strathfield: deduplicate location
-  - pattern: "^Duo Strathfie?l?d? ?Strathfield.*"
+  # Duo Strathfield: deduplicate location (Square terminal doubles the name)
+  - pattern: "^Duo (?:Duo )?Strathfie?l?d? ?Strathfield.*"
     canonical: "Duo Strathfield"
-  - pattern: "^Duo Strathfield$"
+  - pattern: "^Duo (?:Duo )?Strathfield$"
     canonical: "Duo Strathfield"
 
   # Z Cosme: deduplicate name
