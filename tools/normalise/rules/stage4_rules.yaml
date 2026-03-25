@@ -700,6 +700,316 @@ merchant_mappings:
   - pattern: "^ADAIRS (.+)"
     canonical: "Adairs {1}"
 
+  # --- Cluster-derived consolidation (iter 022) ---
+
+  # Wok N Bbq Chinese Restaurant: truncation variants
+  - pattern: "^Wok N Bbq Chinese Rest?a?u?r?a?n?t? (.+)"
+    canonical: "Wok N BBQ Chinese Restaurant {1}"
+
+  # Gnt Services: consolidation
+  - pattern: "^Gnt Services.*North Strathfield.*"
+    canonical: "GNT Services North Strathfield"
+
+  # Bespoke Letterpress: strip middle truncation
+  - pattern: "^Bespoke Letterpress.*Bowral.*"
+    canonical: "Bespoke Letterpress Bowral"
+
+  # Cathay Pacific: strip terminal code
+  - pattern: "^Cathay Pacific Airways.*Sydney.*"
+    canonical: "Cathay Pacific Airways Sydney"
+
+  # The Sneaker Laundry: consolidate with/without Lab
+  - pattern: "^The Sneaker Laundry.*Sydney.*"
+    canonical: "The Sneaker Laundry Sydney"
+
+  # Kitchen by Mike: strip duplicate word
+  - pattern: "^Kitchen by Mike.*Sydney.*"
+    canonical: "Kitchen by Mike Sydney"
+
+  # C Major Cafe: truncation
+  - pattern: "^C Major Cafe and Desse?r?t?s? (.+)"
+    canonical: "C Major Cafe and Dessert {1}"
+
+  # Bathers Pavilion: strip terminal code
+  - pattern: "^Bathers Pavilion X\\d+ (.+)"
+    canonical: "Bathers Pavilion {1}"
+
+  # Sydney Airport: strip terminal code
+  - pattern: "^Sydney Airport Sxx\\d+ (.+)"
+    canonical: "Sydney Airport {1}"
+
+  # Prosperous Lgj Group: strip store number
+  - pattern: "^Prosperous Lgj Group \\d* ?(.+)"
+    canonical: "Prosperous LGJ Group {1}"
+
+  # Dental Corporation: strip suffix
+  - pattern: "^Dental Corporation.*/L? ?(.+)"
+    canonical: "Dental Corporation {1}"
+
+  # Unibros UTS: strip duplicate name
+  - pattern: "^Unibros UTS.*Ultimo.*"
+    canonical: "Unibros UTS Ultimo"
+  - pattern: "^Uni Bros UTS.*Ultimo.*"
+    canonical: "Uni Bros UTS Ultimo"
+
+  # Merchants of Ultimo: consolidate
+  - pattern: "^Merchants of Ultimo.*Broadway.*"
+    canonical: "Merchants of Ultimo Broadway"
+
+  # Kingpin Bowling: consolidate truncated locations
+  - pattern: "^Kingpin Bowling.*North Strathfield.*"
+    canonical: "Kingpin Bowling North Strathfield"
+  - pattern: "^Kingpin Bowling.*North Strathfau.*"
+    canonical: "Kingpin Bowling North Strathfield"
+
+  # Ippudo: strip dash variant
+  - pattern: "^Ippudo.*Westfield.*Sydney.*"
+    canonical: "Ippudo Westfield Sydney"
+
+  # Discount General: consolidate truncation
+  - pattern: "^Discount General.*Burwood.*"
+    canonical: "Discount General Burwood"
+
+  # Rickshaw International: truncation
+  - pattern: "^Rickshaw Internation?a?l? (.+)"
+    canonical: "Rickshaw International {1}"
+
+  # Burwood Pharmacy: truncation
+  - pattern: "^Burwood Pharmacy.*Burwood.*"
+    canonical: "Burwood Pharmacy Burwood"
+
+  # Mediconsul Wellhams: truncation
+  - pattern: "^Mediconsul Wellhams Pha?r?m?a?c?y? (.+)"
+    canonical: "Mediconsul Wellhams Pharmacy {1}"
+
+  # Sushia Broadway: strip store codes
+  - pattern: "^Sushia Broadway.*Broadway.*"
+    canonical: "Sushia Broadway"
+
+  # Pop Mart: truncation
+  - pattern: "^Pop Mart Oceania Li? (.+)"
+    canonical: "Pop Mart Oceania {1}"
+
+  # Starbucks the Rocks: deduplicate location
+  - pattern: "^Starbucks the Rocks.*"
+    canonical: "Starbucks The Rocks"
+
+  # Huntley Projects: strip store number
+  - pattern: "^Huntley Projects CBD \\d* ?(.+)"
+    canonical: "Huntley Projects CBD {1}"
+
+  # 1915 Lanzhou Beef Noodle: truncation
+  - pattern: "^1915 Lanzhou Beef No?o?d?l?e?s? (.+)"
+    canonical: "1915 Lanzhou Beef Noodle {1}"
+
+  # Sushi World Macquarie: truncation
+  - pattern: "^Sushi World.*Macquarie Park.*"
+    canonical: "Sushi World Macquarie Park"
+
+  # Ticketek Web: truncation
+  - pattern: "^Ticketek Web Sy?d?n?e?y? (.+)"
+    canonical: "Ticketek Web {1}"
+
+  # La Lune Market: consolidate
+  - pattern: "^La Lune Market.*North Strathfield.*"
+    canonical: "La Lune Market North Strathfield"
+  - pattern: "^La Lune Market.*North Strathfau.*"
+    canonical: "La Lune Market North Strathfield"
+
+  # Naya AUS Group: strip store number
+  - pattern: "^Naya AUS Group \\d* ?(.+)"
+    canonical: "Naya AUS Group {1}"
+
+  # Kmart: strip store number
+  - pattern: "^Kmart (?:Broadway )?\\d+ (.+)"
+    canonical: "Kmart {1}"
+  - pattern: "^Kmart (.+)"
+    canonical: "Kmart {1}"
+
+  # Top Impression Bakery: strip store number
+  - pattern: "^Top Impression Bakery \\d* ?(.+)"
+    canonical: "Top Impression Bakery {1}"
+
+  # Kopi-Tiam: normalise separator
+  - pattern: "^Kopi-Tiam.*Spice Alley (.+)"
+    canonical: "Kopi-Tiam Spice Alley {1}"
+
+  # Salt Meats Cheese: strip store number
+  - pattern: "^Salt Meats Cheese Cq \\d* ?(.+)"
+    canonical: "Salt Meats Cheese CQ {1}"
+
+  # Edomae Sushi: strip duplicate name
+  - pattern: "^Edomae Sushi.*Burwood.*"
+    canonical: "Edomae Sushi Burwood"
+
+  # Knight's Coffee & Tea: strip store number
+  - pattern: "^Knight'?s? Coffee & Tea \\d* ?(.+)"
+    canonical: "Knight's Coffee & Tea {1}"
+
+  # Mee the Noodle House: normalise dash
+  - pattern: "^Mee.*the Noodle House (.+)"
+    canonical: "Mee The Noodle House {1}"
+
+  # Three Mothers Kitchen: truncation
+  - pattern: "^Three Mothers Kitche?n? (.+)"
+    canonical: "Three Mothers Kitchen {1}"
+
+  # Double Barral Coffee: truncation
+  - pattern: "^Double Barral Coff?e?e? (.+)"
+    canonical: "Double Barral Coffee {1}"
+
+  # Lil Miss Collins: truncation
+  - pattern: "^Lil Miss Collins B? ?(.+)"
+    canonical: "Lil Miss Collins {1}"
+
+  # Fresh Seafood Strathfield: truncation
+  - pattern: "^Fresh Seafood Str?a?t?h?f?i?e?l?d? (.+)"
+    canonical: "Fresh Seafood {1}"
+
+  # Decathlon Australia: strip suffix
+  - pattern: "^Decathlon Australia.*Tempe.*"
+    canonical: "Decathlon Tempe"
+
+  # Single O Surry Hills: deduplicate location
+  - pattern: "^Single O-Surry Hills.*"
+    canonical: "Single O Surry Hills"
+
+  # Ho Jiak Strathfield: strip trailing state
+  - pattern: "^Ho Jiak.*Strathfield.*"
+    canonical: "Ho Jiak Strathfield"
+
+  # Mad Wholefoods: strip middle code
+  - pattern: "^Mad Wholefoods.*Summer Hill.*"
+    canonical: "Mad Wholefoods Summer Hill"
+
+  # Harvey Norman: strip store code
+  - pattern: "^Harvey Norman Av/It.*Auburn.*"
+    canonical: "Harvey Norman Auburn"
+
+  # Sahara Turkish Restaurant: truncation
+  - pattern: "^Sahara Turkish Resta?u?r?a?n?t?.*"
+    canonical: "Sahara Turkish Restaurant"
+
+  # Alo-Ban: truncation
+  - pattern: "^Alo-Ban.*Inst?o? (.+)"
+    canonical: "Alo-Ban {1}"
+
+  # Prijm Investments: strip suffix
+  - pattern: "^Prijm Investments L? ?(.+)"
+    canonical: "Prijm Investments {1}"
+
+  # Pho Life Pho Sure: strip suffix
+  - pattern: "^Pho Life Pho Sure L? ?(.+)"
+    canonical: "Pho Life Pho Sure {1}"
+
+  # The Missing Piece: truncation
+  - pattern: "^The Missing Piece C? ?Macquarie Park.*"
+    canonical: "The Missing Piece Macquarie Park"
+
+  # Sushi Hub World Tower: truncation
+  - pattern: "^Sushi Hub World Towe?r? (.+)"
+    canonical: "Sushi Hub World Tower {1}"
+
+  # Friendly Grocer: truncation
+  - pattern: "^Friendly Grocer Croy?d?o?n? (.+)"
+    canonical: "Friendly Grocer {1}"
+
+  # Lanzhou Lamian: truncation
+  - pattern: "^Lanzhou Lamian Beef (.+)"
+    canonical: "Lanzhou Lamian Beef {1}"
+
+  # Oliver Brown: truncation
+  - pattern: "^Oliver Brown Strathfiel? (.+)"
+    canonical: "Oliver Brown {1}"
+
+  # Anything Dance: truncation
+  - pattern: "^Anything Dance Croyd?o?n? (.+)"
+    canonical: "Anything Dance {1}"
+
+  # Tom's Project: truncation
+  - pattern: "^Tom'?s? Project.*Burwood.*"
+    canonical: "Tom's Project Burwood"
+
+  # Concord Bakehouse: strip suffix
+  - pattern: "^Concord Bakehouse Concord\\d*"
+    canonical: "Concord Bakehouse Concord"
+
+  # ATM Burwood: strip terminal letter
+  - pattern: "^ATM 210 Burwood [A-Za-z]$"
+    canonical: "ATM Burwood"
+
+  # Estimated Investment Returns: strip date
+  - pattern: "^Estimated Investment Returns Since \\d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) Xx\\d{2} - (.+)"
+    canonical: "Estimated Investment Returns - {1}"
+
+  # Duo Strathfield: deduplicate location
+  - pattern: "^Duo Strathfie?l?d? ?Strathfield.*"
+    canonical: "Duo Strathfield"
+  - pattern: "^Duo Strathfield$"
+    canonical: "Duo Strathfield"
+
+  # Z Cosme: deduplicate name
+  - pattern: "^Z Cosme(?:tics)? Z Cosme(?:tics)? (.+)"
+    canonical: "Z Cosmetics {1}"
+  - pattern: "^Z Cosme(?:tics)? (.+)"
+    canonical: "Z Cosmetics {1}"
+
+  # Apple Espresso Bar: strip terminal code
+  - pattern: "^Apple Espresso Bar [A-Z]p\\d+ (.+)"
+    canonical: "Apple Espresso Bar {1}"
+
+  # Whsmith: strip terminal number
+  - pattern: "^Whsmith Sydt1 Arrival\\d? (.+)"
+    canonical: "WHSmith Sydney T1 {1}"
+
+  # Rhodes Phoenix Chinese: strip number
+  - pattern: "^Rhodes Phoenix Chines \\d* ?(.+)"
+    canonical: "Rhodes Phoenix Chinese {1}"
+
+  # Dutch Smuggler: deduplicate location
+  - pattern: "^Dutch Smuggler Sydney P? ?Sydney.*"
+    canonical: "Dutch Smuggler Sydney"
+  - pattern: "^Dutch Smuggler Sydney$"
+    canonical: "Dutch Smuggler Sydney"
+
+  # Palm Beach Wine Co: deduplicate location
+  - pattern: "^Palm Beach Wine Co.*Palm Beach.*"
+    canonical: "Palm Beach Wine Co"
+  - pattern: "^Palm Beach Wine Co$"
+    canonical: "Palm Beach Wine Co"
+
+  # The Knox Made in Watson: truncation
+  - pattern: "^The Knox Made in Watso?n? (.+)"
+    canonical: "The Knox Made In Watson {1}"
+
+  # Berkelo: strip suffix
+  - pattern: "^Berkelo.*Mona Vale.*"
+    canonical: "Berkelo Mona Vale"
+
+  # Eg Fuelco Marsfield: truncation
+  - pattern: "^Eg Fuelco Marsfiel? (.+)"
+    canonical: "EG Fuelco {1}"
+
+  # Ice Kirin Bar: truncation
+  - pattern: "^Ice Kirin Bar Burw?o?o?d? (.+)"
+    canonical: "Ice Kirin Bar {1}"
+
+  # The Body Shop QVB: strip store code
+  - pattern: "^The Body Shop.*QVB.*Sydney.*"
+    canonical: "The Body Shop QVB Sydney"
+
+  # Barrenjoey House: normalise spacing
+  - pattern: "^Barrenjoey ?house (.+)"
+    canonical: "Barrenjoey House {1}"
+
+  # The Sports Basement: strip store number
+  - pattern: "^The Sports Basement \\d* ?(.+)"
+    canonical: "The Sports Basement {1}"
+
+  # Coles Broadway: strip store number
+  - pattern: "^Coles Broadway \\d*$"
+    canonical: "Coles Broadway"
+
 # Patterns to strip from merchant names (case-insensitive, applied with re.sub)
 strip_patterns:
   # PTY LTD variants (anywhere in string, not just at end)
