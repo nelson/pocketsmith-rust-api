@@ -154,3 +154,21 @@ suffixes:
   # Email suffix (e.g. "- paypal-aud@airbnb.com")
   - pattern: "\\s*-\\s*[\\w.+-]+@[\\w.-]+$"
     name: "Email suffix"
+
+  # PTY LTD variants
+  - pattern: "\\s+PTY\\.?\\s*LTD?\\.?\\s*$"
+    name: "PTY LTD suffix"
+  - pattern: "\\s+P/L\\s*$"
+    name: "P/L suffix"
+
+  # Long reference numbers
+  - pattern: "\\s+\\d{7,}$"
+    name: "Long reference number"
+
+  # State + postcode suffix
+  - pattern: "\\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\\s+\\d{4,6}$"
+    name: "State + postcode"
+
+  # Bare state suffix
+  - pattern: "\\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)$"
+    name: "State suffix"

@@ -13,3 +13,4 @@ iteration	score	delta	hypothesis	outcome
 012	92.87	0.00	Add supplementary long-tail metrics to measure.py (diagnostic only)	kept
 013	92.94	+0.07	Uppercase normalisation + IGNORECASE regexes in stage1	kept
 014	92.95	+0.01	Stage repetition (stages 1 and 5, max 5 repeats)	kept
+015	92.98	+0.03	PTY LTD, state+postcode, digit run suffixes in stage1	kept
