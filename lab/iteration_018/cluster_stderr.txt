@@ -1,0 +1,5 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running `target/debug/cluster --db lab/working.db`
+Loaded 4252 long-tail payees
+Found 140 edges above threshold 0.8
+Found 113 clusters

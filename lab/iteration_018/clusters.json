@@ -1,0 +1,1765 @@
+[
+  {
+    "max_sim": 0.891,
+    "members": [
+      {
+        "count": 1,
+        "payee": "28/01/26, Direct Debit 066215 Omf International, 21231"
+      },
+      {
+        "count": 1,
+        "payee": "28/08/24, Direct Debit 066215 Omf International, 21231"
+      },
+      {
+        "count": 1,
+        "payee": "28/08/25, Direct Debit 066215 Omf International, 21231"
+      },
+      {
+        "count": 2,
+        "payee": "28/11/25, Direct Debit 066215 Omf International, 21231"
+      },
+      {
+        "count": 1,
+        "payee": "30/06/25, Direct Debit 066215 Omf International, 21231"
+      },
+      {
+        "count": 1,
+        "payee": "Direct Debit 066215 Omf International, 21231"
+      }
+    ],
+    "min_sim": 0.808,
+    "suggested_canonical": "28/11/25, Direct Debit 066215 Omf International, 21231"
+  },
+  {
+    "max_sim": 1.0,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Saidgani Musaev, to Payid Phone, From"
+      },
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Saidgani Musaev, to Payid Phone, Lunch"
+      },
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Saidgani Musaev, to Payid Phone, Said"
+      },
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Saidgani Musaev, to Payid Phone, Saidgani"
+      }
+    ],
+    "min_sim": 0.893,
+    "suggested_canonical": "Fast Transfer From Saidgani Musaev, to Payid Phone, Saidgani"
+  },
+  {
+    "max_sim": 0.875,
+    "members": [
+      {
+        "count": 1,
+        "payee": "ATM 210 Burwood B"
+      },
+      {
+        "count": 1,
+        "payee": "ATM 210 Burwood C"
+      },
+      {
+        "count": 1,
+        "payee": "ATM 210 Burwood a"
+      }
+    ],
+    "min_sim": 0.875,
+    "suggested_canonical": "ATM 210 Burwood a"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Estimated Investment Returns Since 01 Jan Xx24 - High Growth"
+      },
+      {
+        "count": 2,
+        "payee": "Estimated Investment Returns Since 01 Jul Xx23 - High Growth"
+      },
+      {
+        "count": 1,
+        "payee": "Estimated Investment Returns Since 01 Jul Xx24 - High Growth"
+      }
+    ],
+    "min_sim": 0.869,
+    "suggested_canonical": "Estimated Investment Returns Since 01 Jul Xx23 - High Growth"
+  },
+  {
+    "max_sim": 0.848,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Gnt Services Lqps North Strathfield"
+      },
+      {
+        "count": 1,
+        "payee": "Gnt Services North Strathfau"
+      },
+      {
+        "count": 7,
+        "payee": "Gnt Services North Strathfield"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Gnt Services North Strathfield"
+  },
+  {
+    "max_sim": 0.839,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Wok N Bbq Chinese Re Burwood"
+      },
+      {
+        "count": 2,
+        "payee": "Wok N Bbq Chinese Rest Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Wok N Bbq Chinese Resta Burwood"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Wok N Bbq Chinese Rest Burwood"
+  },
+  {
+    "max_sim": 0.87,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Burwood Discount Chemi"
+      },
+      {
+        "count": 1,
+        "payee": "Burwood Discount Chemi Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Burwood Discount Chemis Burwood"
+      }
+    ],
+    "min_sim": 0.808,
+    "suggested_canonical": "Burwood Discount Chemis Burwood"
+  },
+  {
+    "max_sim": 0.87,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Papparich Macquarie"
+      },
+      {
+        "count": 2,
+        "payee": "Papparich Macquarie Park"
+      },
+      {
+        "count": 2,
+        "payee": "Papparich Macquarie U Macquarie Park"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Papparich Macquarie U Macquarie Park"
+  },
+  {
+    "max_sim": 0.912,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Estimated Investment Returns Since 01 Jan Xx24 - Sustainable Balanced"
+      },
+      {
+        "count": 2,
+        "payee": "Estimated Investment Returns Since 01 Jul Xx23 - Sustainable Balanced"
+      },
+      {
+        "count": 1,
+        "payee": "Estimated Investment Returns Since 01 Jul Xx24 - Sustainable Balanced"
+      }
+    ],
+    "min_sim": 0.806,
+    "suggested_canonical": "Estimated Investment Returns Since 01 Jul Xx23 - Sustainable Balanced"
+  },
+  {
+    "max_sim": 0.852,
+    "members": [
+      {
+        "count": 7,
+        "payee": "Bespoke Letterpress Bowral"
+      },
+      {
+        "count": 1,
+        "payee": "Bespoke Letterpress L Bowral"
+      },
+      {
+        "count": 1,
+        "payee": "Bespoke Letterpress Pt Bowral"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "Bespoke Letterpress Bowral"
+  },
+  {
+    "max_sim": 0.853,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Tam S & Tam L N Deposit - Receipt"
+      },
+      {
+        "count": 1,
+        "payee": "Tam S & Tam L N Deposit - Receipt 44184"
+      },
+      {
+        "count": 1,
+        "payee": "Tam S & Tam L N Deposit - Receipt 8829"
+      }
+    ],
+    "min_sim": 0.829,
+    "suggested_canonical": "Tam S & Tam L N Deposit - Receipt 8829"
+  },
+  {
+    "max_sim": 0.867,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Duo Strathfie Strathfield"
+      },
+      {
+        "count": 2,
+        "payee": "Duo Strathfiel Strathfield"
+      },
+      {
+        "count": 7,
+        "payee": "Duo Strathfield"
+      }
+    ],
+    "min_sim": 0.867,
+    "suggested_canonical": "Duo Strathfield"
+  },
+  {
+    "max_sim": 0.897,
+    "members": [
+      {
+        "count": 4,
+        "payee": "Cornerstone Presbyterian Chu"
+      },
+      {
+        "count": 2,
+        "payee": "Cornerstone Presbyterian Church"
+      },
+      {
+        "count": 2,
+        "payee": "Cornerstone Presbyterian Com"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Cornerstone Presbyterian Chu"
+  },
+  {
+    "max_sim": 0.905,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Yun Zhou Macquarie Pa"
+      },
+      {
+        "count": 6,
+        "payee": "Yun Zhou Macquarie Park"
+      }
+    ],
+    "min_sim": 0.905,
+    "suggested_canonical": "Yun Zhou Macquarie Park"
+  },
+  {
+    "max_sim": 0.805,
+    "members": [
+      {
+        "count": 7,
+        "payee": "International Transaction Fee Rebate - Receipt"
+      },
+      {
+        "count": 10,
+        "payee": "International Transaction Fee Receipt"
+      }
+    ],
+    "min_sim": 0.805,
+    "suggested_canonical": "International Transaction Fee Receipt"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 6,
+        "payee": "Woolworths Marsfie Marsfield"
+      },
+      {
+        "count": 1,
+        "payee": "Woolworths Marsfield"
+      }
+    ],
+    "min_sim": 0.9,
+    "suggested_canonical": "Woolworths Marsfie Marsfield"
+  },
+  {
+    "max_sim": 0.844,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Cathay Pacific Airways Sydney"
+      },
+      {
+        "count": 5,
+        "payee": "Cathay Pacific Airways Sydney (Syd)"
+      }
+    ],
+    "min_sim": 0.844,
+    "suggested_canonical": "Cathay Pacific Airways Sydney (Syd)"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Jason Hu"
+      },
+      {
+        "count": 10,
+        "payee": "Jason Hui"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Jason Hui"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 2,
+        "payee": "The Sneaker Laundry Lab Sydney"
+      },
+      {
+        "count": 1,
+        "payee": "The Sneaker Laundry Sydney"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "The Sneaker Laundry Lab Sydney"
+  },
+  {
+    "max_sim": 0.826,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Kitchen by Mike Kitchen Sydney"
+      },
+      {
+        "count": 2,
+        "payee": "Kitchen by Mike Sydney"
+      }
+    ],
+    "min_sim": 0.826,
+    "suggested_canonical": "Kitchen by Mike Kitchen Sydney"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 1,
+        "payee": "C Major Cafe and Desse Strathfield"
+      },
+      {
+        "count": 1,
+        "payee": "C Major Cafe and Desser Strathfield"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "C Major Cafe and Desser Strathfield"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 8,
+        "payee": "Woolworths Newingt Newington"
+      },
+      {
+        "count": 1,
+        "payee": "Woolworths Newington"
+      }
+    ],
+    "min_sim": 0.9,
+    "suggested_canonical": "Woolworths Newingt Newington"
+  },
+  {
+    "max_sim": 0.875,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Mancinis Wood Melbourne"
+      },
+      {
+        "count": 5,
+        "payee": "Mancinis Wood Melbourne Vi"
+      }
+    ],
+    "min_sim": 0.875,
+    "suggested_canonical": "Mancinis Wood Melbourne Vi"
+  },
+  {
+    "max_sim": 0.938,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Beijingguojidujia"
+      },
+      {
+        "count": 1,
+        "payee": "Beijingguojidujiaq"
+      }
+    ],
+    "min_sim": 0.938,
+    "suggested_canonical": "Beijingguojidujia"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Bravo Repair Centr St Peters"
+      },
+      {
+        "count": 1,
+        "payee": "Bravo Repair Centre St Peters"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Bravo Repair Centre St Peters"
+  },
+  {
+    "max_sim": 0.913,
+    "members": [
+      {
+        "count": 4,
+        "payee": "The Knox Made in Watso Watson"
+      },
+      {
+        "count": 1,
+        "payee": "The Knox Made in Watson"
+      }
+    ],
+    "min_sim": 0.913,
+    "suggested_canonical": "The Knox Made in Watso Watson"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Strathfield Boulevar"
+      },
+      {
+        "count": 2,
+        "payee": "Strathfield Boulevar Strathfield"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Strathfield Boulevar Strathfield"
+  },
+  {
+    "max_sim": 0.815,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Barrenjoey House Palm Beach"
+      },
+      {
+        "count": 1,
+        "payee": "Barrenjoeyhouse Palm Beach"
+      }
+    ],
+    "min_sim": 0.815,
+    "suggested_canonical": "Barrenjoeyhouse Palm Beach"
+  },
+  {
+    "max_sim": 0.824,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Apple Espresso Bar Ap01 Cupertino"
+      },
+      {
+        "count": 2,
+        "payee": "Apple Espresso Bar Vp01 Cupertino"
+      }
+    ],
+    "min_sim": 0.824,
+    "suggested_canonical": "Apple Espresso Bar Vp01 Cupertino"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Whsmith Sydt1 Arrival1 Mascot"
+      },
+      {
+        "count": 1,
+        "payee": "Whsmith Sydt1 Arrival2 Mascot"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Whsmith Sydt1 Arrival2 Mascot"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Airport Retail Enter Mascot"
+      },
+      {
+        "count": 1,
+        "payee": "Airport Retail Enterpr Mascot"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Airport Retail Enterpr Mascot"
+  },
+  {
+    "max_sim": 0.833,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Rhodes Phoenix Chines 6 Rhodes"
+      },
+      {
+        "count": 2,
+        "payee": "Rhodes Phoenix Chines Rhodes"
+      }
+    ],
+    "min_sim": 0.833,
+    "suggested_canonical": "Rhodes Phoenix Chines Rhodes"
+  },
+  {
+    "max_sim": 0.913,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Friendly Grocer Croy Croydon"
+      },
+      {
+        "count": 4,
+        "payee": "Friendly Grocer Croydon"
+      }
+    ],
+    "min_sim": 0.913,
+    "suggested_canonical": "Friendly Grocer Croydon"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Bathers Pavilion X3522 Mosman"
+      },
+      {
+        "count": 2,
+        "payee": "Bathers Pavilion X3529 Mosman"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Bathers Pavilion X3529 Mosman"
+  },
+  {
+    "max_sim": 0.913,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Tom'S Project - B Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Tom'S Project - Burwood"
+      }
+    ],
+    "min_sim": 0.913,
+    "suggested_canonical": "Tom'S Project - Burwood"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 5,
+        "payee": "Mad Wholefoods Pl Summer Hill"
+      },
+      {
+        "count": 2,
+        "payee": "Mad Wholefoods Summer Hill"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "Mad Wholefoods Pl Summer Hill"
+  },
+  {
+    "max_sim": 0.923,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Harvey Norman Av/It Aub Auburn"
+      },
+      {
+        "count": 1,
+        "payee": "Harvey Norman Av/It Auburn"
+      }
+    ],
+    "min_sim": 0.923,
+    "suggested_canonical": "Harvey Norman Av/It Auburn"
+  },
+  {
+    "max_sim": 0.909,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Harbour Plaza Resort C"
+      },
+      {
+        "count": 1,
+        "payee": "Harbour Plaza Resort Cit"
+      }
+    ],
+    "min_sim": 0.909,
+    "suggested_canonical": "Harbour Plaza Resort Cit"
+  },
+  {
+    "max_sim": 0.842,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Sydney Airport Sxx3570 Syd Intl Termin"
+      },
+      {
+        "count": 3,
+        "payee": "Sydney Airport Sxx3571 Syd Intl Termin"
+      }
+    ],
+    "min_sim": 0.842,
+    "suggested_canonical": "Sydney Airport Sxx3571 Syd Intl Termin"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Woolworths West Ry West Ryde"
+      },
+      {
+        "count": 1,
+        "payee": "Woolworths West Ryde"
+      }
+    ],
+    "min_sim": 0.9,
+    "suggested_canonical": "Woolworths West Ry West Ryde"
+  },
+  {
+    "max_sim": 0.839,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Prosperous Lgj Group 15 Villawood"
+      },
+      {
+        "count": 3,
+        "payee": "Prosperous Lgj Group Villawood"
+      }
+    ],
+    "min_sim": 0.839,
+    "suggested_canonical": "Prosperous Lgj Group Villawood"
+  },
+  {
+    "max_sim": 0.842,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Palm Beach Wine Co"
+      },
+      {
+        "count": 1,
+        "payee": "Palm Beach Wine Co Palm Beach"
+      }
+    ],
+    "min_sim": 0.842,
+    "suggested_canonical": "Palm Beach Wine Co Palm Beach"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Dental Corporation /L Burwood"
+      },
+      {
+        "count": 4,
+        "payee": "Dental Corporation Burwood"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "Dental Corporation Burwood"
+  },
+  {
+    "max_sim": 0.938,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Unibros UTS Ultimo"
+      },
+      {
+        "count": 6,
+        "payee": "Unibros UTS Unibros Ultimo"
+      }
+    ],
+    "min_sim": 0.938,
+    "suggested_canonical": "Unibros UTS Unibros Ultimo"
+  },
+  {
+    "max_sim": 0.806,
+    "members": [
+      {
+        "count": 5,
+        "payee": "Merchants of Ultimo 577 Broadway"
+      },
+      {
+        "count": 1,
+        "payee": "Merchants of Ultimo Broadway"
+      }
+    ],
+    "min_sim": 0.806,
+    "suggested_canonical": "Merchants of Ultimo 577 Broadway"
+  },
+  {
+    "max_sim": 0.813,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Kingpin Bowling North Strathfau"
+      },
+      {
+        "count": 8,
+        "payee": "Kingpin Bowling North Strathfield"
+      }
+    ],
+    "min_sim": 0.813,
+    "suggested_canonical": "Kingpin Bowling North Strathfield"
+  },
+  {
+    "max_sim": 0.833,
+    "members": [
+      {
+        "count": 4,
+        "payee": "Ippudo - Westfield Sydney"
+      },
+      {
+        "count": 5,
+        "payee": "Ippudo Westfield Sydney"
+      }
+    ],
+    "min_sim": 0.833,
+    "suggested_canonical": "Ippudo Westfield Sydney"
+  },
+  {
+    "max_sim": 0.917,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Oliver Brown Strathfiel Strathfield"
+      },
+      {
+        "count": 1,
+        "payee": "Oliver Brown Strathfield"
+      }
+    ],
+    "min_sim": 0.917,
+    "suggested_canonical": "Oliver Brown Strathfield"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 2,
+        "payee": "McDonald's Dt 0314 Enfield"
+      },
+      {
+        "count": 1,
+        "payee": "Mcdonald'S 0314 Enfield"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "McDonald's Dt 0314 Enfield"
+  },
+  {
+    "max_sim": 0.846,
+    "members": [
+      {
+        "count": 5,
+        "payee": "Discount General Burwo Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Discount General L Burwood"
+      }
+    ],
+    "min_sim": 0.846,
+    "suggested_canonical": "Discount General Burwo Burwood"
+  },
+  {
+    "max_sim": 0.84,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Strathfield Veggie She Strathfield"
+      },
+      {
+        "count": 1,
+        "payee": "Strathfield Veggie Shed Strathfield"
+      }
+    ],
+    "min_sim": 0.84,
+    "suggested_canonical": "Strathfield Veggie She Strathfield"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 2,
+        "payee": "PayPal *Budgetpetpr Bud Xxxxxx5886"
+      },
+      {
+        "count": 2,
+        "payee": "PayPal *Budgetpetpr Xxxxxx5886"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "PayPal *Budgetpetpr Xxxxxx5886"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Rickshaw Internation Burwood"
+      },
+      {
+        "count": 3,
+        "payee": "Rickshaw International Burwood"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Rickshaw International Burwood"
+  },
+  {
+    "max_sim": 0.848,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Holy Basil Darling Squ Haymarket"
+      },
+      {
+        "count": 1,
+        "payee": "Holy Basil Darling Squa Haymarket"
+      }
+    ],
+    "min_sim": 0.848,
+    "suggested_canonical": "Holy Basil Darling Squa Haymarket"
+  },
+  {
+    "max_sim": 0.905,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Ice Kirin Bar Burw Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Ice Kirin Bar Burwood"
+      }
+    ],
+    "min_sim": 0.905,
+    "suggested_canonical": "Ice Kirin Bar Burw Burwood"
+  },
+  {
+    "max_sim": 0.92,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Fresh Seafood Str Strathfield"
+      },
+      {
+        "count": 1,
+        "payee": "Fresh Seafood Strathfield"
+      }
+    ],
+    "min_sim": 0.92,
+    "suggested_canonical": "Fresh Seafood Str Strathfield"
+  },
+  {
+    "max_sim": 0.842,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Uni Bros UTS Ultimo"
+      },
+      {
+        "count": 6,
+        "payee": "Uni Bros UTS Uni Br Ultimo"
+      }
+    ],
+    "min_sim": 0.842,
+    "suggested_canonical": "Uni Bros UTS Uni Br Ultimo"
+  },
+  {
+    "max_sim": 0.882,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Top Impression Bakery 1 Chippendale"
+      },
+      {
+        "count": 1,
+        "payee": "Top Impression Bakery Chippendale"
+      }
+    ],
+    "min_sim": 0.882,
+    "suggested_canonical": "Top Impression Bakery Chippendale"
+  },
+  {
+    "max_sim": 0.882,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Kopi-Tiam @ Spice Alley Chippendale"
+      },
+      {
+        "count": 3,
+        "payee": "Kopi-Tiam Spice Alley Chippendale"
+      }
+    ],
+    "min_sim": 0.882,
+    "suggested_canonical": "Kopi-Tiam Spice Alley Chippendale"
+  },
+  {
+    "max_sim": 0.808,
+    "members": [
+      {
+        "count": 1,
+        "payee": "The Body Shop - QVB Sydney"
+      },
+      {
+        "count": 1,
+        "payee": "The Body Shop QVB Sy Sydney"
+      }
+    ],
+    "min_sim": 0.808,
+    "suggested_canonical": "The Body Shop QVB Sy Sydney"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 6,
+        "payee": "Tasty Towns Gelat Rhodes"
+      },
+      {
+        "count": 1,
+        "payee": "Tasty Towns Gelato Rhodes"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Tasty Towns Gelat Rhodes"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 9,
+        "payee": "Coles Broadway"
+      },
+      {
+        "count": 1,
+        "payee": "Coles Broadway 02"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Coles Broadway"
+  },
+  {
+    "max_sim": 0.826,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Dutch Smuggler Sydney"
+      },
+      {
+        "count": 2,
+        "payee": "Dutch Smuggler Sydney P Sydney"
+      }
+    ],
+    "min_sim": 0.826,
+    "suggested_canonical": "Dutch Smuggler Sydney P Sydney"
+  },
+  {
+    "max_sim": 0.815,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Decathlon Australia Pt Tempe"
+      },
+      {
+        "count": 6,
+        "payee": "Decathlon Australia Tempe"
+      }
+    ],
+    "min_sim": 0.815,
+    "suggested_canonical": "Decathlon Australia Tempe"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Salt Meats Cheese Cq 68 Sydney"
+      },
+      {
+        "count": 1,
+        "payee": "Salt Meats Cheese Cq Sydney"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Salt Meats Cheese Cq Sydney"
+  },
+  {
+    "max_sim": 0.917,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Lil Miss Collins B Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Lil Miss Collins Burwood"
+      }
+    ],
+    "min_sim": 0.917,
+    "suggested_canonical": "Lil Miss Collins Burwood"
+  },
+  {
+    "max_sim": 0.867,
+    "members": [
+      {
+        "count": 10,
+        "payee": "Z Cosme Burwood"
+      },
+      {
+        "count": 2,
+        "payee": "Z Cosme Z Cosme Burwood"
+      }
+    ],
+    "min_sim": 0.867,
+    "suggested_canonical": "Z Cosme Burwood"
+  },
+  {
+    "max_sim": 0.88,
+    "members": [
+      {
+        "count": 6,
+        "payee": "Double Barral Cof Burwood"
+      },
+      {
+        "count": 4,
+        "payee": "Double Barral Coff Burwood"
+      }
+    ],
+    "min_sim": 0.88,
+    "suggested_canonical": "Double Barral Cof Burwood"
+  },
+  {
+    "max_sim": 0.818,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Cash Deposit - Beem It - Receipt"
+      },
+      {
+        "count": 1,
+        "payee": "Cash Deposit - Beem It - Receipt 56793"
+      }
+    ],
+    "min_sim": 0.818,
+    "suggested_canonical": "Cash Deposit - Beem It - Receipt 56793"
+  },
+  {
+    "max_sim": 0.906,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Ho Jiak - Strathfield Melbourne"
+      },
+      {
+        "count": 1,
+        "payee": "Ho Jiak - Strathfield Melbourne Vi"
+      }
+    ],
+    "min_sim": 0.906,
+    "suggested_canonical": "Ho Jiak - Strathfield Melbourne"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 5,
+        "payee": "Three Mothers Kitche Burwood"
+      },
+      {
+        "count": 3,
+        "payee": "Three Mothers Kitchen Burwood"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Three Mothers Kitche Burwood"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Mee - the Noodle House Burwood"
+      },
+      {
+        "count": 8,
+        "payee": "Mee the Noodle House Burwood"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Mee the Noodle House Burwood"
+  },
+  {
+    "max_sim": 0.895,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Woolworths Chullor Chullora"
+      },
+      {
+        "count": 1,
+        "payee": "Woolworths Chullora"
+      }
+    ],
+    "min_sim": 0.895,
+    "suggested_canonical": "Woolworths Chullora"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Kmart 1155 Broadway"
+      },
+      {
+        "count": 8,
+        "payee": "Kmart Broadway 1155 Broadway"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Kmart Broadway 1155 Broadway"
+  },
+  {
+    "max_sim": 0.806,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Smith St Traders Summer Hill"
+      },
+      {
+        "count": 1,
+        "payee": "Smith Street Traders Summer Hill"
+      }
+    ],
+    "min_sim": 0.806,
+    "suggested_canonical": "Smith Street Traders Summer Hill"
+  },
+  {
+    "max_sim": 0.913,
+    "members": [
+      {
+        "count": 1,
+        "payee": "* Matthias Media Waterloo"
+      },
+      {
+        "count": 3,
+        "payee": "Matthias Media Waterloo"
+      }
+    ],
+    "min_sim": 0.913,
+    "suggested_canonical": "Matthias Media Waterloo"
+  },
+  {
+    "max_sim": 0.808,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Burwood Pharmacy NSW P Burwood"
+      },
+      {
+        "count": 3,
+        "payee": "Burwood Pharmacy NSW Pt Burwood"
+      }
+    ],
+    "min_sim": 0.808,
+    "suggested_canonical": "Burwood Pharmacy NSW Pt Burwood"
+  },
+  {
+    "max_sim": 0.839,
+    "members": [
+      {
+        "count": 9,
+        "payee": "Mediconsul Wellhams Ph Croydon"
+      },
+      {
+        "count": 3,
+        "payee": "Mediconsul Wellhams Pha Croydon"
+      }
+    ],
+    "min_sim": 0.839,
+    "suggested_canonical": "Mediconsul Wellhams Ph Croydon"
+  },
+  {
+    "max_sim": 0.8,
+    "members": [
+      {
+        "count": 6,
+        "payee": "Sushia Broadway L 1 Broadway"
+      },
+      {
+        "count": 2,
+        "payee": "Sushia Broadway L Broadway"
+      }
+    ],
+    "min_sim": 0.8,
+    "suggested_canonical": "Sushia Broadway L 1 Broadway"
+  },
+  {
+    "max_sim": 0.938,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Lanzhou Lamian Beef Macquarie Pa"
+      },
+      {
+        "count": 5,
+        "payee": "Lanzhou Lamian Beef Macquarie Park"
+      }
+    ],
+    "min_sim": 0.938,
+    "suggested_canonical": "Lanzhou Lamian Beef Macquarie Park"
+  },
+  {
+    "max_sim": 0.833,
+    "members": [
+      {
+        "count": 2,
+        "payee": "New Galaxy Entertain Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "New Galaxy Entertainmen Burwood"
+      }
+    ],
+    "min_sim": 0.833,
+    "suggested_canonical": "New Galaxy Entertain Burwood"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Sahara Turkish Resta"
+      },
+      {
+        "count": 2,
+        "payee": "Sahara Turkish Restaur"
+      }
+    ],
+    "min_sim": 0.9,
+    "suggested_canonical": "Sahara Turkish Restaur"
+  },
+  {
+    "max_sim": 0.833,
+    "members": [
+      {
+        "count": 1,
+        "payee": "The Sports Basement 053 San Francisco"
+      },
+      {
+        "count": 1,
+        "payee": "The Sports Basement San Francisco"
+      }
+    ],
+    "min_sim": 0.833,
+    "suggested_canonical": "The Sports Basement San Francisco"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 5,
+        "payee": "Pop Mart Oceania L Melbourne"
+      },
+      {
+        "count": 2,
+        "payee": "Pop Mart Oceania Li Melbourne"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Pop Mart Oceania L Melbourne"
+  },
+  {
+    "max_sim": 1.0,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Starbucks the Rocks"
+      },
+      {
+        "count": 2,
+        "payee": "Starbucks the Rocks the Rocks"
+      }
+    ],
+    "min_sim": 1.0,
+    "suggested_canonical": "Starbucks the Rocks the Rocks"
+  },
+  {
+    "max_sim": 0.857,
+    "members": [
+      {
+        "count": 4,
+        "payee": "Single O-Surry Hills"
+      },
+      {
+        "count": 4,
+        "payee": "Single O-Surry Hills Surry Hills"
+      }
+    ],
+    "min_sim": 0.857,
+    "suggested_canonical": "Single O-Surry Hills Surry Hills"
+  },
+  {
+    "max_sim": 1.0,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Anna McQueen"
+      },
+      {
+        "count": 4,
+        "payee": "Anna Mcqueen"
+      }
+    ],
+    "min_sim": 1.0,
+    "suggested_canonical": "Anna Mcqueen"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 4,
+        "payee": "Huntley Projects CBD 97 Sydney"
+      },
+      {
+        "count": 1,
+        "payee": "Huntley Projects CBD Sydney"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Huntley Projects CBD 97 Sydney"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 1,
+        "payee": "1915 Lanzhou Beef No Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "1915 Lanzhou Beef Nood Burwood"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "1915 Lanzhou Beef Nood Burwood"
+  },
+  {
+    "max_sim": 0.889,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Cornerstone Concor Concord"
+      },
+      {
+        "count": 2,
+        "payee": "Cornerstone Concord"
+      }
+    ],
+    "min_sim": 0.889,
+    "suggested_canonical": "Cornerstone Concord"
+  },
+  {
+    "max_sim": 0.929,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Sushi World - Macq Macquarie Park"
+      },
+      {
+        "count": 1,
+        "payee": "Sushi World - Macquarie Park"
+      }
+    ],
+    "min_sim": 0.929,
+    "suggested_canonical": "Sushi World - Macq Macquarie Park"
+  },
+  {
+    "max_sim": 0.864,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Mr David James Greena"
+      },
+      {
+        "count": 6,
+        "payee": "Mr David James Greenaway"
+      }
+    ],
+    "min_sim": 0.864,
+    "suggested_canonical": "Mr David James Greenaway"
+  },
+  {
+    "max_sim": 0.922,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Fast Transfer From Mr David James Greena, to Payid Phone, David Lunch"
+      },
+      {
+        "count": 2,
+        "payee": "Fast Transfer From Mr David James Greena, to Payid Phone, Lunch David"
+      }
+    ],
+    "min_sim": 0.922,
+    "suggested_canonical": "Fast Transfer From Mr David James Greena, to Payid Phone, Lunch David"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Stephanie Wong Deposit - Receipt 72809"
+      },
+      {
+        "count": 1,
+        "payee": "Stephanie Wong Deposit - Receipt 7789"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "Stephanie Wong Deposit - Receipt 7789"
+  },
+  {
+    "max_sim": 0.815,
+    "members": [
+      {
+        "count": 3,
+        "payee": "Alo-Ban - Inst Strathfield"
+      },
+      {
+        "count": 2,
+        "payee": "Alo-Ban - Insto Strathfield"
+      }
+    ],
+    "min_sim": 0.815,
+    "suggested_canonical": "Alo-Ban - Inst Strathfield"
+  },
+  {
+    "max_sim": 0.895,
+    "members": [
+      {
+        "count": 4,
+        "payee": "Ticketek Web Sy Sydney"
+      },
+      {
+        "count": 5,
+        "payee": "Ticketek Web Sydney"
+      }
+    ],
+    "min_sim": 0.895,
+    "suggested_canonical": "Ticketek Web Sydney"
+  },
+  {
+    "max_sim": 0.813,
+    "members": [
+      {
+        "count": 1,
+        "payee": "La Lune Market North Strathfau"
+      },
+      {
+        "count": 6,
+        "payee": "La Lune Market North Strathfield"
+      }
+    ],
+    "min_sim": 0.813,
+    "suggested_canonical": "La Lune Market North Strathfield"
+  },
+  {
+    "max_sim": 0.867,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Naya AUS Group 1 Macquarie Park"
+      },
+      {
+        "count": 2,
+        "payee": "Naya AUS Group Macquarie Park"
+      }
+    ],
+    "min_sim": 0.867,
+    "suggested_canonical": "Naya AUS Group Macquarie Park"
+  },
+  {
+    "max_sim": 0.867,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Prijm Investments Chippendale"
+      },
+      {
+        "count": 3,
+        "payee": "Prijm Investments L Chippendale"
+      }
+    ],
+    "min_sim": 0.867,
+    "suggested_canonical": "Prijm Investments L Chippendale"
+  },
+  {
+    "max_sim": 0.867,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Pho Life Pho Sure Homebush West"
+      },
+      {
+        "count": 1,
+        "payee": "Pho Life Pho Sure L Homebush West"
+      }
+    ],
+    "min_sim": 0.867,
+    "suggested_canonical": "Pho Life Pho Sure Homebush West"
+  },
+  {
+    "max_sim": 0.9,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Concord Bakehouse Concord"
+      },
+      {
+        "count": 1,
+        "payee": "Concord Bakehouse Concord02"
+      }
+    ],
+    "min_sim": 0.9,
+    "suggested_canonical": "Concord Bakehouse Concord02"
+  },
+  {
+    "max_sim": 0.813,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Bancilchn*Weixin*Jiangx Shenzhen"
+      },
+      {
+        "count": 1,
+        "payee": "Bancilchn*Weixin*Jiangy Shenzhen"
+      }
+    ],
+    "min_sim": 0.813,
+    "suggested_canonical": "Bancilchn*Weixin*Jiangy Shenzhen"
+  },
+  {
+    "max_sim": 0.814,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Curtis Millar, to Payid Phone, Ippudo"
+      },
+      {
+        "count": 1,
+        "payee": "Fast Transfer From Curtis Millar, to Payid Phone, Yayoi"
+      }
+    ],
+    "min_sim": 0.814,
+    "suggested_canonical": "Fast Transfer From Curtis Millar, to Payid Phone, Yayoi"
+  },
+  {
+    "max_sim": 0.821,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Sushi Hub World Towe Sydney"
+      },
+      {
+        "count": 1,
+        "payee": "Sushi Hub World Tower Sydney"
+      }
+    ],
+    "min_sim": 0.821,
+    "suggested_canonical": "Sushi Hub World Tower Sydney"
+  },
+  {
+    "max_sim": 0.909,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Anything Dance Croyd Croydon"
+      },
+      {
+        "count": 1,
+        "payee": "Anything Dance Croydon"
+      }
+    ],
+    "min_sim": 0.909,
+    "suggested_canonical": "Anything Dance Croydon"
+  },
+  {
+    "max_sim": 0.833,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Berkelo Mona Vale"
+      },
+      {
+        "count": 1,
+        "payee": "Berkelo Mv Mona Vale"
+      }
+    ],
+    "min_sim": 0.833,
+    "suggested_canonical": "Berkelo Mona Vale"
+  },
+  {
+    "max_sim": 0.895,
+    "members": [
+      {
+        "count": 1,
+        "payee": "* Bscycling Southport"
+      },
+      {
+        "count": 4,
+        "payee": "Bscycling Southport"
+      }
+    ],
+    "min_sim": 0.895,
+    "suggested_canonical": "Bscycling Southport"
+  },
+  {
+    "max_sim": 0.824,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Kudoboard Denver"
+      },
+      {
+        "count": 3,
+        "payee": "Kudoboard Denver Co"
+      }
+    ],
+    "min_sim": 0.824,
+    "suggested_canonical": "Kudoboard Denver Co"
+  },
+  {
+    "max_sim": 0.81,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Edomae Sushi Burwood"
+      },
+      {
+        "count": 7,
+        "payee": "Edomae Sushi Edomae Burwood"
+      }
+    ],
+    "min_sim": 0.81,
+    "suggested_canonical": "Edomae Sushi Edomae Burwood"
+  },
+  {
+    "max_sim": 0.895,
+    "members": [
+      {
+        "count": 2,
+        "payee": "Eg Fuelco Marsfiel Marsfield"
+      },
+      {
+        "count": 1,
+        "payee": "Eg Fuelco Marsfield"
+      }
+    ],
+    "min_sim": 0.895,
+    "suggested_canonical": "Eg Fuelco Marsfiel Marsfield"
+  },
+  {
+    "max_sim": 0.906,
+    "members": [
+      {
+        "count": 6,
+        "payee": "The Missing Piece C Macquarie Park"
+      },
+      {
+        "count": 1,
+        "payee": "The Missing Piece Macquarie Park"
+      }
+    ],
+    "min_sim": 0.906,
+    "suggested_canonical": "The Missing Piece C Macquarie Park"
+  },
+  {
+    "max_sim": 0.828,
+    "members": [
+      {
+        "count": 1,
+        "payee": "Tk Chinatown Sydney Burwood"
+      },
+      {
+        "count": 1,
+        "payee": "Tk Chinatown Sydney Pt Burwood"
+      }
+    ],
+    "min_sim": 0.828,
+    "suggested_canonical": "Tk Chinatown Sydney Pt Burwood"
+  },
+  {
+    "max_sim": 0.875,
+    "members": [
+      {
+        "count": 7,
+        "payee": "Knight'S Coffee & Tea 3 Haymarket"
+      },
+      {
+        "count": 6,
+        "payee": "Knight'S Coffee & Tea Haymarket"
+      }
+    ],
+    "min_sim": 0.875,
+    "suggested_canonical": "Knight'S Coffee & Tea 3 Haymarket"
+  }
+]

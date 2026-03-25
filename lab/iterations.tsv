@@ -16,3 +16,4 @@ iteration	score	delta	hypothesis	outcome
 015	92.98	+0.03	PTY LTD, state+postcode, digit run suffixes in stage1	kept
 016	92.98	+0.00	Stage 5 trailing noise (VISA, BANK, etc.) + state uppercase_exceptions	kept
 017	92.98	+0.00	Title prefix stripping (MR/MRS/MS/DR)	discarded — MR YUM false positive
+018	92.98	+0.00	Build + run Rust clusterer (113 clusters found, diagnostic)	kept
