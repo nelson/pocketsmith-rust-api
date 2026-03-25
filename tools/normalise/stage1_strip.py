@@ -12,16 +12,16 @@ def load_rules(rules_dir: str) -> dict:
         rules = yaml.safe_load(f)
     # Pre-compile regexes
     for p in rules.get("prefixes", []):
-        p["_re"] = re.compile(p["pattern"])
+        p["_re"] = re.compile(p["pattern"], re.IGNORECASE)
     for s in rules.get("suffixes", []):
-        s["_re"] = re.compile(s["pattern"])
+        s["_re"] = re.compile(s["pattern"], re.IGNORECASE)
     return rules
 
 
 def apply(payee: str, rules: dict) -> tuple[str, dict]:
     """Strip prefixes and suffixes. Returns (cleaned_payee, metadata)."""
     metadata = {}
-    result = payee
+    result = payee.upper()
 
     # Apply prefixes (first match wins)
     for rule in rules.get("prefixes", []):
