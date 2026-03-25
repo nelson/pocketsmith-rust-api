@@ -10,3 +10,4 @@ iteration	score	delta	hypothesis	outcome
 009	92.80	0.19	Fix classifications (BPAY, loan, interest) + chain consolidation + joint account mapping	kept
 010	92.85	0.05	Utilities consolidation (Strathfield Council, Sydney Water, EnergyAustralia) + more chains	kept
 011	92.87	0.02	Fix case variants (Netflix, Powershop) + more merchant consolidation (Microsoft, Scan QR)	kept
+012	92.87	0.00	Add supplementary long-tail metrics to measure.py (diagnostic only)	kept

@@ -5,6 +5,8 @@ import json
 import math
 import re
 import sqlite3
+from collections import Counter
+
 import yaml
 from pathlib import Path
 
@@ -109,7 +111,6 @@ def score_dedup(results: list[dict]) -> float:
     score = 100.0 / (1.0 + math.exp(-12.0 * (reduction - 0.35)))
 
     # Over-merge penalty: if any single normalised payee maps to >200 originals, subtract 20
-    from collections import Counter
     norm_counts = Counter(r["final"] for r in results)
     max_count = max(norm_counts.values()) if norm_counts else 0
     if max_count > 200:
@@ -210,8 +211,13 @@ def compute_metrics(results: list[dict], disambig_path: str, db_path: str) -> di
     # Stats
     originals = {r["original"] for r in results}
     normalised = {r["final"] for r in results}
-    from collections import Counter
     type_counts = Counter(r.get("type", "unknown") for r in results)
+
+    # Long-tail analysis
+    norm_counter = Counter(r["final"] for r in results)
+    orig_counter = Counter(r["original"] for r in results)
+    long_tail_before = sum(1 for v in orig_counter.values() if v <= 10)
+    long_tail_after = sum(1 for v in norm_counter.values() if v <= 10)
 
     return {
         "composite_score": round(q, 2),
@@ -228,6 +234,16 @@ def compute_metrics(results: list[dict], disambig_path: str, db_path: str) -> di
             "unique_normalised": len(normalised),
             "reduction_pct": round(100 * (len(originals) - len(normalised)) / len(originals), 1) if originals else 0,
             "type_distribution": dict(type_counts),
+        },
+        "long_tail": {
+            "unique_before": len(orig_counter),
+            "unique_after": len(norm_counter),
+            "long_tail_before": long_tail_before,
+            "long_tail_after": long_tail_after,
+            "txn_count_after": sum(v for v in norm_counter.values() if v <= 10),
+            "singleton_count": sum(1 for v in norm_counter.values() if v == 1),
+            "clusters_found": 0,
+            "clusters_merged": 0,
         },
         "disambig_failures": disambig_failures,
     }
