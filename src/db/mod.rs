@@ -30,6 +30,27 @@ pub fn initialize_in_memory() -> Result<Connection> {
     Ok(conn)
 }
 
+fn set_change_reason(conn: &Connection, reason: &str) -> Result<()> {
+    conn.execute("DELETE FROM _transaction_history_reason", [])?;
+    conn.execute("INSERT INTO _transaction_history_reason (reason) VALUES (?1)", [reason])?;
+    Ok(())
+}
+
+fn clear_change_reason(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM _transaction_history_reason", [])?;
+    Ok(())
+}
+
+pub fn with_change_reason<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
+where
+    F: FnOnce(&Connection) -> Result<T>,
+{
+    set_change_reason(conn, reason)?;
+    let result = f(conn);
+    clear_change_reason(conn)?;
+    result
+}
+
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;

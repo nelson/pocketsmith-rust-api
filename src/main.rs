@@ -5,6 +5,8 @@ use pocketsmith_sync::db;
 use pocketsmith_sync::models::TransactionParams;
 
 fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
+
     let api_key = std::env::var("POCKETSMITH_API_KEY")
         .context("POCKETSMITH_API_KEY environment variable not set")?;
 
@@ -40,11 +42,14 @@ fn main() -> Result<()> {
     println!("  {} total transactions", transactions.len());
 
     // Batch insert in a SQLite transaction for performance
-    let tx = conn.unchecked_transaction()?;
-    for txn in &transactions {
-        db::upsert_transaction(&tx, txn)?;
-    }
-    tx.commit()?;
+    db::with_change_reason(&conn, "pocketsmith", |conn| {
+        let tx = conn.unchecked_transaction()?;
+        for txn in &transactions {
+            db::upsert_transaction(&tx, txn)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })?;
 
     println!("Sync complete!");
     println!("  Users: 1");

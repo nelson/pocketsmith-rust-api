@@ -23,7 +23,7 @@ pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
         .map(|l| serde_json::to_string(l).unwrap_or_default());
 
     conn.execute(
-        "INSERT OR REPLACE INTO transactions (
+        "INSERT INTO transactions (
             id, transaction_type, payee, amount, amount_in_base_currency,
             date, cheque_number, memo, is_transfer, category_id,
             note, labels, original_payee, upload_source,
@@ -32,7 +32,27 @@ pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
         ) VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
             ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
-        )",
+        )
+        ON CONFLICT(id) DO UPDATE SET
+            transaction_type = excluded.transaction_type,
+            payee = excluded.payee,
+            amount = excluded.amount,
+            amount_in_base_currency = excluded.amount_in_base_currency,
+            date = excluded.date,
+            cheque_number = excluded.cheque_number,
+            memo = excluded.memo,
+            is_transfer = excluded.is_transfer,
+            category_id = excluded.category_id,
+            note = excluded.note,
+            labels = excluded.labels,
+            original_payee = excluded.original_payee,
+            upload_source = excluded.upload_source,
+            closing_balance = excluded.closing_balance,
+            transaction_account_id = excluded.transaction_account_id,
+            status = excluded.status,
+            needs_review = excluded.needs_review,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at",
         params![
             t.id,
             t.transaction_type,
@@ -63,12 +83,15 @@ pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
 mod tests {
     use super::*;
     use crate::db::test_helpers::*;
+    use crate::db::with_change_reason;
 
     #[test]
     fn test_upsert_transaction_simple() {
         let conn = test_db();
-        let txn = make_transaction(1, "Supermarket");
-        upsert_transaction(&conn, &txn).unwrap();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Supermarket"))
+        })
+        .unwrap();
 
         let payee: String = conn
             .query_row("SELECT payee FROM transactions WHERE id = 1", [], |row| {
@@ -83,7 +106,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Supermarket");
         txn.category = Some(make_category(10, "Food"));
-        upsert_transaction(&conn, &txn).unwrap();
+        with_change_reason(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let cat_title: String = conn
             .query_row("SELECT title FROM categories WHERE id = 10", [], |row| {
@@ -107,7 +130,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Supermarket");
         txn.transaction_account = Some(make_transaction_account(300, "Daily"));
-        upsert_transaction(&conn, &txn).unwrap();
+        with_change_reason(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let ta_name: String = conn
             .query_row(
@@ -133,7 +156,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Store");
         txn.labels = Some(vec!["food".into(), "weekly".into()]);
-        upsert_transaction(&conn, &txn).unwrap();
+        with_change_reason(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let labels: String = conn
             .query_row("SELECT labels FROM transactions WHERE id = 1", [], |row| {
@@ -147,8 +170,11 @@ mod tests {
     #[test]
     fn test_upsert_transaction_replace() {
         let conn = test_db();
-        upsert_transaction(&conn, &make_transaction(1, "Store A")).unwrap();
-        upsert_transaction(&conn, &make_transaction(1, "Store B")).unwrap();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
+            upsert_transaction(conn, &make_transaction(1, "Store B"))
+        })
+        .unwrap();
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM transactions", [], |row| row.get(0))
@@ -174,7 +200,7 @@ mod tests {
         txn.labels = Some(vec!["groceries".into()]);
         txn.note = Some("Weekly shop".into());
 
-        upsert_transaction(&conn, &txn).unwrap();
+        with_change_reason(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let cat_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
@@ -199,17 +225,181 @@ mod tests {
     #[test]
     fn test_batch_upsert_transactions() {
         let conn = test_db();
-        let txns: Vec<Transaction> = (1..=100)
-            .map(|i| make_transaction(i, &format!("Store {}", i)))
-            .collect();
-
-        for txn in &txns {
-            upsert_transaction(&conn, txn).unwrap();
-        }
+        with_change_reason(&conn, "test", |conn| {
+            let txns: Vec<Transaction> = (1..=100)
+                .map(|i| make_transaction(i, &format!("Store {}", i)))
+                .collect();
+            for txn in &txns {
+                upsert_transaction(conn, txn)?;
+            }
+            Ok(())
+        })
+        .unwrap();
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM transactions", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 100);
+    }
+
+    // --- History tracking tests ---
+
+    #[test]
+    fn test_history_initial_insert() {
+        let conn = test_db();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))
+        })
+        .unwrap();
+
+        let (version, mask, payee, reason): (i64, i64, String, String) = conn
+            .query_row(
+                "SELECT _version, _mask, payee, reason FROM _transactions_history WHERE _rowid = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(version, 1);
+        assert_eq!(mask, 63);
+        assert_eq!(payee, "Store A");
+        assert_eq!(reason, "test");
+    }
+
+    #[test]
+    fn test_history_no_change_no_new_row() {
+        let conn = test_db();
+        let txn = make_transaction(1, "Store A");
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &txn)?;
+            upsert_transaction(conn, &txn)
+        })
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_history_tracked_field_change() {
+        let conn = test_db();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
+            upsert_transaction(conn, &make_transaction(1, "Store B"))
+        })
+        .unwrap();
+
+        let (version, mask, payee): (i64, i64, String) = conn
+            .query_row(
+                "SELECT _version, _mask, payee FROM _transactions_history WHERE _rowid = 1 AND _version = 2",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(version, 2);
+        assert_eq!(mask, 1); // only payee bit
+        assert_eq!(payee, "Store B");
+    }
+
+    #[test]
+    fn test_history_only_changed_fields_populated() {
+        let conn = test_db();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
+            let mut txn = make_transaction(1, "Store B");
+            txn.note = Some("a note".into());
+            upsert_transaction(conn, &txn)
+        })
+        .unwrap();
+
+        let memo_is_null: bool = conn
+            .query_row(
+                "SELECT memo IS NULL FROM _transactions_history WHERE _rowid = 1 AND _version = 2",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(memo_is_null); // memo didn't change, should be NULL
+    }
+
+    #[test]
+    fn test_history_multiple_field_changes_mask() {
+        let conn = test_db();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
+            let mut txn = make_transaction(1, "Store B"); // payee bit 0 = 1
+            txn.memo = Some("new memo".into()); // memo bit 5 = 32
+            upsert_transaction(conn, &txn)
+        })
+        .unwrap();
+
+        let mask: i64 = conn
+            .query_row(
+                "SELECT _mask FROM _transactions_history WHERE _rowid = 1 AND _version = 2",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mask, 1 | 32); // 33
+    }
+
+    #[test]
+    fn test_history_reason_recorded() {
+        let conn = test_db();
+        with_change_reason(&conn, "pocketsmith", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))
+        })
+        .unwrap();
+
+        let reason: String = conn
+            .query_row(
+                "SELECT reason FROM _transactions_history WHERE _rowid = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(reason, "pocketsmith");
+    }
+
+    #[test]
+    fn test_history_missing_context_fails() {
+        let conn = test_db();
+        let result = upsert_transaction(&conn, &make_transaction(1, "Store A"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_history_delete_creates_row() {
+        let conn = test_db();
+        with_change_reason(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
+            conn.execute("DELETE FROM transactions WHERE id = 1", [])?;
+            Ok(())
+        })
+        .unwrap();
+
+        let (version, mask): (i64, i64) = conn
+            .query_row(
+                "SELECT _version, _mask FROM _transactions_history WHERE _rowid = 1 ORDER BY _version DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(version, 2);
+        assert_eq!(mask, 63);
+
+        let payee_is_null: bool = conn
+            .query_row(
+                "SELECT payee IS NULL FROM _transactions_history WHERE _rowid = 1 AND _version = 2",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(payee_is_null);
     }
 }

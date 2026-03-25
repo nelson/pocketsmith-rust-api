@@ -13,6 +13,9 @@ target
 # Contains mutation testing data
 **/mutants.out*/
 
+# Environment variables
+.env
+
 # SQLite database
 *.db
 *.db-wal
