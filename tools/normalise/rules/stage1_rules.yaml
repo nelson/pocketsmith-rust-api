@@ -59,6 +59,22 @@ prefixes:
     name: "percent prefix"
   - pattern: "^GLOBAL-E\\* "
     name: "Global-E"
+  - pattern: "^EFTPOS\\s+"
+    name: "EFTPOS"
+  - pattern: "^EZI\\*"
+    name: "Ezi"
+  - pattern: "^DNH\\*"
+    name: "DNH"
+  - pattern: "^PP\\*"
+    name: "PP"
+  - pattern: "^WINDCAVE\\*"
+    name: "Windcave"
+  - pattern: "^LIGHTSPEED\\*(?:SR-)?"
+    name: "Lightspeed"
+  - pattern: "^LIME\\*"
+    name: "Lime"
+  - pattern: "^EB\\s*\\*"
+    name: "Eventbrite"
 
 suffixes:
   # Card + value date (most common pattern, ~3774 unique payees)
