@@ -669,12 +669,18 @@ merchant_mappings:
     canonical: "McDonald's Wollongong"
   - pattern: "^McDonald'?s? Pmatta.*"
     canonical: "McDonald's North Parramatta"
-  - pattern: "^McDonald'?s? Syd(?:ney)? (?:Domesti|Airport).*"
+  - pattern: "^McDonald'?s? Syd(?:ney)? (?:Domesti|Intern|Int Ai|Airport).*"
     canonical: "McDonald's Sydney Airport"
-  - pattern: "^McDonald'?s? Gateway.*Sydney.*"
+  - pattern: "^McDonald'?s? (?:Gateway|Plaza).*Sydney.*"
     canonical: "McDonald's Sydney"
-  - pattern: "^McDonald'?s? Plaza.*Sydney.*"
-    canonical: "McDonald's Sydney"
+  - pattern: "^McDonald'?s? Wynyard.*"
+    canonical: "McDonald's Wynyard"
+  - pattern: "^McDonald'?s? Strathfield.*"
+    canonical: "McDonald's Strathfield South"
+  - pattern: "^McDonald'?s? Croydon P(?:rk|ark).*"
+    canonical: "McDonald's Croydon Park"
+  - pattern: "^McDonald'?s? Five Dock.*"
+    canonical: "McDonald's Five Dock"
   - pattern: "^McDonald'?s? Hurstville.*"
     canonical: "McDonald's Hurstville"
   - pattern: "^McDonald'?s? \\d+ (.+)"
@@ -1324,10 +1330,118 @@ merchant_mappings:
     canonical: "Meriden School Strathfield"
 
   # Cotton On: consolidate
+  - pattern: "^Cotton on Body.*"
+    canonical: "Cotton On Body"
   - pattern: "^Cotton on.*"
     canonical: "Cotton On"
-  - pattern: "^Cotton On Body.*"
-    canonical: "Cotton On Body"
+
+  # Kmart: consolidate store numbers
+  - pattern: "^Kmart Burwood.*"
+    canonical: "Kmart Burwood"
+  - pattern: "^Kmart Online.*"
+    canonical: "Kmart Online"
+  - pattern: "^Kmart (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Kmart {1}"
+  - pattern: "^Kmart (.+?)\\s+\\d+$"
+    canonical: "Kmart {1}"
+
+  # Starbucks: consolidate
+  - pattern: "^Starbucks Central Park.*"
+    canonical: "Starbucks Chippendale"
+  - pattern: "^Starbucks Macquarie.*"
+    canonical: "Starbucks North Ryde"
+  - pattern: "^Starbucks Broadway.*"
+    canonical: "Starbucks Ultimo"
+  - pattern: "^Starbucks the Rocks.*"
+    canonical: "Starbucks The Rocks"
+
+  # Ippudo: consolidate truncated locations
+  - pattern: "^Ippudo.*Macquarie.*"
+    canonical: "Ippudo Macquarie"
+  - pattern: "^Ippudo Ma .*"
+    canonical: "Ippudo"
+
+  # Lovisa: consolidate
+  - pattern: "^Lovisa(?:\\.Com)?\\s+(?:Australia|\\d+).*"
+    canonical: "Lovisa Online"
+  - pattern: "^Lovisa QVB.*"
+    canonical: "Lovisa Sydney"
+  - pattern: "^Lovisa \\d+ (.+)"
+    canonical: "Lovisa {1}"
+
+  # Lindt: consolidate
+  - pattern: "^Lindt (?:&|&Amp;|and) Spr(?:ü|u)ngli.*"
+    canonical: "Lindt"
+  - pattern: "^Lindt (.+)"
+    canonical: "Lindt {1}"
+
+  # Haigh's: consolidate
+  - pattern: "^Haigh'S - X\\d+ (.+)"
+    canonical: "Haigh's {1}"
+  - pattern: "^Haigh'S Broadway.*"
+    canonical: "Haigh's Broadway"
+
+  # Heinemann: consolidate
+  - pattern: "^Heinemann (?:Depart|Duty Free).*Mascot.*"
+    canonical: "Heinemann Sydney Airport"
+
+  # Yo-Chi: strip store codes
+  - pattern: "^Yo-Chi (.+?)\\s+(?:X\\d+|\\d{4})\\s+(.+)"
+    canonical: "Yo-Chi {1}"
+  - pattern: "^Yo-Chi (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Yo-Chi {1}"
+
+  # Sports Basement: consolidate
+  - pattern: "^(?:The )?Sports Basement.*Sunnyvale.*"
+    canonical: "Sports Basement Sunnyvale"
+  - pattern: "^(?:The )?Sports Basement.*San Francisco.*"
+    canonical: "Sports Basement San Francisco"
+
+  # Heritage Coffee: consolidate
+  - pattern: "^Heritage Coffee Summer.*"
+    canonical: "Heritage Coffee Summer Hill"
+
+  # Luneburger: consolidate
+  - pattern: "^Luneburger (?:Australia )?(?:C|Cent|QVB|Qv).*(?:Sydney|Darlinghurst).*"
+    canonical: "Luneburger Sydney"
+  - pattern: "^Luneburger German Baker.*"
+    canonical: "Luneburger North Ryde"
+
+  # Cafe Sienna: consolidate
+  - pattern: "^Cafe Sienna.*Burwood.*"
+    canonical: "Cafe Sienna Burwood"
+
+  # Good Venture Partners: consolidate
+  - pattern: "^Good Ven(?:ture|tre).*Strathfield.*"
+    canonical: "Good Venture Partners Strathfield"
+  - pattern: "^Good Venture Partners$"
+    canonical: "Good Venture Partners Strathfield"
+
+  # Auvers Cafe: consolidate
+  - pattern: "^Auvers (?:Cafe|Ingens).*(?:Rhodes|Haymarket).*"
+    canonical: "Auvers Cafe"
+  - pattern: "^Auvers Cafe.*"
+    canonical: "Auvers Cafe"
+
+  # Hong Kong Bing Sutt: consolidate
+  - pattern: "^Hong Kong Bing Sutt.*Burwood.*"
+    canonical: "Hong Kong Bing Sutt Burwood"
+
+  # Priceline Pharmacy (Pline Ph): consolidate
+  - pattern: "^Pline Ph (.+)"
+    canonical: "Priceline Pharmacy {1}"
+
+  # Dopa: consolidate
+  - pattern: "^Dopa Donburi.*Martin.*"
+    canonical: "Dopa Donburi Martin Place"
+  - pattern: "^Dopa Martin.*"
+    canonical: "Dopa Martin Place"
+  - pattern: "^Dopa Donburi.*Milkba.*"
+    canonical: "Dopa North Ryde"
+  - pattern: "^Dopa by Devon.*"
+    canonical: "Dopa by Devon Sydney"
+  - pattern: "^Dopa Sydney$"
+    canonical: "Dopa Sydney"
 
   # --- Internal transfer consolidation (iter 028) ---
 
