@@ -12,6 +12,10 @@ persons_strip_memo:
   - "Lok Sun Nelson Tam"
   - "Saidgani Musaev"
   - "Tam S & Tam L N"
+  - "Tam S Tam L N"
+  - "Tam S Tam L"
+  - "Tam S S Tam L N"
+  - "Tam S S Tam L"
 
 persons:
   "LOK SUN NELSON TAM": "Nelson Tam"
@@ -30,6 +34,16 @@ persons:
   "Tam S S & Tam L": "Joint Account (Tam)"
   "Tam S & Tam L N": "Joint Account (Tam)"
   "TAM S S & TAM L N": "Joint Account (Tam)"
+  "TAM S S TAM L N": "Joint Account (Tam)"
+  "Tam S S Tam L N": "Joint Account (Tam)"
+  "TAM S S TAM L": "Joint Account (Tam)"
+  "Tam S S Tam L": "Joint Account (Tam)"
+  "TAM S &": "Joint Account (Tam)"
+  "Tam S &": "Joint Account (Tam)"
+  "TAM S TAM L N": "Joint Account (Tam)"
+  "Tam S Tam L N": "Joint Account (Tam)"
+  "TAM S TAM L": "Joint Account (Tam)"
+  "Tam S Tam L": "Joint Account (Tam)"
   "MR DAVID JAMES GREENAWAY": "David Greenaway"
   "MR DAVID JAMES GREENA": "David Greenaway"
   "Mr David James Greenaway": "David Greenaway"
@@ -137,21 +151,27 @@ banking_identity_mappings:
   # FMC: consolidate variants
   - pattern: "Direct Credit (?:XX)?\\d+ Fmc"
     canonical: "FMC"
+  # PAYMENT FROM / TRANSFER FROM Tam S: extract to Joint Account
+  - pattern: "(?:Payment|Transfer) From Tam S"
+    canonical: "Joint Account (Tam)"
   # BPAY Payment
   - pattern: "^(?:Bpay|BPAY) Payment.*$"
     canonical: "BPAY Payment"
   # Online Payment Received
   - pattern: "^Online Payment Received.*$"
     canonical: "Online Payment Received"
-  # Internal Transfer
+  # Internal Transfer → consolidate with Internal Account Transfer
   - pattern: "^Internal Transfer.*$"
-    canonical: "Internal Transfer"
+    canonical: "Internal Account Transfer"
   # IFTTT Strava
   - pattern: "^Ifttt Strava Activity.*$"
     canonical: "IFTTT Strava"
   # International Transaction Fee (including Rebate)
   - pattern: "^International Transaction Fee.*$"
     canonical: "International Transaction Fee"
+  # Repayment/Payment: consolidate variants
+  - pattern: "^Repayment/Payment.*$"
+    canonical: "Repayment/Payment"
   # Salary Deposit via receipt
   - pattern: "^Salary - Salary Deposit.*$"
     canonical: "Salary Deposit"
@@ -1040,6 +1060,22 @@ merchant_mappings:
   # Coles Broadway: strip store number
   - pattern: "^Coles Broadway \\d*$"
     canonical: "Coles Broadway"
+
+  # --- Internal transfer consolidation (iter 028) ---
+
+  # Internal Transfer: typed as merchant, not banking_operation
+  - pattern: "^Internal Transfer$"
+    canonical: "Internal Account Transfer"
+
+  # Repayment/Payment: consolidate variants
+  - pattern: "^Repayment/Payment.*"
+    canonical: "Repayment/Payment"
+
+  # Tam S Tam L N: deposit/transfer variants typed as merchant
+  - pattern: "^Tam S S? &? ?Tam L N?.*"
+    canonical: "Joint Account (Tam)"
+  - pattern: "^Tam S Tam L.*"
+    canonical: "Joint Account (Tam)"
 
   # --- Banking entity consolidation (iter 027) ---
 

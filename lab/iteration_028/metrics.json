@@ -1,0 +1,34 @@
+{
+  "composite_score": 93.3,
+  "sub_scores": {
+    "S_disambig": 100.0,
+    "S_dedup": 73.39,
+    "S_entity": 100.0,
+    "S_noise": 99.67,
+    "S_truncation": 100.0
+  },
+  "stats": {
+    "total_transactions": 21353,
+    "unique_original": 10190,
+    "unique_normalised": 4375,
+    "reduction_pct": 57.1,
+    "type_distribution": {
+      "salary": 232,
+      "merchant": 16711,
+      "banking_operation": 1080,
+      "transfer_out": 1914,
+      "transfer_in": 1416
+    }
+  },
+  "long_tail": {
+    "unique_before": 10190,
+    "unique_after": 4375,
+    "long_tail_before": 10002,
+    "long_tail_after": 4094,
+    "txn_count_after": 8132,
+    "singleton_count": 2570,
+    "clusters_found": 0,
+    "clusters_merged": 0
+  },
+  "disambig_failures": []
+}
