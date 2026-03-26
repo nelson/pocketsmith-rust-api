@@ -1,0 +1,503 @@
+Dry run: would update 572 of 21353 transactions
+[
+  {
+    "original": "VODAFONE *AUSTRALIA NORTH SYDNEY",
+    "final": "Vodafone Australia",
+    "type": "merchant",
+    "stages": {
+      "s1": "VODAFONE *AUSTRALIA NORTH SYDNEY",
+      "s3": "VODAFONE *AUSTRALIA NORTH SYDNEY",
+      "s4": "Vodafone Australia"
+    }
+  },
+  {
+    "original": "PAMINGGO PTY LTD STRATHFIELD AUS, Card xx3772, Value date: 07/03/2023",
+    "final": "Paminggo Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "PAMINGGO PTY LTD STRATHFIELD",
+      "s3": "PAMINGGO PTY LTD STRATHFIELD",
+      "s4": "PAMINGGO STRATHFIELD"
+    }
+  },
+  {
+    "original": "OSKER MACQUARIE PARK",
+    "final": "Osker Macquarie Park",
+    "type": "merchant",
+    "stages": {
+      "s1": "OSKER MACQUARIE PARK",
+      "s3": "OSKER MACQUARIE PARK",
+      "s4": "OSKER MACQUARIE PARK"
+    }
+  },
+  {
+    "original": "EZI*QuickCliq Booragoon AU AUS, Card xx0723, Value date: 19/09/2024",
+    "final": "Quickcliq Booragoon",
+    "type": "merchant",
+    "stages": {
+      "s1": "QUICKCLIQ BOORAGOON",
+      "s3": "QUICKCLIQ BOORAGOON",
+      "s4": "QUICKCLIQ BOORAGOON"
+    }
+  },
+  {
+    "original": "From PEXA - Surplus",
+    "final": "PEXA",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FROM PEXA - SURPLUS",
+      "s3": "FROM PEXA - SURPLUS",
+      "s4": "PEXA"
+    }
+  },
+  {
+    "original": "Direct Credit Pension 015884, 441S0G0V203440184S",
+    "final": "Centrelink Pension",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT CREDIT PENSION 015884, 441S0G0V203440184S",
+      "s3": "DIRECT CREDIT PENSION 015884, 441S0G0V203440184S",
+      "s4": "Centrelink Pension"
+    }
+  },
+  {
+    "original": "To Miss Tzvetelina Petkova - Funds transfer",
+    "final": "Tzvetelina Petkova",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TO MISS TZVETELINA PETKOVA - FUNDS TRANSFER",
+      "s3": "TO MISS TZVETELINA PETKOVA - FUNDS TRANSFER",
+      "s4": "Tzvetelina Petkova"
+    }
+  },
+  {
+    "original": "Transfer to xx9549 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO XX9549 COMMBANK APP",
+      "s3": "TRANSFER TO XX9549 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "LOAN PAYMENT",
+    "final": "Loan Payment",
+    "type": "merchant",
+    "stages": {
+      "s1": "LOAN PAYMENT",
+      "s3": "LOAN PAYMENT",
+      "s4": "LOAN PAYMENT"
+    }
+  },
+  {
+    "original": "SMP*Hero Sushi Strath Strathfield AU AUS, Card xx0723, Value date: 10/09/2024",
+    "final": "Hero Sushi Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "HERO SUSHI STRATH STRATHFIELD",
+      "s3": "HERO SUSHI STRATHFIELD STRATHFIELD",
+      "s4": "Hero Sushi STRATHFIELD"
+    }
+  },
+  {
+    "original": "NEW DXY PTY. LTD. BURWOOD AUS, Card xx3772, Value date: 26/09/2023",
+    "final": "New Dxy Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "NEW DXY PTY. LTD. BURWOOD",
+      "s3": "NEW DXY PTY. LTD. BURWOOD",
+      "s4": "NEW DXY BURWOOD"
+    }
+  },
+  {
+    "original": "Weixin Nanjing Big B",
+    "final": "Nanjing Big B",
+    "type": "merchant",
+    "stages": {
+      "s1": "NANJING BIG B",
+      "s3": "NANJING BIG B",
+      "s4": "NANJING BIG B"
+    }
+  },
+  {
+    "original": "Direct Debit XX4011 Pioneers of Aust PAYWAYXXXXXX3666",
+    "final": "Pioneers of Australia",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT DEBIT XX4011 PIONEERS OF AUST PAYWAYXXXXXX3666",
+      "s3": "DIRECT DEBIT XX4011 PIONEERS OF AUST PAYWAYXXXXXX3666",
+      "s4": "Pioneers of Australia"
+    }
+  },
+  {
+    "original": "YUZU SUSHI NEWINGTON",
+    "final": "Yuzu Sushi Newington",
+    "type": "merchant",
+    "stages": {
+      "s1": "YUZU SUSHI NEWINGTON",
+      "s3": "YUZU SUSHI NEWINGTON",
+      "s4": "YUZU SUSHI NEWINGTON"
+    }
+  },
+  {
+    "original": "Knight's Coffee & Tea Haymarket NS AUS, Card xx3772, Value date: 21/03/2023",
+    "final": "Knight's Coffee & Tea Haymarket",
+    "type": "merchant",
+    "stages": {
+      "s1": "KNIGHT'S COFFEE & TEA HAYMARKET",
+      "s3": "KNIGHT'S COFFEE & TEA HAYMARKET",
+      "s4": "Knight's Coffee & Tea HAYMARKET"
+    }
+  },
+  {
+    "original": "ZLR*EDOMAE SUSHI EDOMAE BURWOOD",
+    "final": "Edomae Sushi Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "EDOMAE SUSHI EDOMAE BURWOOD",
+      "s3": "EDOMAE SUSHI EDOMAE BURWOOD",
+      "s4": "Edomae Sushi Burwood"
+    }
+  },
+  {
+    "original": "HANARO MART STRATHFIELD AUS, Card xx0723, Value date: 16/10/2024",
+    "final": "Hanaro Mart Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "HANARO MART STRATHFIELD",
+      "s3": "HANARO MART STRATHFIELD",
+      "s4": "HANARO MART STRATHFIELD"
+    }
+  },
+  {
+    "original": "APPLE.COM/BILL SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/BILL SYDNEY",
+      "s3": "APPLE.COM/BILL SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "To Nelson Tam - Funds transfer",
+    "final": "Nelson Tam",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TO NELSON TAM - FUNDS TRANSFER",
+      "s3": "TO NELSON TAM - FUNDS TRANSFER",
+      "s4": "Nelson Tam"
+    }
+  },
+  {
+    "original": "Fresh Catering - Visa Purchase - Receipt 144527In Rookwood Date 22 May 2021 Card 462263xxxxxx9172",
+    "final": "Fresh Catering",
+    "type": "merchant",
+    "stages": {
+      "s1": "FRESH CATERING",
+      "s3": "FRESH CATERING",
+      "s4": "FRESH CATERING"
+    }
+  },
+  {
+    "original": "International Transaction Fee Value Date: 24/08/2021",
+    "final": "International Transaction Fee",
+    "type": "merchant",
+    "stages": {
+      "s1": "INTERNATIONAL TRANSACTION FEE",
+      "s3": "INTERNATIONAL TRANSACTION FEE",
+      "s4": "International Transaction Fee"
+    }
+  },
+  {
+    "original": "APPLE PARK CAFFE EB C00 CUPERTINO",
+    "final": "Apple Park Caffe Eb C00 Cupertino",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE PARK CAFFE EB C00 CUPERTINO",
+      "s3": "APPLE PARK CAFFE EB C00 CUPERTINO",
+      "s4": "Apple Park CAFFE EB C00 CUPERTINO"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSW OPAL Visa Purchase - Receipt 187999 In CHIPPENDALE Date 23 May 2022 Card 462263xxxxxx9172",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSW OPAL",
+      "s3": "TRANSPORTFORNSW OPAL",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "BREADTOP TOWNHALL PTY SYDNEY AUS Card xx1737 Value Date: 13/10/2022",
+    "final": "Breadtop Townhall Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "BREADTOP TOWNHALL PTY SYDNEY",
+      "s3": "BREADTOP TOWNHALL PTY SYDNEY",
+      "s4": "BREADTOP TOWNHALL SYDNEY"
+    }
+  },
+  {
+    "original": "APM SYDNEY WESTFIELD 62 SYDNEY",
+    "final": "Apm Sydney Westfield 62 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "APM SYDNEY WESTFIELD 62 SYDNEY",
+      "s3": "APM SYDNEY WESTFIELD 62 SYDNEY",
+      "s4": "APM SYDNEY WESTFIELD 62 SYDNEY"
+    }
+  },
+  {
+    "original": "FLEXISCHOOLS*ACC TOPUP",
+    "final": "Flexischools*Acc Topup",
+    "type": "merchant",
+    "stages": {
+      "s1": "FLEXISCHOOLS*ACC TOPUP",
+      "s3": "FLEXISCHOOLS*ACC TOPUP",
+      "s4": "FLEXISCHOOLS*ACC TOPUP"
+    }
+  },
+  {
+    "original": "Interest charged",
+    "final": "Interest Charged",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "INTEREST CHARGED",
+      "s3": "INTEREST CHARGED",
+      "s4": "INTEREST CHARGED"
+    }
+  },
+  {
+    "original": "BEST MART STRATHFIELD P STRATHFIELD",
+    "final": "Best Mart Strathfield P",
+    "type": "merchant",
+    "stages": {
+      "s1": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s3": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s4": "Best Mart STRATHFIELD P"
+    }
+  },
+  {
+    "original": "Aussie Broadband limit MORWELL AU AUS Card xx1737 Value Date: 23/08/2021",
+    "final": "Aussie Broadband",
+    "type": "merchant",
+    "stages": {
+      "s1": "AUSSIE BROADBAND LIMIT MORWELL",
+      "s3": "AUSSIE BROADBAND LIMIT MORWELL",
+      "s4": "Aussie Broadband"
+    }
+  },
+  {
+    "original": "Direct Credit Pension 015884, 441S0NDV203440184S",
+    "final": "Centrelink Pension",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT CREDIT PENSION 015884, 441S0NDV203440184S",
+      "s3": "DIRECT CREDIT PENSION 015884, 441S0NDV203440184S",
+      "s4": "Centrelink Pension"
+    }
+  },
+  {
+    "original": "W COSMETICS BURWOOD BURWOOD",
+    "final": "W Cosmetics Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "W COSMETICS BURWOOD BURWOOD",
+      "s3": "W COSMETICS BURWOOD BURWOOD",
+      "s4": "W Cosmetics BURWOOD"
+    }
+  },
+  {
+    "original": "From AFES - 2 HILLCREST AVE",
+    "final": "AFES (Sophia Salary)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FROM AFES - 2 HILLCREST AVE",
+      "s3": "FROM AFES - 2 HILLCREST AVE",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "Aussie Broadband limited",
+    "final": "Aussie Broadband",
+    "type": "merchant",
+    "stages": {
+      "s1": "AUSSIE BROADBAND LIMITED",
+      "s3": "AUSSIE BROADBAND LIMITED",
+      "s4": "Aussie Broadband"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "Transfer From JOHNNY TAM Vodafone",
+    "final": "Johnny Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM JOHNNY TAM VODAFONE",
+      "s3": "TRANSFER FROM JOHNNY TAM VODAFONE",
+      "s4": "Johnny Tam"
+    }
+  },
+  {
+    "original": "Transfer from xx9549 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX9549 COMMBANK APP",
+      "s3": "TRANSFER FROM XX9549 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "AUSTIN AIRPORT-F&B AUSTIN",
+    "final": "Austin Airport-F&B Austin",
+    "type": "merchant",
+    "stages": {
+      "s1": "AUSTIN AIRPORT-F&B AUSTIN",
+      "s3": "AUSTIN AIRPORT-F&B AUSTIN",
+      "s4": "AUSTIN AIRPORT-F&B AUSTIN"
+    }
+  },
+  {
+    "original": "FARMERS FRESH BURW - Visa Purchase - Receipt 174164In BURWOOD Date 24 Dec 2020 Card 462263xxxxxx9172",
+    "final": "Farmers Fresh Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "FARMERS FRESH BURW",
+      "s3": "FARMERS FRESH BURWOOD",
+      "s4": "Farmers Fresh BURWOOD"
+    }
+  },
+  {
+    "original": "Fast Transfer From PAUL MAC, Laura Mac",
+    "final": "Paul Mac",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM PAUL MAC, LAURA MAC",
+      "s3": "FAST TRANSFER FROM PAUL MAC, LAURA MAC",
+      "s4": "PAUL MAC"
+    }
+  },
+  {
+    "original": "MRS STEPHANIE WONG 570 for course and... - Deposit - Receipt XXXXXX 570 for course and 50 for kallax",
+    "final": "Mrs Stephanie Wong",
+    "type": "merchant",
+    "stages": {
+      "s1": "MRS STEPHANIE WONG 570 FOR COURSE AND...",
+      "s3": "MRS STEPHANIE WONG 570 FOR COURSE AND...",
+      "s4": "Mrs Stephanie Wong"
+    }
+  },
+  {
+    "original": "Disney Plus Richmond AU AUS Card xx3772 Value Date: 18/07/2022",
+    "final": "Disney Plus Richmond",
+    "type": "merchant",
+    "stages": {
+      "s1": "DISNEY PLUS RICHMOND",
+      "s3": "DISNEY PLUS RICHMOND",
+      "s4": "DISNEY PLUS RICHMOND"
+    }
+  },
+  {
+    "original": "CROYDON* CRUST - CROYD CROYDON",
+    "final": "Crust Pizza Croydon",
+    "type": "merchant",
+    "stages": {
+      "s1": "CROYDON* CRUST - CROYD CROYDON",
+      "s3": "CROYDON* CRUST - CROYDON CROYDON",
+      "s4": "Crust Pizza Croydon"
+    }
+  },
+  {
+    "original": "PAYPAL *MYCHEMIST 0418983353",
+    "final": "PayPal *Mychemist",
+    "type": "merchant",
+    "stages": {
+      "s1": "PAYPAL *MYCHEMIST",
+      "s3": "PAYPAL *MYCHEMIST",
+      "s4": "PAYPAL *MYCHEMIST"
+    }
+  },
+  {
+    "original": "GONG CHA STRATHFIELD STRATHFIELD AUS Tap and Pay xx9084 Value Date: 28/04/2021",
+    "final": "Gong Cha Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "GONG CHA STRATHFIELD STRATHFIELD",
+      "s3": "GONG CHA STRATHFIELD STRATHFIELD",
+      "s4": "Gong Cha STRATHFIELD"
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Joint Account (Tam)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s3": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s4": "Joint Account (Tam)"
+    }
+  },
+  {
+    "original": "EDITION ROASTERS WYN 99 SYDNEY",
+    "final": "Edition Roasters Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s3": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s4": "Edition Roasters SYDNEY"
+    }
+  },
+  {
+    "original": "Fast Transfer From SOPHIA S TAM, to PayID Phone, CREDIT TO ACCOUNT",
+    "final": "Sophia Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM SOPHIA S TAM, TO PAYID PHONE, CREDIT TO ACCOUNT",
+      "s3": "FAST TRANSFER FROM SOPHIA S TAM, TO PAYID PHONE, CREDIT TO ACCOUNT",
+      "s4": "Sophia Tam"
+    }
+  },
+  {
+    "original": "DEK THAI PTY LTD - Visa Purchase - Receipt 185062In SURRY HILLS Date 05 May 2021 Card 462263xxxxxx9172",
+    "final": "Dek Thai",
+    "type": "merchant",
+    "stages": {
+      "s1": "DEK THAI",
+      "s3": "DEK THAI",
+      "s4": "DEK THAI"
+    }
+  },
+  {
+    "original": "COLES BURWOOD 861 BURWOOD",
+    "final": "Coles Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "COLES BURWOOD 861 BURWOOD",
+      "s3": "COLES BURWOOD 861 BURWOOD",
+      "s4": "Coles BURWOOD"
+    }
+  },
+  {
+    "original": "SYDNEY ACADEMY OF CHES BURWOOD AUS, Card xx3772, Value date: 23/09/2023",
+    "final": "Sydney Academy of Ches Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "SYDNEY ACADEMY OF CHES BURWOOD",
+      "s3": "SYDNEY ACADEMY OF CHES BURWOOD",
+      "s4": "SYDNEY ACADEMY OF CHES BURWOOD"
+    }
+  }
+]
