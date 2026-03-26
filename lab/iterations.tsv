@@ -31,3 +31,4 @@ iteration	score	delta	hypothesis	outcome
 030	93.40	+0.08	Chain merchant batch: Woolworths, McDonald's, Coles, Officeworks, Bunnings, Ampol, etc.	kept
 031	93.45	+0.05	More chain cleanup: McDonald's dedup, Kmart, Starbucks, Ippudo, Lindt, Heinemann, etc.	kept
 032	93.51	+0.06	More chain cleanup: AmEx, Ghost, Memocorp, Avenue, Linkt, David Jones, Sushi, etc.	kept
+033	93.57	+0.06	Small chain batch: singleton-to-location consolidation (50+ rules)	kept

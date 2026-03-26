@@ -1573,6 +1573,242 @@ merchant_mappings:
   - pattern: "^Yakitori Jin$"
     canonical: "Yakitori Jin"
 
+  # --- Iter 033: remaining small chain cleanup ---
+
+  # Woolworths Strathfield: strip cash out suffix
+  - pattern: "^Woolworths Strathfield NSW.*"
+    canonical: "Woolworths Strathfield"
+
+  # Cornerstone Concord: strip terminal code
+  - pattern: "^Cornerstone Concord.*"
+    canonical: "Cornerstone Concord"
+
+  # Kmart Burwood: strip store number
+  - pattern: "^Kmart Burwood \\d+.*"
+    canonical: "Kmart Burwood"
+
+  # Interpark UTS: consolidate
+  - pattern: "^Interpark UTS.*"
+    canonical: "Interpark UTS Ultimo"
+
+  # Hanaro Mart: consolidate
+  - pattern: "^Hanaro Mart$"
+    canonical: "Hanaro Mart Strathfield"
+
+  # Healthy Care Burwood: consolidate
+  - pattern: "^Healthy Care Burwood.*"
+    canonical: "Healthy Care Burwood"
+
+  # Greenway Meat: consolidate
+  - pattern: "^Greenway Meat and Fd.*"
+    canonical: "Greenway Meat Strathfield"
+
+  # Newyen Investment: consolidate
+  - pattern: "^Newyen Investment.*"
+    canonical: "Newyen Investment Crows Nest"
+
+  # Amorepacific: consolidate
+  - pattern: "^Amorepacific Austral.*"
+    canonical: "Amorepacific Burwood"
+
+  # Visco Universal: consolidate
+  - pattern: "^Visco Universal.*"
+    canonical: "Visco Universal"
+
+  # Dutch Smuggler: consolidate
+  - pattern: "^Dutch Smuggler$"
+    canonical: "Dutch Smuggler Sydney"
+
+  # Jfc Strathfield: consolidate
+  - pattern: "^Jfc Strathfield.*"
+    canonical: "JFC Strathfield"
+
+  # Myeong Dong: consolidate
+  - pattern: "^Myeong Dong$"
+    canonical: "Myeong Dong North Strathfield"
+
+  # Pochanara: consolidate
+  - pattern: "^Pochanara$"
+    canonical: "Pochanara Newington"
+
+  # Yun Zhou: consolidate
+  - pattern: "^Yun Zhou$"
+    canonical: "Yun Zhou Macquarie Park"
+
+  # Komart: consolidate
+  - pattern: "^Komart(?:\\s+North\\s+Strat)?$"
+    canonical: "Komart North Strathfield"
+
+  # Zipby Limited: consolidate
+  - pattern: "^Zipby Limited$"
+    canonical: "Zipby Limited South Granville"
+
+  # Malay Express: consolidate
+  - pattern: "^Malay Express$"
+    canonical: "Malay Express Strathfield"
+
+  # Dorothy Cowie School: consolidate truncation
+  - pattern: "^Dorothy Cowie School of Danc.*"
+    canonical: "Dorothy Cowie School"
+
+  # Red Pepper Club: consolidate
+  - pattern: "^Red Pepper Club$"
+    canonical: "Red Pepper Club Strathfield"
+
+  # Double Barral Coffee: consolidate
+  - pattern: "^Double Barral Coffee$"
+    canonical: "Double Barral Coffee Burwood"
+
+  # Logans Pianos: consolidate
+  - pattern: "^Logans Pianos Hire$"
+    canonical: "Logans Pianos Hire Burwood"
+
+  # Bespoke Letterpress: consolidate
+  - pattern: "^Bespoke Letterpress$"
+    canonical: "Bespoke Letterpress Bowral"
+
+  # Huntley Projects CBD: consolidate
+  - pattern: "^Huntley Projects CBD$"
+    canonical: "Huntley Projects CBD Sydney"
+
+  # W Retail Group: consolidate
+  - pattern: "^W Retail Group$"
+    canonical: "W Retail Group Strathfield"
+
+  # Koorong Books: consolidate
+  - pattern: "^Koorong Books$"
+    canonical: "Koorong Books West Ryde"
+
+  # Caffe Relax'N: consolidate
+  - pattern: "^Caffe Relax'N$"
+    canonical: "Caffe Relax'N Strathfield"
+
+  # Hook Line and Sinker: consolidate
+  - pattern: "^Hook Line and Sinker$"
+    canonical: "Hook Line and Sinker Burwood"
+
+  # My Mr Stonebowl: consolidate
+  - pattern: "^My Mr Stonebowl$"
+    canonical: "My Mr Stonebowl Burwood"
+
+  # Contribution Tax: consolidate
+  - pattern: "^Contribution Tax Adjustment$"
+    canonical: "Contribution Tax"
+
+  # Strathfield Council: consolidate Crn
+  - pattern: "^Strathfield Council - Crn$"
+    canonical: "Strathfield Council"
+
+  # Daiso Burwood: consolidate
+  - pattern: "^Daiso Burwood.*"
+    canonical: "Daiso Burwood"
+
+  # Miniso Burwood: consolidate
+  - pattern: "^Miniso Burwood.*"
+    canonical: "Miniso Burwood"
+
+  # Coles Broadway: strip trailing number
+  - pattern: "^Coles Broadway \\d+$"
+    canonical: "Coles Broadway"
+
+  # Manish Seneviratne: strip memo
+  - pattern: "^Manish Seneviratne .+"
+    canonical: "Manish Seneviratne"
+
+  # David Greenaway: strip memo
+  - pattern: "^David Greenaway .+"
+    canonical: "David Greenaway"
+
+  # Johnny Tam: strip memo
+  - pattern: "^Johnny Tam .+"
+    canonical: "Johnny Tam"
+
+  # Roger Chan: strip memo
+  - pattern: "^Roger Chan .+"
+    canonical: "Roger Chan"
+
+  # Kobe Cc Tsang: strip memo
+  - pattern: "^Kobe Cc Tsang .+"
+    canonical: "Kobe Cc Tsang"
+
+  # Amznprimeau: consolidate
+  - pattern: "^Amznprimeau Membership.*"
+    canonical: "Amazon Prime"
+
+  # ANZ Internet Banking BPAY: consolidate
+  - pattern: "^ANZ Internet Banking Bpay.*"
+    canonical: "ANZ BPAY"
+
+  # Flower Power: consolidate
+  - pattern: "^Flower Power.*Enfield.*"
+    canonical: "Flower Power Enfield"
+  - pattern: "^Flower Power$"
+    canonical: "Flower Power"
+
+  # Officeworks North Ryde: consolidate
+  - pattern: "^Officeworks North Ryde.*"
+    canonical: "Officeworks North Ryde"
+
+  # Bp Enfield: consolidate
+  - pattern: "^Bp Enfield.*"
+    canonical: "BP Enfield"
+
+  # 40 Grains Thai: consolidate
+  - pattern: "^40 Grains Thai$"
+    canonical: "40 Grains Thai Summer Hill"
+
+  # Ashfield Apothecary: consolidate
+  - pattern: "^Ashfield Apothecary$"
+    canonical: "Ashfield Apothecary Ashfield"
+
+  # Ausko Cooperation: consolidate
+  - pattern: "^Ausko Cooperation.*"
+    canonical: "Ausko Cooperation Concord"
+
+  # Coronation Pharmacy: consolidate
+  - pattern: "^Coronation Pharmacy$"
+    canonical: "Coronation Pharmacy Enfield"
+
+  # Gnt Services: consolidate
+  - pattern: "^Gnt Services$"
+    canonical: "GNT Services North Strathfield"
+
+  # La Lune Market: consolidate bare
+  - pattern: "^La Lune Market$"
+    canonical: "La Lune Market North Strathfield"
+
+  # Paminggo: consolidate
+  - pattern: "^Paminggo$"
+    canonical: "Paminggo Strathfield"
+
+  # Pre-Uni New College: consolidate
+  - pattern: "^Pre-Uni New College$"
+    canonical: "Pre-Uni New College Strathfield"
+
+  # Campion Education: consolidate
+  - pattern: "^Campion Education$"
+    canonical: "Campion Education"
+
+  # Mancini S Pizzeria: consolidate
+  - pattern: "^Mancini S Pizzeria.*"
+    canonical: "Mancini's Pizzeria Belfield"
+
+  # Mancinis Wood: consolidate
+  - pattern: "^Mancinis Wood Melbourne.*"
+    canonical: "Mancinis Wood Melbourne"
+
+  # Burwood Council: consolidate
+  - pattern: "^Burwood Council$"
+    canonical: "Burwood Council Burwood"
+
+  # Lotus Entertainment: consolidate bare
+  - pattern: "^Lotus Entertainment$"
+    canonical: "Lotus Entertainment Burwood"
+
+  # Yilan Group: consolidate
+  - pattern: "^Yilan Group$"
+    canonical: "Yilan Group Burwood"
+
   # --- Internal transfer consolidation (iter 028) ---
 
   # Internal Transfer: typed as merchant, not banking_operation
