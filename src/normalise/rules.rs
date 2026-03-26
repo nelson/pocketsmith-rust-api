@@ -253,3 +253,78 @@ impl CompiledClassifyRules {
         Ok(Self { rules })
     }
 }
+
+// ── Stage 3: Expand ─────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ExpandRulesYaml {
+    #[serde(default)]
+    suburbs: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    words: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    merchants: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    known_locations: Vec<String>,
+}
+
+pub(super) struct ExpandPattern {
+    pub(super) re: Re,
+    pub(super) replacement: String,
+    pub(super) truncated: String,
+}
+
+pub(super) struct LocationPattern {
+    pub(super) re: Re,
+    pub(super) name: String,
+}
+
+pub struct CompiledExpandRules {
+    pub(super) patterns: Vec<ExpandPattern>,
+    pub(super) locations: Vec<LocationPattern>,
+}
+
+impl CompiledExpandRules {
+    pub fn load(rules_dir: &Path) -> Result<Self> {
+        let yaml: ExpandRulesYaml = load_yaml(rules_dir, "expand.yaml")?;
+
+        // Merge all dictionaries, uppercase keys
+        let mut merged: Vec<(String, String)> = Vec::new();
+        for map in [&yaml.suburbs, &yaml.words, &yaml.merchants] {
+            for (k, v) in map {
+                merged.push((k.to_uppercase(), v.to_uppercase()));
+            }
+        }
+        // Sort by key length descending (longest match first)
+        merged.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
+        // Compile word-boundary patterns, skipping no-ops
+        let mut patterns = Vec::new();
+        for (truncated, full) in &merged {
+            if truncated != full {
+                let pat = format!("(?i)\\b{}\\b", escape(truncated));
+                patterns.push(ExpandPattern {
+                    re: compile_re(&pat, "expand")?,
+                    replacement: full.clone(),
+                    truncated: truncated.clone(),
+                });
+            }
+        }
+
+        // Compile known_locations patterns (longest first)
+        let mut locs: Vec<&String> = yaml.known_locations.iter().collect();
+        locs.sort_by(|a, b| b.len().cmp(&a.len()));
+        let locations = locs
+            .into_iter()
+            .map(|loc| {
+                let pat = format!("(?i)\\b{}\\b", escape(&loc.to_uppercase()));
+                Ok(LocationPattern {
+                    re: compile_re(&pat, "expand location")?,
+                    name: loc.clone(),
+                })
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(Self { patterns, locations })
+    }
+}

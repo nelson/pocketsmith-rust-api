@@ -9,6 +9,8 @@ pub mod meta {
     pub const EXTRACT_KIND: &str = "extract_kind";
     pub const PREFIX_STRIPPED: &str = "prefix_stripped";
     pub const SUFFIXES_STRIPPED: &str = "suffixes_stripped";
+    pub const TRUNCATIONS_EXPANDED: &str = "truncations_expanded";
+    pub const DETECTED_LOCATION: &str = "detected_location";
 }
 
 pub mod rules;
