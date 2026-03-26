@@ -64,6 +64,32 @@ def apply(payee: str, metadata: dict, rules: dict) -> tuple[str, dict]:
     for pattern in rules["_trailing"]:
         result = pattern.sub("", result).strip()
 
+    # Remove truncated-prefix duplicates: if word[i] is a proper prefix of
+    # word[i+1] (case-insensitive, len >= 4), drop word[i].
+    # Exclusions: directional/title words that legitimately prefix longer words,
+    # and masked reference codes (Xxxxx patterns).
+    _prefix_exclude = {"SAINT", "STREET", "MOUNT", "NORTH", "SOUTH", "EAST",
+                        "WEST", "EVERY", "KING", "OVER", "UNDER", "CAMP",
+                        "PORT", "GRAND", "PARK", "PALM"}
+    words = result.split()
+    cleaned = []
+    i = 0
+    while i < len(words):
+        if i < len(words) - 1:
+            a, b = words[i], words[i + 1]
+            au, bu = a.upper(), b.upper()
+            # Must be >= 4 chars, proper prefix, not in exclude set, not masked refs
+            if (len(a) >= 4 and len(b) > len(a)
+                    and bu.startswith(au) and au != bu
+                    and au not in _prefix_exclude
+                    and not au.startswith("XXXX")):
+                # Skip the truncated word, keep the full one
+                i += 1
+                continue
+        cleaned.append(words[i])
+        i += 1
+    result = " ".join(cleaned)
+
     # Smart title case — always apply for consistency across variants
     # Preserve known mixed-case brand names first
     brand_preserves = {

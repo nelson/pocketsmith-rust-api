@@ -1,0 +1,503 @@
+Dry run: would update 20636 of 21353 transactions
+[
+  {
+    "original": "Transfer To early purpose, CommBank App 2214261",
+    "final": "Early Purpose",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO EARLY PURPOSE, COMMBANK APP",
+      "s3": "TRANSFER TO EARLY PURPOSE, COMMBANK APP",
+      "s4": "early purpose"
+    }
+  },
+  {
+    "original": "EG FUELCO 1460 STRATHFI BURWOOD",
+    "final": "Eg Fuelco Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "EG FUELCO 1460 STRATHFI BURWOOD",
+      "s3": "EG FUELCO 1460 STRATHFIELD BURWOOD",
+      "s4": "EG Fuelco Strathfield"
+    }
+  },
+  {
+    "original": "KOMART - Visa Purchase - Receipt 160382In NORTH STRATH Date 15 May 2021 Card 462263xxxxxx9172",
+    "final": "Komart",
+    "type": "merchant",
+    "stages": {
+      "s1": "KOMART",
+      "s3": "KOMART",
+      "s4": "KOMART"
+    }
+  },
+  {
+    "original": "MAXIMA MACQUARIE CENTRE RICHMOND",
+    "final": "Maxima Macquarie Centre Richmond",
+    "type": "merchant",
+    "stages": {
+      "s1": "MAXIMA MACQUARIE CENTRE RICHMOND",
+      "s3": "MAXIMA MACQUARIE CENTRE RICHMOND",
+      "s4": "MAXIMA MACQUARIE CENTRE RICHMOND"
+    }
+  },
+  {
+    "original": "Fast Transfer From SOPHIA S TAM, to PayID Phone, CREDIT TO ACCOUNT",
+    "final": "Sophia Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM SOPHIA S TAM, TO PAYID PHONE, CREDIT TO ACCOUNT",
+      "s3": "FAST TRANSFER FROM SOPHIA S TAM, TO PAYID PHONE, CREDIT TO ACCOUNT",
+      "s4": "Sophia Tam"
+    }
+  },
+  {
+    "original": "IMBEAU COSMETIC BURWOOD AU AUS, Card xx0723, Value date: 13/02/2026",
+    "final": "Imbeau Cosmetic Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "IMBEAU COSMETIC BURWOOD",
+      "s3": "IMBEAU COSMETIC BURWOOD",
+      "s4": "IMBEAU COSMETIC BURWOOD"
+    }
+  },
+  {
+    "original": "ZLR*TENDER GOURMET BUTC NORTH RYDE",
+    "final": "Tender Gourmet Butc North Ryde",
+    "type": "merchant",
+    "stages": {
+      "s1": "TENDER GOURMET BUTC NORTH RYDE",
+      "s3": "TENDER GOURMET BUTC NORTH RYDE",
+      "s4": "TENDER GOURMET BUTC NORTH RYDE"
+    }
+  },
+  {
+    "original": "APPLE.COM/AU SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/AU SYDNEY",
+      "s3": "APPLE.COM/AU SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "Salary from AFES - TAM AFES APY",
+    "final": "AFES (Sophia Salary)",
+    "type": "salary",
+    "stages": {
+      "s1": "SALARY FROM AFES - TAM AFES APY",
+      "s3": "SALARY FROM AFES - TAM AFES APY",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "DOORDASH*CAKE IT AWAY MELBOURNE VI AUS Card xx0008 Value Date: 12/09/2021",
+    "final": "Cake It Away Melbourne Vi",
+    "type": "merchant",
+    "stages": {
+      "s1": "CAKE IT AWAY MELBOURNE VI",
+      "s3": "CAKE IT AWAY MELBOURNE VI",
+      "s4": "CAKE IT AWAY MELBOURNE VI"
+    }
+  },
+  {
+    "original": "TRANSFER FROM TAM S S & TAM L FUNDS TRANSFER",
+    "final": "Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM TAM S S & TAM L FUNDS TRANSFER",
+      "s3": "TRANSFER FROM TAM S S & TAM L FUNDS TRANSFER",
+      "s4": "TAM"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "S'FIELD B'VDE PHARMACY STRATHFIELD NS AUS, Card xx0723, Value date: 16/11/2025",
+    "final": "S'Field B'Vde Pharmacy Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "S'FIELD B'VDE PHARMACY STRATHFIELD",
+      "s3": "S'FIELD B'VDE PHARMACY STRATHFIELD",
+      "s4": "S'FIELD B'VDE PHARMACY STRATHFIELD"
+    }
+  },
+  {
+    "original": "To Nelson Tam - Funds transfer",
+    "final": "Nelson Tam",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TO NELSON TAM - FUNDS TRANSFER",
+      "s3": "TO NELSON TAM - FUNDS TRANSFER",
+      "s4": "Nelson Tam"
+    }
+  },
+  {
+    "original": "CORNERSTONE CAFE UTS Haymarket",
+    "final": "Cornerstone Cafe UTS",
+    "type": "merchant",
+    "stages": {
+      "s1": "CORNERSTONE CAFE UTS HAYMARKET",
+      "s3": "CORNERSTONE CAFE UTS HAYMARKET",
+      "s4": "Cornerstone Cafe UTS"
+    }
+  },
+  {
+    "original": "OPENAI *CHATGPT SUBSCR SAN FRANCISCO",
+    "final": "Openai *Chatgpt Subscr San Francisco",
+    "type": "merchant",
+    "stages": {
+      "s1": "OPENAI *CHATGPT SUBSCR SAN FRANCISCO",
+      "s3": "OPENAI *CHATGPT SUBSCR SAN FRANCISCO",
+      "s4": "OPENAI *CHATGPT SUBSCR SAN FRANCISCO"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSW TAP Visa Purchase - Receipt 162863 In SYDNEY Date 27 Aug 2023 Card 462263xxxxxx9172",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSW TAP",
+      "s3": "TRANSPORTFORNSW TAP",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "KMART BANKSTOWN 1058 BANKSTOWN",
+    "final": "Kmart Bankstown 1058 Bankstown",
+    "type": "merchant",
+    "stages": {
+      "s1": "KMART BANKSTOWN 1058 BANKSTOWN",
+      "s3": "KMART BANKSTOWN 1058 BANKSTOWN",
+      "s4": "Kmart BANKSTOWN 1058 BANKSTOWN"
+    }
+  },
+  {
+    "original": "CORNERSTONE EASTWOOD",
+    "final": "Cornerstone Eastwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "CORNERSTONE EASTWOOD",
+      "s3": "CORNERSTONE EASTWOOD",
+      "s4": "CORNERSTONE EASTWOOD"
+    }
+  },
+  {
+    "original": "KMART BROADWAY 1155 BROADWAY",
+    "final": "Kmart Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "KMART BROADWAY 1155 BROADWAY",
+      "s3": "KMART BROADWAY 1155 BROADWAY",
+      "s4": "Kmart BROADWAY"
+    }
+  },
+  {
+    "original": "USCUSTOMS ESTA APPL PMT INDIANAPOLIS",
+    "final": "Uscustoms Esta Appl Pmt Indianapolis",
+    "type": "merchant",
+    "stages": {
+      "s1": "USCUSTOMS ESTA APPL PMT INDIANAPOLIS",
+      "s3": "USCUSTOMS ESTA APPL PMT INDIANAPOLIS",
+      "s4": "USCUSTOMS ESTA APPL PMT INDIANAPOLIS"
+    }
+  },
+  {
+    "original": "GREENWAY MEAT AND FD STRATHFIELD NS AUS, Card xx0723, Value date: 22/03/2025",
+    "final": "Greenway Meat and Fd Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "GREENWAY MEAT AND FD STRATHFIELD",
+      "s3": "GREENWAY MEAT AND FD STRATHFIELD",
+      "s4": "GREENWAY MEAT AND FD STRATHFIELD"
+    }
+  },
+  {
+    "original": "COLES ONLINE 5792 GREEN 5792 GREENACR",
+    "final": "Coles Online 5792 Green 5792 Greenacr",
+    "type": "merchant",
+    "stages": {
+      "s1": "COLES ONLINE 5792 GREEN 5792 GREENACR",
+      "s3": "COLES ONLINE 5792 GREEN 5792 GREENACR",
+      "s4": "COLES ONLINE 5792 GREEN 5792 GREENACR"
+    }
+  },
+  {
+    "original": "Burwood FamilyDoctors Burwood NS AUS, Card xx0723, Value date: 07/04/2025",
+    "final": "Burwood Familydoctors Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "BURWOOD FAMILYDOCTORS BURWOOD",
+      "s3": "BURWOOD FAMILYDOCTORS BURWOOD",
+      "s4": "BURWOOD FAMILYDOCTORS BURWOOD"
+    }
+  },
+  {
+    "original": "EAT ISTANBUL MARTIN PLA Sydney",
+    "final": "Eat Istanbul Martin Pla Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "EAT ISTANBUL MARTIN PLA SYDNEY",
+      "s3": "EAT ISTANBUL MARTIN PLA SYDNEY",
+      "s4": "EAT ISTANBUL MARTIN PLA SYDNEY"
+    }
+  },
+  {
+    "original": "BEST MART STRATHFIELD P STRATHFIELD",
+    "final": "Best Mart Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s3": "BEST MART STRATHFIELD P STRATHFIELD",
+      "s4": "Best Mart Strathfield"
+    }
+  },
+  {
+    "original": "COLES BURWOOD 861 BURWOOD",
+    "final": "Coles Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "COLES BURWOOD 861 BURWOOD",
+      "s3": "COLES BURWOOD 861 BURWOOD",
+      "s4": "Coles Burwood"
+    }
+  },
+  {
+    "original": "Fast Transfer From Stephanie Wong, to PayID Phone, Estee Lauder",
+    "final": "Stephanie Wong",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM STEPHANIE WONG, TO PAYID PHONE, ESTEE LAUDER",
+      "s3": "FAST TRANSFER FROM STEPHANIE WONG, TO PAYID PHONE, ESTEE LAUDER",
+      "s4": "Stephanie Wong"
+    }
+  },
+  {
+    "original": "Myer Pty Ltd DOCKLANDS VI AUS, Card xx3772, Value date: 26/01/2024",
+    "final": "MYER Docklands Vi",
+    "type": "merchant",
+    "stages": {
+      "s1": "MYER PTY LTD DOCKLANDS VI",
+      "s3": "MYER PTY LTD DOCKLANDS VI",
+      "s4": "MYER DOCKLANDS VI"
+    }
+  },
+  {
+    "original": "Shop PayPal with Points",
+    "final": "Shop PayPal With Points",
+    "type": "merchant",
+    "stages": {
+      "s1": "SHOP PAYPAL WITH POINTS",
+      "s3": "SHOP PAYPAL WITH POINTS",
+      "s4": "SHOP PAYPAL WITH POINTS"
+    }
+  },
+  {
+    "original": "METRO PETROLEUM EPP EPPING NS AUS, Card xx3772, Value date: 10/05/2024",
+    "final": "Metro Petroleum Epp Epping",
+    "type": "merchant",
+    "stages": {
+      "s1": "METRO PETROLEUM EPP EPPING",
+      "s3": "METRO PETROLEUM EPP EPPING",
+      "s4": "METRO PETROLEUM EPP EPPING"
+    }
+  },
+  {
+    "original": "OLIVER BROWN STRATHFIEL Strathfield",
+    "final": "Oliver Brown Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "OLIVER BROWN STRATHFIEL STRATHFIELD",
+      "s3": "OLIVER BROWN STRATHFIEL STRATHFIELD",
+      "s4": "Oliver Brown STRATHFIELD"
+    }
+  },
+  {
+    "original": "Fast Transfer From Stephanie Wong, to PayID Phone, Mothersday",
+    "final": "Stephanie Wong",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM STEPHANIE WONG, TO PAYID PHONE, MOTHERSDAY",
+      "s3": "FAST TRANSFER FROM STEPHANIE WONG, TO PAYID PHONE, MOTHERSDAY",
+      "s4": "Stephanie Wong"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSW TAP - Visa Purchase - Receipt 139412In SYDNEY Date 02 Jun 2021 Card 462263xxxxxx3579",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSW TAP",
+      "s3": "TRANSPORTFORNSW TAP",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "EDITION ROASTERS WYN 99 SYDNEY",
+    "final": "Edition Roasters Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s3": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s4": "Edition Roasters SYDNEY"
+    }
+  },
+  {
+    "original": "STRATHFIELD COUNCIL CommBank app BPAY XXXXX XXX7634",
+    "final": "Strathfield Council CommBank App Bpay Xxxxx Xxx7634",
+    "type": "merchant",
+    "stages": {
+      "s1": "STRATHFIELD COUNCIL COMMBANK APP BPAY XXXXX XXX7634",
+      "s3": "STRATHFIELD COUNCIL COMMBANK APP BPAY XXXXX XXX7634",
+      "s4": "STRATHFIELD COUNCIL COMMBANK APP BPAY XXXXX XXX7634"
+    }
+  },
+  {
+    "original": "Fast Transfer From DENNIS LAW, Parents reimbursement, Sharon iphone, Value date: 19/01/2023",
+    "final": "Dennis Law",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM DENNIS LAW, PARENTS REIMBURSEMENT, SHARON IPHONE,",
+      "s3": "FAST TRANSFER FROM DENNIS LAW, PARENTS REIMBURSEMENT, SHARON IPHONE,",
+      "s4": "DENNIS LAW"
+    }
+  },
+  {
+    "original": "APPLE.COM/BILL SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/BILL SYDNEY",
+      "s3": "APPLE.COM/BILL SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "SQ *MR. FROYO Burwood NS AUS, Card xx3772, Value date: 16/03/2024",
+    "final": "Mr. Froyo Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "MR. FROYO BURWOOD",
+      "s3": "MR. FROYO BURWOOD",
+      "s4": "MR. FROYO BURWOOD"
+    }
+  },
+  {
+    "original": "AIRBNB * HM2FBJSD5W LONDON",
+    "final": "Airbnb London",
+    "type": "merchant",
+    "stages": {
+      "s1": "AIRBNB * HM2FBJSD5W LONDON",
+      "s3": "AIRBNB * HM2FBJSD5W LONDON",
+      "s4": "Airbnb LONDON"
+    }
+  },
+  {
+    "original": "Weixin Scan Qr Code Fo",
+    "final": "Scan Qr Code",
+    "type": "merchant",
+    "stages": {
+      "s1": "SCAN QR CODE FO",
+      "s3": "SCAN QR CODE FO",
+      "s4": "Scan QR Code"
+    }
+  },
+  {
+    "original": "LOAN PAYMENT",
+    "final": "Loan Payment",
+    "type": "merchant",
+    "stages": {
+      "s1": "LOAN PAYMENT",
+      "s3": "LOAN PAYMENT",
+      "s4": "LOAN PAYMENT"
+    }
+  },
+  {
+    "original": "SUSHI WORLD - MACQUARIE Macquarie Park",
+    "final": "Sushi World Macquarie Park",
+    "type": "merchant",
+    "stages": {
+      "s1": "SUSHI WORLD - MACQUARIE MACQUARIE PARK",
+      "s3": "SUSHI WORLD - MACQUARIE MACQUARIE PARK",
+      "s4": "Sushi World Macquarie Park"
+    }
+  },
+  {
+    "original": "NRMA PBTM SYDNEY NS AUS Card xx1737 Value Date: 25/11/2021",
+    "final": "Nrma Pbtm Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "NRMA PBTM SYDNEY",
+      "s3": "NRMA PBTM SYDNEY",
+      "s4": "NRMA PBTM SYDNEY"
+    }
+  },
+  {
+    "original": "M & C COFFEE PTY LTD SYDNEY NS AUS Card xx0008 Value Date: 22/11/2021",
+    "final": "M & C Coffee Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "M & C COFFEE PTY LTD SYDNEY",
+      "s3": "M & C COFFEE PTY LTD SYDNEY",
+      "s4": "M & C COFFEE SYDNEY"
+    }
+  },
+  {
+    "original": "TH*Derek Tan Associ Carlingford NS AUS, Card xx0993, Value date: 27/05/2025",
+    "final": "Th*Derek Tan Associ Carlingford",
+    "type": "merchant",
+    "stages": {
+      "s1": "TH*DEREK TAN ASSOCI CARLINGFORD",
+      "s3": "TH*DEREK TAN ASSOCI CARLINGFORD",
+      "s4": "TH*DEREK TAN ASSOCI CARLINGFORD"
+    }
+  },
+  {
+    "original": "AMZNPRIMEAU MEMBERSHIP",
+    "final": "Amznprimeau Membership",
+    "type": "merchant",
+    "stages": {
+      "s1": "AMZNPRIMEAU MEMBERSHIP",
+      "s3": "AMZNPRIMEAU MEMBERSHIP",
+      "s4": "AMZNPRIMEAU MEMBERSHIP"
+    }
+  },
+  {
+    "original": "Payment to AMERICAN EXPRESS - CRN XXXXXXXXXXX3006",
+    "final": "American Express - Crn Xxxxxxxxxxx3006",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "PAYMENT TO AMERICAN EXPRESS - CRN XXXXXXXXXXX3006",
+      "s3": "PAYMENT TO AMERICAN EXPRESS - CRN XXXXXXXXXXX3006",
+      "s4": "AMERICAN EXPRESS - CRN XXXXXXXXXXX3006"
+    }
+  },
+  {
+    "original": "ALEX KEARNS RESTAURANTS GLEBE",
+    "final": "Alex Kearns Restaurants Glebe",
+    "type": "merchant",
+    "stages": {
+      "s1": "ALEX KEARNS RESTAURANTS GLEBE",
+      "s3": "ALEX KEARNS RESTAURANTS GLEBE",
+      "s4": "ALEX KEARNS RESTAURANTS GLEBE"
+    }
+  },
+  {
+    "original": "Transfer from xx8820 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s3": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  }
+]
