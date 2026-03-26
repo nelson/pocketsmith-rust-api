@@ -1,0 +1,206 @@
+# Stage 3: Truncation expansion dictionary
+# Maps truncated words/suffixes to their full forms.
+# Applied as word-boundary replacements (case-insensitive).
+
+# Australian suburbs (commonly truncated at card terminal limits)
+suburbs:
+  STRATHFIEL: STRATHFIELD
+  STRATHFIE: STRATHFIELD
+  STRATHFI: STRATHFIELD
+  STRATHF: STRATHFIELD
+  STRATH: STRATHFIELD
+  STRAT: STRATHFIELD
+  NORTH STRATH: NORTH STRATHFIELD
+  NORTH STRATHF: NORTH STRATHFIELD
+  NORTH STRATHFIE: NORTH STRATHFIELD
+  NORTH RY: NORTH RYDE
+  WEST RY: WEST RYDE
+  BURWOO: BURWOOD
+  BURWO: BURWOOD
+  BURW: BURWOOD
+  MACQUARIE PAR: MACQUARIE PARK
+  MACQUARIE PA: MACQUARIE PARK
+  MACQUARIE CEN: MACQUARIE CENTRE
+  MACQUARI: MACQUARIE
+  MACQUAR: MACQUARIE
+  CHIPPENDALE: CHIPPENDALE
+  HABERFIEL: HABERFIELD
+  HEBERFIELD: HABERFIELD
+  HABERFIELD: HABERFIELD
+  HOMEBUSH WEA: HOMEBUSH WEST
+  SOUTH GRANVIL: SOUTH GRANVILLE
+  SOUTH GRANVILLE: SOUTH GRANVILLE
+  DARLINGHURS: DARLINGHURST
+  WOOLLOOMOOL: WOOLLOOMOOLOO
+  BALGOWNI: BALGOWNIE
+  COOLANGATT: COOLANGATTA
+  SILVERWATER: SILVERWATER
+  PARRAMATT: PARRAMATTA
+  BARANGARO: BARANGAROO
+  PETERSHA: PETERSHAM
+  STANMOR: STANMORE
+  SURFERS PARADIS: SURFERS PARADISE
+  MELBOURNE AIRPO: MELBOURNE AIRPORT
+  STRATHFAU: STRATHFIELD
+  NORTH STRATHFAU: NORTH STRATHFIELD
+  MARSFIE: MARSFIELD
+  MARSFIEL: MARSFIELD
+  NEWINGT: NEWINGTON
+  CHULLOR: CHULLORA
+  CONCOR: CONCORD
+  CROYD: CROYDON
+  PALM BEAC: PALM BEACH
+  MONA VAL: MONA VALE
+  SUMMER HIL: SUMMER HILL
+  HOMEBUSH WES: HOMEBUSH WEST
+  BROADW: BROADWAY
+  BROADWA: BROADWAY
+  GATEWA: GATEWAY
+  CHARLESTOW: CHARLESTOWN
+  HEATHCO: HEATHCOTE
+  KIRRIBILL: KIRRIBILLI
+  SHELL C: SHELL COVE
+  SHELL COV: SHELL COVE
+  BOMADERR: BOMADERRY
+  WOLLONGON: WOLLONGONG
+  HURSTV: HURSTVILLE
+  FIVE DOC: FIVE DOCK
+  ENFIELD: ENFIELD
+  ASHFIEL: ASHFIELD
+  BELFIEL: BELFIELD
+  CROWS NES: CROWS NEST
+  DICKSO: DICKSON
+  FORTITUD: FORTITUDE VALLEY
+
+# Common word truncations
+words:
+  PHARMCY: PHARMACY
+  MKTPL: MARKETPLACE
+  MKTPLC: MARKETPLACE
+  RETA: RETAIL
+  AUSTRA: AUSTRALIA
+  SUPERMARKE: SUPERMARKET
+  SUPERMAR: SUPERMARKET
+  RESTAURAN: RESTAURANT
+  INTERNATIO: INTERNATIONAL
+  INTERNATIONA: INTERNATIONAL
+  ENTERPRI: ENTERPRISES
+  ENTERPRIS: ENTERPRISES
+  ENTERPRISE: ENTERPRISES
+  CHOCOLA: CHOCOLATES
+  ACUPUNCT: ACUPUNCTURE
+  CHEMIS: CHEMIST
+  CHEMI: CHEMIST
+  KITCHE: KITCHEN
+  KITCH: KITCHEN
+  GELAT: GELATO
+  ENTERTAIN: ENTERTAINMENT
+  ENTERTAINMEN: ENTERTAINMENT
+  BOULEVAR: BOULEVARD
+  TOWE: TOWER
+  COF: COFFEE
+  COFF: COFFEE
+  COSME: COSMETICS
+
+# Merchant name truncations
+merchants:
+  STARBUC: STARBUCKS
+  BREADTO: BREADTOP
+
+# Canonical location names for detection (used by stage 3 to tag metadata)
+known_locations:
+  - North Strathfield
+  - Strathfield South
+  - Strathfield
+  - North Ryde
+  - West Ryde
+  - North Parramatta
+  - Croydon Park
+  - Macquarie Park
+  - Macquarie Centre
+  - Summer Hill
+  - Homebush West
+  - Homebush
+  - Shell Cove
+  - Mona Vale
+  - Palm Beach
+  - Surry Hills
+  - Crows Nest
+  - Five Dock
+  - South Granville
+  - West Melbourne
+  - Fortitude Valley
+  - Melbourne Airport
+  - Sydney Airport
+  - Burwood
+  - Broadway
+  - Sydney
+  - Melbourne
+  - Chippendale
+  - Ultimo
+  - Bowral
+  - Tempe
+  - Croydon
+  - Enfield
+  - Newington
+  - Concord
+  - Rhodes
+  - Heathcote
+  - Bomaderry
+  - Wollongong
+  - Hurstville
+  - Kingsford
+  - Marsfield
+  - Ashfield
+  - Belfield
+  - Dickson
+  - Mascot
+  - Auburn
+  - Paddington
+  - Darlinghurst
+  - Kirribilli
+  - Stanmore
+  - Petersham
+  - Haberfield
+  - Chullora
+  - Silverwater
+  - Parramatta
+  - Barangaroo
+  - Wynyard
+  - Sunnyvale
+  - San Francisco
+  - Charlestown
+  - Martin Place
+  - The Rocks
+  - Haymarket
+  - Gateway
+  - Macquarie
+  - Coolangatta
+  - Surfers Paradise
+  - Woolloomooloo
+  - Balgownie
+  - Fairy Meadow
+  - Chatswood
+  - Blacktown
+  - Lidcombe
+  - Greenacre
+  - Engadine
+  - Blaxland
+  - Goulburn
+  - Katoomba
+  - Baulkham Hills
+  - Epping
+  - Ryde
+  - Pennant Hills
+  - Dural
+  - Ourimbah
+  - The Entrance
+  - Balmain
+  - Bankstown
+  - Moorebank
+  - Pyrmont
+  - Westmead
+  - Eastern Creek
+  - Northmead
+  - Lyneham
+  - Campsie
