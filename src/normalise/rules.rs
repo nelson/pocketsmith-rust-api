@@ -136,9 +136,12 @@ pub fn escape(s: &str) -> String {
     regex::escape(s)
 }
 
+fn compile_re(pattern: &str, context: &str) -> Result<Re> {
+    Re::new(pattern).map_err(|e| anyhow::anyhow!("Bad {} pattern '{}': {}", context, pattern, e))
+}
+
 fn compile_icase(pattern: &str, context: &str) -> Result<Re> {
-    let full = format!("(?i){}", pattern);
-    Re::new(&full).map_err(|e| anyhow::anyhow!("Bad {} pattern '{}': {}", context, pattern, e))
+    compile_re(&format!("(?i){}", pattern), context)
 }
 
 fn load_yaml<T: serde::de::DeserializeOwned>(rules_dir: &Path, filename: &str) -> Result<T> {
@@ -166,15 +169,15 @@ struct StripRuleYaml {
     set_flag: Option<String>,
 }
 
-pub struct CompiledStripRule {
-    pub re: Re,
-    pub name: String,
-    pub set_flag: Option<String>,
+pub(super) struct CompiledStripRule {
+    pub(super) re: Re,
+    pub(super) name: String,
+    pub(super) set_flag: Option<String>,
 }
 
 pub struct CompiledStripRules {
-    pub prefixes: Vec<CompiledStripRule>,
-    pub suffixes: Vec<CompiledStripRule>,
+    pub(super) prefixes: Vec<CompiledStripRule>,
+    pub(super) suffixes: Vec<CompiledStripRule>,
 }
 
 impl CompiledStripRules {
@@ -191,5 +194,62 @@ impl CompiledStripRules {
             prefixes: yaml.prefixes.into_iter().map(compile).collect::<Result<_>>()?,
             suffixes: yaml.suffixes.into_iter().map(compile).collect::<Result<_>>()?,
         })
+    }
+}
+
+// ── Stage 2: Classify ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ClassifyRulesYaml {
+    #[serde(default)]
+    classification_rules: Vec<ClassifyRuleYaml>,
+}
+
+#[derive(Deserialize)]
+struct ClassifyRuleYaml {
+    pattern: String,
+    #[serde(rename = "type")]
+    payee_type: String,
+    extract: Option<String>,
+    extract_pattern: Option<String>,
+}
+
+pub(super) struct Extraction {
+    pub(super) kind: String,
+    pub(super) re: Re,
+}
+
+pub(super) struct CompiledClassifyRule {
+    pub(super) re: Re,
+    pub(super) payee_type: String,
+    pub(super) extraction: Option<Extraction>,
+}
+
+pub struct CompiledClassifyRules {
+    pub(super) rules: Vec<CompiledClassifyRule>,
+}
+
+impl CompiledClassifyRules {
+    pub fn load(rules_dir: &Path) -> Result<Self> {
+        let yaml: ClassifyRulesYaml = load_yaml(rules_dir, "classify.yaml")?;
+        let rules = yaml
+            .classification_rules
+            .into_iter()
+            .map(|r| {
+                let extraction = match (r.extract, r.extract_pattern) {
+                    (Some(kind), Some(pat)) => Some(Extraction {
+                        kind,
+                        re: compile_re(&pat, "classify extract")?,
+                    }),
+                    _ => None,
+                };
+                Ok(CompiledClassifyRule {
+                    re: compile_re(&r.pattern, "classify")?,
+                    payee_type: r.payee_type,
+                    extraction,
+                })
+            })
+            .collect::<Result<_>>()?;
+        Ok(Self { rules })
     }
 }

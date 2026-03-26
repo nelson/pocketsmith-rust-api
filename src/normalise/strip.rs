@@ -1,8 +1,6 @@
+use crate::normalise::{meta, Metadata};
 use crate::normalise::rules::CompiledStripRules;
 use serde_json::Value;
-use std::collections::HashMap;
-
-pub type Metadata = HashMap<String, Value>;
 
 /// Stage 1: Strip prefixes and suffixes.
 /// Returns (cleaned_payee, metadata).
@@ -13,7 +11,7 @@ pub fn apply(payee: &str, rules: &CompiledStripRules) -> (String, Metadata) {
     // Apply prefixes (first match wins)
     for rule in &rules.prefixes {
         if let Some((_start, end)) = rule.re.find(&result) {
-            metadata.insert("prefix_stripped".into(), Value::String(rule.name.clone()));
+            metadata.insert(meta::PREFIX_STRIPPED.into(), Value::String(rule.name.clone()));
             if let Some(ref flag) = rule.set_flag {
                 metadata.insert(flag.clone(), Value::Bool(true));
             }
@@ -26,7 +24,7 @@ pub fn apply(payee: &str, rules: &CompiledStripRules) -> (String, Metadata) {
     for rule in &rules.suffixes {
         if let Some((start, _end)) = rule.re.find(&result) {
             let stripped = metadata
-                .entry("suffixes_stripped".into())
+                .entry(meta::SUFFIXES_STRIPPED.into())
                 .or_insert_with(|| Value::Array(Vec::new()));
             if let Value::Array(ref mut arr) = stripped {
                 arr.push(Value::String(rule.name.clone()));
