@@ -16,6 +16,36 @@ persons_strip_memo:
   - "Tam S Tam L"
   - "Tam S S Tam L N"
   - "Tam S S Tam L"
+  # Person names with memo leakage (paint and sip, event memos, etc.)
+  - "A S-W Bywaters"
+  - "A Ventura Mendoza"
+  - "Adam Rasko"
+  - "Bethany Macey"
+  - "Bianca Sunito"
+  - "Charlotte Field"
+  - "Chester Wong"
+  - "Elijah Mucci"
+  - "Elspeth Meek"
+  - "Ethan Lum Mow"
+  - "Hannah Tarrant"
+  - "James Mulholland"
+  - "Janette Vardy"
+  - "Jessica Pireh"
+  - "Manish Seneviratne"
+  - "Miss Elizabeth Joy Th"
+  - "Miss Emily Maree Benn"
+  - "Miss Tabitha Wood"
+  - "Mr Caleb Andrew Mitch"
+  - "Mr Thomas Ross Baker"
+  - "Natalia Taberner"
+  - "Nerida Gifford"
+  - "Roger Chan"
+  - "Samule Li"
+  - "Serena E Chiert"
+  - "Stephanie Wong"
+  - "Zachary Matthew Fishe"
+  # Martin Highland: drum teacher
+  - "Martin Highland"
 
 persons:
   "LOK SUN NELSON TAM": "Nelson Tam"
@@ -52,6 +82,85 @@ persons:
   "CORNERSTONE PRESBYTERIAN COM": "Cornerstone Presbyterian Church"
   "Cornerstone Presbyterian Chu": "Cornerstone Presbyterian Church"
   "Cornerstone Presbyterian Com": "Cornerstone Presbyterian Church"
+
+  # Nelson Tam variants
+  "Tam": "Nelson Tam"
+  "Lok": "Nelson Tam"
+
+  # Name consolidation (first name → full name)
+  "Alexander Bahn": "Alex Bahn"
+  "Bridonie": "Bridonie Nicholson"
+  "Chenhan": "Chenhan Ma"
+  "Dennis": "Dennis Law"
+  "Gillian": "Gillian Li"
+  "Hannah T": "Hannah Tarrant"
+  "Hoermann S R": "Stephan Hoermann"
+  "Janette": "Janette Vardy"
+  "Jason Hu": "Jason Hui"
+  "Johnny": "Johnny Tam"
+  "Johnny Chung Leung T": "Johnny Tam"
+  "Ningjia": "Ningjia Wang"
+  "Ningjia and Shawn": "Ningjia Wang"
+  "Vonnie": "Vonnie Ho Ching Yee"
+  "Vonnie Ho": "Vonnie Ho Ching Yee"
+  "Yonnie": "Yonnie Ho"
+  "Zoe": "Zoe Fan"
+  "Stefan": "Stefan Gotz"
+  "Hsin Tan": "Cindy Tan"
+  "Hsin Yen Cindy Tan": "Cindy Tan"
+  "Samule": "Samule Li"
+  "Samule Li Sam": "Samule Li"
+  "Anna": "Anna McQueen"
+  "Anna Mcqueen": "Anna McQueen"
+  "Jen": "Jen Tan"
+  "Charlotte": "Charlotte Hitchcock"
+  "Rebecca": "Rebecca Ng"
+  "Richard": "Richard Ho"
+  "Amanda": "Amanda"
+  "Clarissa": "Clarissa"
+  "Ka": "Ka"
+
+  # Reversed / re-ordered names
+  "G W Wong See": "Graeme Wong See"
+  "Gw Wong See": "Graeme Wong See"
+  "Lam Harry": "Harry Lam"
+  "Davies K": "Kirsten Davies"
+  "Timms Lana Grace": "Lana Grace Timms"
+  "Lang Kenneth Hames": "Lang Hames"
+  "Thomas Mm Leong": "Thomas Leong"
+  "Elder Robert Grahame": "Rob Elder"
+
+  # Casing fixes
+  "Adam Mccann": "Adam McCann"
+
+  # Couple consolidation
+  "Simon and Stephanie Wong": "Stephanie and Simon Wong"
+  "Emily and Jason": "Emily and Jason Hui"
+  "Grace and Hannah": "Grace and Hannah Chan"
+  "Sam and Kirby Atwood": "Samuel Atwood"
+
+  # Title prefix mappings (Mr/Mrs/Miss/Ms → canonical)
+  "Miss Sharon Law": "Sharon Law"
+  "Miss Nerida Gifford": "Nerida Gifford"
+  "Miss Tzvetelina Petkova": "Tzvetelina Petkova"
+  "Mr Andy Chi-Kit Tan": "Andy Tan"
+  "Mr Christopher Chun Kit Wong": "Christopher Wong"
+  "Mr Hock Lim Ooi": "Hock Ooi"
+  "Mr Philip Andrew Snel": "Philip Snelling"
+  "Mr Pierre Jean-Luc Th": "Pierre Thielemans"
+  "Mr Tristan Alexander": "Tristan McBide"
+  "Mr Vinh Gia Tran": "Vinh Tran"
+  "Mr Samuel David Atwoo": "Samuel Atwood"
+  "Ms Doris Ming Wai Cho": "Doris Chong"
+  "Ms Maree Jayashree Mo": "Maree Selvaraj"
+  "Ms Hoi Wan Li & Mr Ki": "Hoi Wan Li and Jason Tam"
+  "Ms Natasha Lo": "Natasha Lo"
+  "Mrs Hea-Won Park": "Mrs Hea-Won Park"
+
+  # Standalone truncated titles → Unknown Person
+  "Mr": "Unknown Person"
+  "Miss": "Unknown Person"
+  "Mrs": "Unknown Person"
 
 # Employer canonicalisation (for salary/transfer_in types)
 employers:
@@ -1698,6 +1807,54 @@ merchant_mappings:
   # Tam S & Tam L N Deposit: strip receipt
   - pattern: "^(?:Tam S & Tam L N|Joint Account \\(Tam\\)) Deposit.*"
     canonical: "Joint Account (Tam)"
+
+  # --- Business entities appearing in transfers (not person names) ---
+
+  # AES: electrician
+  - pattern: "^Aes$"
+    canonical: "AES Electrical"
+
+  # Tan Hands: physiotherapy
+  - pattern: "^Tan Hands.*"
+    canonical: "Tan Hands Physiotherapy"
+
+  # Focus: business
+  - pattern: "^Focus$"
+    canonical: "Focus"
+
+  # Genesis Gardens: lawnmowing service
+  - pattern: "^Genesis Gardens.*"
+    canonical: "Genesis Gardens"
+
+  # Oilstone: training and professional development
+  - pattern: "^Oilstone.*"
+    canonical: "Oilstone"
+
+  # ING Bank: transfers
+  - pattern: "^Ing$"
+    canonical: "ING"
+
+  # Cs Education: consolidate with/without location
+  - pattern: "^Cs Education.*"
+    canonical: "CS Education Strathfield"
+  - pattern: "^Cs$"
+    canonical: "CS Education Strathfield"
+
+  # Early Purpose: business
+  - pattern: "^Early Purpose.*"
+    canonical: "Early Purpose"
+
+  # Baked Beats: business
+  - pattern: "^Baked Beats.*"
+    canonical: "Baked Beats"
+
+  # Slower Deeper Wiser: business
+  - pattern: "^Slower Deeper Wiser.*"
+    canonical: "Slower Deeper Wiser"
+
+  # Soulgram Partners: business
+  - pattern: "^Soulgram Partners.*"
+    canonical: "Soulgram Partners"
 
 # Default locations for singleton merchants (appended when bare name matches)
 # Key = canonical merchant name, Value = default location

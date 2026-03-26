@@ -33,3 +33,4 @@ iteration	score	delta	hypothesis	outcome
 032	93.51	+0.06	More chain cleanup: AmEx, Ghost, Memocorp, Avenue, Linkt, David Jones, Sushi, etc.	kept
 033	93.57	+0.06	Small chain batch: singleton-to-location consolidation (50+ rules)	kept
 034	93.59	+0.02	Generic location captures + capture noise stripping + known locations + merchant groups	kept
+035	93.66	+0.07	Human name identification and canonicalisation (~65 persons, ~25 memo-strip, ~10 businesses)	kept

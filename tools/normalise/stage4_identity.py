@@ -131,10 +131,21 @@ def _canonicalise_person(name: str, rules: dict) -> str:
     stripped = " ".join(name.split())
     if stripped in persons:
         return persons[stripped]
+    # Strip Mr/Mrs/Miss/Ms title prefixes and retry
+    title_re = re.compile(r'^(?:Mr|Mrs|Ms|Miss|Elder)\s+', re.IGNORECASE)
+    title_stripped = title_re.sub('', name)
+    if title_stripped != name:
+        # Check persons dict for the title-stripped form
+        if title_stripped in persons:
+            return persons[title_stripped]
+        for variant, canonical in persons.items():
+            if variant.upper() == title_stripped.upper():
+                return canonical
     # Check if name starts with a known person (strip memo)
     for person in rules.get("persons_strip_memo", []):
         if name.upper().startswith(person.upper()) and len(name) > len(person):
-            return person
+            # Recurse so the stripped name also goes through persons lookup
+            return _canonicalise_person(person, rules)
     return name
 
 

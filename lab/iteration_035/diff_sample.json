@@ -1,0 +1,503 @@
+Dry run: would update 467 of 21353 transactions
+[
+  {
+    "original": "AP STRATHFIELD SOUTH STRATHFIELD SOU",
+    "final": "Ap Strathfield South Strathfield Sou",
+    "type": "merchant",
+    "stages": {
+      "s1": "AP STRATHFIELD SOUTH STRATHFIELD SOU",
+      "s3": "AP STRATHFIELD SOUTH STRATHFIELD SOU",
+      "s4": "AP STRATHFIELD SOUTH STRATHFIELD SOU"
+    }
+  },
+  {
+    "original": "OFFICEWORKS 0201 Five Five Dock",
+    "final": "Officeworks Five Dock",
+    "type": "merchant",
+    "stages": {
+      "s1": "OFFICEWORKS 0201 FIVE FIVE DOCK",
+      "s3": "OFFICEWORKS 0201 FIVE FIVE DOCK",
+      "s4": "Officeworks FIVE FIVE DOCK"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+    "final": "Woolworths Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+      "s3": "WOOLWORTHS 1624 STRATHFIELD STRATHFIELD",
+      "s4": "Woolworths STRATHFIELD"
+    }
+  },
+  {
+    "original": "Transfer To A GOCK, PayID Phone from CommBank App, STamLunch",
+    "final": "A Gock, PayID Phone From",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO A GOCK, PAYID PHONE FROM COMMBANK APP, STAMLUNCH",
+      "s3": "TRANSFER TO A GOCK, PAYID PHONE FROM COMMBANK APP, STAMLUNCH",
+      "s4": "A GOCK, PayID Phone from"
+    }
+  },
+  {
+    "original": "MCM SOUP PTY LTD BURWOOD NS AUS, Card xx0723, Value date: 12/01/2025",
+    "final": "Mcm Soup Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "MCM SOUP PTY LTD BURWOOD",
+      "s3": "MCM SOUP PTY LTD BURWOOD",
+      "s4": "MCM SOUP BURWOOD"
+    }
+  },
+  {
+    "original": "LAZ PARKING MX2164 0839 AUSTIN",
+    "final": "Laz Parking Mx2164 0839 Austin",
+    "type": "merchant",
+    "stages": {
+      "s1": "LAZ PARKING MX2164 0839 AUSTIN",
+      "s3": "LAZ PARKING MX2164 0839 AUSTIN",
+      "s4": "LAZ PARKING MX2164 0839 AUSTIN"
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Joint Account (Tam)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s3": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s4": "Joint Account (Tam)"
+    }
+  },
+  {
+    "original": "POINT PARKING PTY LTD BURWOOD NS AUS, Card xx3772, Value date: 11/03/2024",
+    "final": "Point Parking",
+    "type": "merchant",
+    "stages": {
+      "s1": "POINT PARKING PTY LTD BURWOOD",
+      "s3": "POINT PARKING PTY LTD BURWOOD",
+      "s4": "Point Parking"
+    }
+  },
+  {
+    "original": "GOLDEN BARLEY HOTEL ENMORE",
+    "final": "Golden Barley Hotel Enmore",
+    "type": "merchant",
+    "stages": {
+      "s1": "GOLDEN BARLEY HOTEL ENMORE",
+      "s3": "GOLDEN BARLEY HOTEL ENMORE",
+      "s4": "GOLDEN BARLEY HOTEL ENMORE"
+    }
+  },
+  {
+    "original": "SQ *C2B AUG 19 THU BA Darlinghurst AU AUS Card xx0008 Value Date: 16/08/2021",
+    "final": "C2B Aug 19 Thu Ba Darlinghurst",
+    "type": "merchant",
+    "stages": {
+      "s1": "C2B AUG 19 THU BA DARLINGHURST",
+      "s3": "C2B AUG 19 THU BA DARLINGHURST",
+      "s4": "C2B AUG 19 THU BA DARLINGHURST"
+    }
+  },
+  {
+    "original": "Salary AFES TAM AFES APY",
+    "final": "AFES (Sophia Salary)",
+    "type": "salary",
+    "stages": {
+      "s1": "SALARY AFES TAM AFES APY",
+      "s3": "SALARY AFES TAM AFES APY",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "MALACCA STRAITS BRDWAY ULTIMO NS AUS, Card xx0723, Value date: 19/11/2024",
+    "final": "Malacca Straits Brdway Ultimo",
+    "type": "merchant",
+    "stages": {
+      "s1": "MALACCA STRAITS BRDWAY ULTIMO",
+      "s3": "MALACCA STRAITS BRDWAY ULTIMO",
+      "s4": "MALACCA STRAITS BRDWAY ULTIMO"
+    }
+  },
+  {
+    "original": "STITCH COFFEE BROADWAY Haymarket",
+    "final": "Stitch Coffee Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "STITCH COFFEE BROADWAY HAYMARKET",
+      "s3": "STITCH COFFEE BROADWAY HAYMARKET",
+      "s4": "Stitch Coffee Broadway"
+    }
+  },
+  {
+    "original": "YAYOI TEISHOKU JAPANESE Sydney",
+    "final": "Yayoi Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "YAYOI TEISHOKU JAPANESE SYDNEY",
+      "s3": "YAYOI TEISHOKU JAPANESE SYDNEY",
+      "s4": "Yayoi Sydney"
+    }
+  },
+  {
+    "original": "CARD PAYMENT FEE - ATO SYDNEY",
+    "final": "Card Payment Fee - ATO Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "CARD PAYMENT FEE - ATO SYDNEY",
+      "s3": "CARD PAYMENT FEE - ATO SYDNEY",
+      "s4": "CARD PAYMENT FEE - ATO SYDNEY"
+    }
+  },
+  {
+    "original": "MAMAKSMLC XX2906 SYDNEY",
+    "final": "Mamaksmlc Xx2906 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "MAMAKSMLC XX2906 SYDNEY",
+      "s3": "MAMAKSMLC XX2906 SYDNEY",
+      "s4": "MAMAKSMLC XX2906 SYDNEY"
+    }
+  },
+  {
+    "original": "Fast Transfer From Tam S S & Tam L N, Funds transfer",
+    "final": "Joint Account (Tam)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s3": "FAST TRANSFER FROM TAM S S & TAM L N, FUNDS TRANSFER",
+      "s4": "Joint Account (Tam)"
+    }
+  },
+  {
+    "original": "SQ *STITCH COFFEE Ultimo AU AUS, Card xx3772, Value date: 14/02/2023",
+    "final": "Stitch Coffee Ultimo",
+    "type": "merchant",
+    "stages": {
+      "s1": "STITCH COFFEE ULTIMO",
+      "s3": "STITCH COFFEE ULTIMO",
+      "s4": "Stitch Coffee ULTIMO"
+    }
+  },
+  {
+    "original": "AMPOL STRATHFIE 20036F STRATHFIELD S AUS Card xx3772 Value Date: 05/05/2022",
+    "final": "Ampol Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "AMPOL STRATHFIE 20036F STRATHFIELD S",
+      "s3": "AMPOL STRATHFIELD 20036F STRATHFIELD S",
+      "s4": "Ampol STRATHFIELD"
+    }
+  },
+  {
+    "original": "ZIPBY PTY LIMITED",
+    "final": "Zipby Limited South Granville",
+    "type": "merchant",
+    "stages": {
+      "s1": "ZIPBY PTY LIMITED",
+      "s3": "ZIPBY PTY LIMITED",
+      "s4": "Zipby Limited South Granville"
+    }
+  },
+  {
+    "original": "Fast Transfer From SAIDGANI MUSAEV, to PayID Phone, Lunch",
+    "final": "Saidgani Musaev",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FAST TRANSFER FROM SAIDGANI MUSAEV, TO PAYID PHONE, LUNCH",
+      "s3": "FAST TRANSFER FROM SAIDGANI MUSAEV, TO PAYID PHONE, LUNCH",
+      "s4": "SAIDGANI MUSAEV"
+    }
+  },
+  {
+    "original": "EG FUELCO 1460 STRATHFI BURWOOD",
+    "final": "Eg Fuelco Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "EG FUELCO 1460 STRATHFI BURWOOD",
+      "s3": "EG FUELCO 1460 STRATHFIELD BURWOOD",
+      "s4": "EG Fuelco Strathfield"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+    "final": "Woolworths Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+      "s3": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+      "s4": "Woolworths BURWOOD"
+    }
+  },
+  {
+    "original": "CLAUDE.AI SUBSCRIPTION SAN FRANCISCO",
+    "final": "Claude.Ai Subscription San Francisco",
+    "type": "merchant",
+    "stages": {
+      "s1": "CLAUDE.AI SUBSCRIPTION SAN FRANCISCO",
+      "s3": "CLAUDE.AI SUBSCRIPTION SAN FRANCISCO",
+      "s4": "CLAUDE.AI SUBSCRIPTION SAN FRANCISCO"
+    }
+  },
+  {
+    "original": "Direct Debit 062246 HollardIns, 3791272--183444721",
+    "final": "Hollard Insurance",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT DEBIT 062246 HOLLARDINS, 3791272--183444721",
+      "s3": "DIRECT DEBIT 062246 HOLLARDINS, 3791272--183444721",
+      "s4": "Hollard Insurance"
+    }
+  },
+  {
+    "original": "SP EMU MUSIC PYMBLE NS AUS, Card xx0723, Value date: 11/04/2025",
+    "final": "Emu Music Pymble",
+    "type": "merchant",
+    "stages": {
+      "s1": "EMU MUSIC PYMBLE",
+      "s3": "EMU MUSIC PYMBLE",
+      "s4": "EMU MUSIC PYMBLE"
+    }
+  },
+  {
+    "original": "Transfer To X NEEMS, PayID Phone from CommBank App, Tam maccas",
+    "final": "X Neems, PayID Phone From",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO X NEEMS, PAYID PHONE FROM COMMBANK APP, TAM MACCAS",
+      "s3": "TRANSFER TO X NEEMS, PAYID PHONE FROM COMMBANK APP, TAM MACCAS",
+      "s4": "X NEEMS, PayID Phone from"
+    }
+  },
+  {
+    "original": "THE LUNE CO FITZROY VI AUS, Card xx3772, Value date: 26/12/2022",
+    "final": "The Lune Co Fitzroy Vi",
+    "type": "merchant",
+    "stages": {
+      "s1": "THE LUNE CO FITZROY VI",
+      "s3": "THE LUNE CO FITZROY VI",
+      "s4": "THE LUNE CO FITZROY VI"
+    }
+  },
+  {
+    "original": "WINDCAVE*NO1 MALATANG B GLEBE",
+    "final": "No1 Malatang B Glebe",
+    "type": "merchant",
+    "stages": {
+      "s1": "NO1 MALATANG B GLEBE",
+      "s3": "NO1 MALATANG B GLEBE",
+      "s4": "NO1 MALATANG B GLEBE"
+    }
+  },
+  {
+    "original": "To Nelson Tam - Funds transfer",
+    "final": "Nelson Tam",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TO NELSON TAM - FUNDS TRANSFER",
+      "s3": "TO NELSON TAM - FUNDS TRANSFER",
+      "s4": "Nelson Tam"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "Transfer To Omid Investment Pty Ltd, CommBank App Chloe and Ethan concert",
+    "final": "Omid Investment PTY LTD",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO OMID INVESTMENT PTY LTD, COMMBANK APP CHLOE AND ETHAN CONCERT",
+      "s3": "TRANSFER TO OMID INVESTMENT PTY LTD, COMMBANK APP CHLOE AND ETHAN CONCERT",
+      "s4": "Omid Investment Pty Ltd"
+    }
+  },
+  {
+    "original": "Aussie Broadband limit MORWELL AU AUS Card xx1737 Value Date: 19/08/2022",
+    "final": "Aussie Broadband",
+    "type": "merchant",
+    "stages": {
+      "s1": "AUSSIE BROADBAND LIMIT MORWELL",
+      "s3": "AUSSIE BROADBAND LIMIT MORWELL",
+      "s4": "Aussie Broadband"
+    }
+  },
+  {
+    "original": "Transfer To Dennis and Dorcas Law CommBank App Wedding",
+    "final": "Dennis and Dorcas Law",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO DENNIS AND DORCAS LAW COMMBANK APP WEDDING",
+      "s3": "TRANSFER TO DENNIS AND DORCAS LAW COMMBANK APP WEDDING",
+      "s4": "Dennis and Dorcas Law"
+    }
+  },
+  {
+    "original": "PappaRich UTS Univers Ultimo NS AUS, Card xx0723, Value date: 09/02/2026",
+    "final": "Papparich UTS Univers Ultimo",
+    "type": "merchant",
+    "stages": {
+      "s1": "PAPPARICH UTS UNIVERS ULTIMO",
+      "s3": "PAPPARICH UTS UNIVERS ULTIMO",
+      "s4": "Papparich UTS UNIVERS ULTIMO"
+    }
+  },
+  {
+    "original": "MICROSOFT*STORE MSBILL.INFO",
+    "final": "Microsoft*Store Msbill.Info",
+    "type": "merchant",
+    "stages": {
+      "s1": "MICROSOFT*STORE MSBILL.INFO",
+      "s3": "MICROSOFT*STORE MSBILL.INFO",
+      "s4": "MICROSOFT*STORE MSBILL.INFO"
+    }
+  },
+  {
+    "original": "GUZMAN Y GOMEZ BROADWAY ULTIMO",
+    "final": "Guzman Y Gomez Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "GUZMAN Y GOMEZ BROADWAY ULTIMO",
+      "s3": "GUZMAN Y GOMEZ BROADWAY ULTIMO",
+      "s4": "Guzman Y Gomez Broadway"
+    }
+  },
+  {
+    "original": "MERIDEN SCHOOL STRATHFI STRATHFIELD",
+    "final": "Meriden School Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "MERIDEN SCHOOL STRATHFI STRATHFIELD",
+      "s3": "MERIDEN SCHOOL STRATHFIELD STRATHFIELD",
+      "s4": "Meriden School Strathfield"
+    }
+  },
+  {
+    "original": "HABERFIELD CW PTY LTD HABERFIELD",
+    "final": "Haberfield Cw Haberfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "HABERFIELD CW PTY LTD HABERFIELD",
+      "s3": "HABERFIELD CW PTY LTD HABERFIELD",
+      "s4": "HABERFIELD CW HABERFIELD"
+    }
+  },
+  {
+    "original": "Transfer from xx9549 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX9549 COMMBANK APP",
+      "s3": "TRANSFER FROM XX9549 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "From AFES - 56934443827",
+    "final": "AFES (Sophia Salary)",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "FROM AFES -",
+      "s3": "FROM AFES -",
+      "s4": "AFES (Sophia Salary)"
+    }
+  },
+  {
+    "original": "APPLE PARK CAFFE EB C00 CUPERTINO",
+    "final": "Apple Park Caffe Eb C00 Cupertino",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE PARK CAFFE EB C00 CUPERTINO",
+      "s3": "APPLE PARK CAFFE EB C00 CUPERTINO",
+      "s4": "Apple Park CAFFE EB C00 CUPERTINO"
+    }
+  },
+  {
+    "original": "BDDK TRADING PTY LTD HORNSBY",
+    "final": "Bddk Trading Hornsby",
+    "type": "merchant",
+    "stages": {
+      "s1": "BDDK TRADING PTY LTD HORNSBY",
+      "s3": "BDDK TRADING PTY LTD HORNSBY",
+      "s4": "BDDK TRADING HORNSBY"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+    "final": "Woolworths Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1624 STRATHF STRATHFIELD",
+      "s3": "WOOLWORTHS 1624 STRATHFIELD STRATHFIELD",
+      "s4": "Woolworths STRATHFIELD"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+    "final": "Woolworths Burwood",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+      "s3": "WOOLWORTHS 1614 BURWOOD BURWOOD",
+      "s4": "Woolworths BURWOOD"
+    }
+  },
+  {
+    "original": "STYLE LOLA PTY LTD SYDNEY",
+    "final": "Style Lola Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "STYLE LOLA PTY LTD SYDNEY",
+      "s3": "STYLE LOLA PTY LTD SYDNEY",
+      "s4": "STYLE LOLA SYDNEY"
+    }
+  },
+  {
+    "original": "Transfer To Jaekyun Park, CommBank App Cleaning",
+    "final": "Jaekyun Park",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO JAEKYUN PARK, COMMBANK APP CLEANING",
+      "s3": "TRANSFER TO JAEKYUN PARK, COMMBANK APP CLEANING",
+      "s4": "Jaekyun Park"
+    }
+  },
+  {
+    "original": "Direct Debit 000517 AMERICAN EXPRESS XXXXXXXXXXX3006",
+    "final": "American Express Payment",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT DEBIT 000517 AMERICAN EXPRESS XXXXXXXXXXX3006",
+      "s3": "DIRECT DEBIT 000517 AMERICAN EXPRESS XXXXXXXXXXX3006",
+      "s4": "American Express Payment"
+    }
+  },
+  {
+    "original": "EDITION ROASTERS WYN 99 SYDNEY",
+    "final": "Edition Roasters Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s3": "EDITION ROASTERS WYN 99 SYDNEY",
+      "s4": "Edition Roasters SYDNEY"
+    }
+  },
+  {
+    "original": "WOOTEA GEORGE ST XX3070 SYDNEY",
+    "final": "Wootea George St Xx3070 Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOTEA GEORGE ST XX3070 SYDNEY",
+      "s3": "WOOTEA GEORGE ST XX3070 SYDNEY",
+      "s4": "WOOTEA GEORGE ST XX3070 SYDNEY"
+    }
+  }
+]
