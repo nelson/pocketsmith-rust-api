@@ -730,10 +730,6 @@ merchant_mappings:
   - pattern: "^Chemist Warehouse (.+)"
     canonical: "Chemist Warehouse {1}"
 
-  # American Express: consolidate
-  - pattern: "^American Express.*"
-    canonical: "American Express"
-
   # Coles: strip store numbers and consolidate
   - pattern: "^Coles Express (.+?)\\s+\\d*\\s*(.+)"
     canonical: "Coles Express {1}"
@@ -1442,6 +1438,140 @@ merchant_mappings:
     canonical: "Dopa by Devon Sydney"
   - pattern: "^Dopa Sydney$"
     canonical: "Dopa Sydney"
+
+  # --- More chain cleanup (iter 032) ---
+
+  # Ghost Locomotion: consolidate
+  - pattern: "^Ghost Locomotion Australia.*"
+    canonical: "Ghost Locomotion"
+
+  # Memocorp: consolidate truncations
+  - pattern: "^Memocorp Australia.*Strathfield.*"
+    canonical: "Memocorp Australia Strathfield"
+  - pattern: "^Memocorp Australia.*"
+    canonical: "Memocorp Australia Strathfield"
+
+  # The Avenue: consolidate
+  - pattern: "^The Avenue.*Newington.*"
+    canonical: "The Avenue Newington"
+  - pattern: "^The Avenue$"
+    canonical: "The Avenue Newington"
+
+  # Linkt: consolidate
+  - pattern: "^Linkt Sydney.*"
+    canonical: "Linkt"
+
+  # David Jones: consolidate Limited variants
+  - pattern: "^David Jones Limited.*"
+    canonical: "David Jones Online"
+
+  # Guzman Y Gomez: consolidate GYG variant
+  - pattern: "^Guzman Y Gomez - Gyg (.+)"
+    canonical: "Guzman Y Gomez {1}"
+  - pattern: "^Guzman Y Gomez Martin.*"
+    canonical: "Guzman Y Gomez Sydney"
+
+  # Sushi Hub QVB: consolidate
+  - pattern: "^Sushi Hub QVB.*"
+    canonical: "Sushi Hub QVB Sydney"
+
+  # Sushi Naya: strip store codes
+  - pattern: "^Sushi Naya.*Chippendale.*"
+    canonical: "Sushi Naya Chippendale"
+  - pattern: "^Sushi Naya Martin.*"
+    canonical: "Sushi Naya Sydney"
+  - pattern: "^Sushi Naya Westfield.*"
+    canonical: "Sushi Naya Burwood"
+
+  # Sushi World: strip dash prefix
+  - pattern: "^Sushi World - (.+?)\\s+(.+)"
+    canonical: "Sushi World {1}"
+  - pattern: "^Sushi World - (.+)"
+    canonical: "Sushi World {1}"
+
+  # Pop Mart: consolidate Oceania
+  - pattern: "^Pop Mart Oceania.*"
+    canonical: "Pop Mart"
+
+  # Dorothy Cowie: consolidate truncation
+  - pattern: "^Dorothy Cowie School.*"
+    canonical: "Dorothy Cowie School"
+
+  # Eat Istanbul: consolidate
+  - pattern: "^Eat Istanbul Macqu.*"
+    canonical: "Eat Istanbul Macquarie Park"
+  - pattern: "^Eat Istanbul Martin.*"
+    canonical: "Eat Istanbul Sydney"
+
+  # Ivy: consolidate
+  - pattern: "^Ivy - Mumu.*"
+    canonical: "Ivy Mumu Sydney"
+
+  # Tea Spot: consolidate
+  - pattern: "^Tea Spot.*Burwood.*"
+    canonical: "Tea Spot Burwood"
+  - pattern: "^Tea Spot$"
+    canonical: "Tea Spot Burwood"
+
+  # Leible Coffee: consolidate
+  - pattern: "^Leible Coffee.*"
+    canonical: "Leible Coffee Sydney"
+
+  # Bakers Delight: consolidate Bwood
+  - pattern: "^Bakers Delight Bwood.*"
+    canonical: "Bakers Delight Burwood"
+  - pattern: "^Bakers Delight Dic.*"
+    canonical: "Bakers Delight Dickson"
+
+  # Hero Sushi: consolidate Gateway
+  - pattern: "^Hero Sushi Gatewa.*"
+    canonical: "Hero Sushi Sydney"
+
+  # Priceline Pharmacy: consolidate Wyny
+  - pattern: "^Priceline Pharmacy Wyny.*"
+    canonical: "Priceline Pharmacy Sydney"
+
+  # Mrs Stephanie Wong: strip memo from merchant-typed entries
+  - pattern: "^Mrs Stephanie Wong .+"
+    canonical: "Mrs Stephanie Wong"
+
+  # Note: Fast Transfer From entries are handled by transfer_entity_extraction
+
+  # Han Sang: consolidate Melbourne variant
+  - pattern: "^Han Sang 8-14.*"
+    canonical: "Han Sang West Melbourne"
+
+  # La Lune: consolidate
+  - pattern: "^La Lune Mark(?:et)?.*North Strathfield.*"
+    canonical: "La Lune Market North Strathfield"
+  - pattern: "^La Lune Mark(?:et)?.*Fortitude.*"
+    canonical: "La Lune Market"
+
+  # Macquarie University: consolidate
+  - pattern: "^Macquarie University.*"
+    canonical: "Macquarie University"
+
+  # Meet Fresh: consolidate
+  - pattern: "^Meet Fresh.*Burwood.*"
+    canonical: "Meet Fresh Burwood"
+  - pattern: "^Meet Fresh \\d+ (.+)"
+    canonical: "Meet Fresh {1}"
+
+  # Sharon Law: strip memo
+  - pattern: "^Sharon Law .+"
+    canonical: "Sharon Law"
+
+  # Maenam Lao: consolidate
+  - pattern: "^Maenam Lao Thai.*Strathfield.*"
+    canonical: "Maenam Lao Thai Strathfield"
+  - pattern: "^Maenam Lao Thai$"
+    canonical: "Maenam Lao Thai Strathfield"
+  - pattern: "^Maenam Lao.*Melbourne.*"
+    canonical: "Maenam Lao Melbourne"
+
+  # Yakitori Jin: consolidate
+  - pattern: "^Yakitori Jin$"
+    canonical: "Yakitori Jin"
 
   # --- Internal transfer consolidation (iter 028) ---
 
