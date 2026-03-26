@@ -1,0 +1,2047 @@
+# Stage 4: Identity-based normalisation rules
+# Applied after type classification and truncation expansion.
+
+# Person name canonicalisation (maps known name variants to canonical form)
+# Transfer consolidation: strip memos from known people
+persons_strip_memo:
+  - "Johnny Tam"
+  - "David Greenaway"
+  - "Mr David James Greenaway"
+  - "Mrs Stephanie Wong"
+  - "Stephan Hoermann"
+  - "Lok Sun Nelson Tam"
+  - "Saidgani Musaev"
+  - "Tam S & Tam L N"
+  - "Tam S Tam L N"
+  - "Tam S Tam L"
+  - "Tam S S Tam L N"
+  - "Tam S S Tam L"
+  # Person names with memo leakage (paint and sip, event memos, etc.)
+  - "A S-W Bywaters"
+  - "A Ventura Mendoza"
+  - "Adam Rasko"
+  - "Bethany Macey"
+  - "Bianca Sunito"
+  - "Charlotte Field"
+  - "Chester Wong"
+  - "Elijah Mucci"
+  - "Elspeth Meek"
+  - "Ethan Lum Mow"
+  - "Hannah Tarrant"
+  - "James Mulholland"
+  - "Janette Vardy"
+  - "Jessica Pireh"
+  - "Manish Seneviratne"
+  - "Miss Elizabeth Joy Th"
+  - "Miss Emily Maree Benn"
+  - "Miss Tabitha Wood"
+  - "Mr Caleb Andrew Mitch"
+  - "Mr Thomas Ross Baker"
+  - "Natalia Taberner"
+  - "Nerida Gifford"
+  - "Roger Chan"
+  - "Samule Li"
+  - "Serena E Chiert"
+  - "Stephanie Wong"
+  - "Zachary Matthew Fishe"
+  # Martin Highland: drum teacher
+  - "Martin Highland"
+
+persons:
+  "LOK SUN NELSON TAM": "Nelson Tam"
+  "LOK SUN NELSON T": "Nelson Tam"
+  "NELSON TAM": "Nelson Tam"
+  "Nelson Tam": "Nelson Tam"
+  "Lok Sun Nelson Tam": "Nelson Tam"
+  "Lok Sun Nelson T": "Nelson Tam"
+  "TAM LOK SUN NELSON": "Nelson Tam"
+  "Tam Lok Sun Nelson": "Nelson Tam"
+  "SOPHIA S TAM": "Sophia Tam"
+  "Sophia S Tam": "Sophia Tam"
+  "Sophia Tam": "Sophia Tam"
+  "Lok Sun Tam": "Nelson Tam"
+  "Tam S S & Tam L N": "Joint Account (Tam)"
+  "Tam S S & Tam L": "Joint Account (Tam)"
+  "Tam S & Tam L N": "Joint Account (Tam)"
+  "TAM S S & TAM L N": "Joint Account (Tam)"
+  "TAM S S TAM L N": "Joint Account (Tam)"
+  "Tam S S Tam L N": "Joint Account (Tam)"
+  "TAM S S TAM L": "Joint Account (Tam)"
+  "Tam S S Tam L": "Joint Account (Tam)"
+  "TAM S &": "Joint Account (Tam)"
+  "Tam S &": "Joint Account (Tam)"
+  "TAM S TAM L N": "Joint Account (Tam)"
+  "Tam S Tam L N": "Joint Account (Tam)"
+  "TAM S TAM L": "Joint Account (Tam)"
+  "Tam S Tam L": "Joint Account (Tam)"
+  "MR DAVID JAMES GREENAWAY": "David Greenaway"
+  "MR DAVID JAMES GREENA": "David Greenaway"
+  "Mr David James Greenaway": "David Greenaway"
+  "Mr David James Greena": "David Greenaway"
+  "CORNERSTONE PRESBYTERIAN CHU": "Cornerstone Presbyterian Church"
+  "CORNERSTONE PRESBYTERIAN COM": "Cornerstone Presbyterian Church"
+  "Cornerstone Presbyterian Chu": "Cornerstone Presbyterian Church"
+  "Cornerstone Presbyterian Com": "Cornerstone Presbyterian Church"
+
+  # Nelson Tam variants
+  "Tam": "Nelson Tam"
+  "Lok": "Nelson Tam"
+
+  # Name consolidation (first name → full name)
+  "Alexander Bahn": "Alex Bahn"
+  "Bridonie": "Bridonie Nicholson"
+  "Chenhan": "Chenhan Ma"
+  "Dennis": "Dennis Law"
+  "Gillian": "Gillian Li"
+  "Hannah T": "Hannah Tarrant"
+  "Hoermann S R": "Stephan Hoermann"
+  "Janette": "Janette Vardy"
+  "Jason Hu": "Jason Hui"
+  "Johnny": "Johnny Tam"
+  "Johnny Chung Leung T": "Johnny Tam"
+  "Ningjia": "Ningjia Wang"
+  "Ningjia and Shawn": "Ningjia Wang"
+  "Vonnie": "Vonnie Ho Ching Yee"
+  "Vonnie Ho": "Vonnie Ho Ching Yee"
+  "Yonnie": "Yonnie Ho"
+  "Zoe": "Zoe Fan"
+  "Stefan": "Stefan Gotz"
+  "Hsin Tan": "Cindy Tan"
+  "Hsin Yen Cindy Tan": "Cindy Tan"
+  "Samule": "Samule Li"
+  "Samule Li Sam": "Samule Li"
+  "Anna": "Anna McQueen"
+  "Anna Mcqueen": "Anna McQueen"
+  "Jen": "Jen Tan"
+  "Charlotte": "Charlotte Hitchcock"
+  "Rebecca": "Rebecca Ng"
+  "Richard": "Richard Ho"
+  "Amanda": "Amanda"
+  "Clarissa": "Clarissa"
+  "Ka": "Ka"
+
+  # Reversed / re-ordered names
+  "G W Wong See": "Graeme Wong See"
+  "Gw Wong See": "Graeme Wong See"
+  "Lam Harry": "Harry Lam"
+  "Davies K": "Kirsten Davies"
+  "Timms Lana Grace": "Lana Grace Timms"
+  "Lang Kenneth Hames": "Lang Hames"
+  "Thomas Mm Leong": "Thomas Leong"
+  "Elder Robert Grahame": "Rob Elder"
+
+  # Casing fixes
+  "Adam Mccann": "Adam McCann"
+
+  # Couple consolidation
+  "Simon and Stephanie Wong": "Stephanie and Simon Wong"
+  "Emily and Jason": "Emily and Jason Hui"
+  "Grace and Hannah": "Grace and Hannah Chan"
+  "Sam and Kirby Atwood": "Samuel Atwood"
+
+  # Title prefix mappings (Mr/Mrs/Miss/Ms → canonical)
+  "Miss Sharon Law": "Sharon Law"
+  "Miss Nerida Gifford": "Nerida Gifford"
+  "Miss Tzvetelina Petkova": "Tzvetelina Petkova"
+  "Mr Andy Chi-Kit Tan": "Andy Tan"
+  "Mr Christopher Chun Kit Wong": "Christopher Wong"
+  "Mr Hock Lim Ooi": "Hock Ooi"
+  "Mr Philip Andrew Snel": "Philip Snelling"
+  "Mr Pierre Jean-Luc Th": "Pierre Thielemans"
+  "Mr Tristan Alexander": "Tristan McBide"
+  "Mr Vinh Gia Tran": "Vinh Tran"
+  "Mr Samuel David Atwoo": "Samuel Atwood"
+  "Ms Doris Ming Wai Cho": "Doris Chong"
+  "Ms Maree Jayashree Mo": "Maree Selvaraj"
+  "Ms Hoi Wan Li & Mr Ki": "Hoi Wan Li and Jason Tam"
+  "Ms Natasha Lo": "Natasha Lo"
+  "Mrs Hea-Won Park": "Mrs Hea-Won Park"
+
+  # Standalone truncated titles → Unknown Person
+  "Mr": "Unknown Person"
+  "Miss": "Unknown Person"
+  "Mrs": "Unknown Person"
+
+# Employer canonicalisation (for salary/transfer_in types)
+employers:
+  - patterns:
+      - "APPLE PTY LTD"
+      - "Apple Pty Ltd"
+      - "APPLE COMPUTERS"
+      - "Apple Computers"
+      - "Apple Computer Australia Pty Ltd"
+    canonical: "Apple (Salary)"
+
+  - patterns:
+      - "AFES"
+      - "Afes"
+      - "AUSTRALIAN FELLO"
+    canonical: "AFES (Sophia Salary)"
+
+# Banking operations that map to specific entities
+banking_identity_mappings:
+  # AFES direct debits = donations, not salary
+  - pattern: "Direct Debit \\d+ (?:AUSTRALIAN FELLO|AFES)"
+    canonical: "AFES (Donation)"
+  - pattern: "Direct Debit XX\\d+ AFES"
+    canonical: "AFES (Donation)"
+  # To AFES = donation/transfer
+  - pattern: "^To AFES"
+    canonical: "AFES (Donation)"
+  - pattern: "^Transfer To AFES"
+    canonical: "AFES (Donation)"
+  # Return on AFES direct debit
+  - pattern: "Return.*Direct Debit \\d+ AFES"
+    canonical: "AFES (Donation Return)"
+  # Direct Credit AFES = Sophia salary
+  - pattern: "Direct Credit \\d+ AFES"
+    canonical: "AFES (Sophia Salary)"
+  - pattern: "Direct Credit XX\\d+ AFES"
+    canonical: "AFES (Sophia Salary)"
+  # Medicare
+  - pattern: "Direct Credit \\d+ MCARE BENEFITS"
+    canonical: "Medicare Benefits"
+  - pattern: "Direct Credit XX\\d+ MCARE BENEFITS"
+    canonical: "Medicare Benefits"
+  # ATO
+  - pattern: "Direct Credit \\d+ ATO"
+    canonical: "ATO"
+  # CommInsure
+  - pattern: "Direct Debit (?:XX)?\\d+ CommInsure"
+    canonical: "CommInsure"
+  # Centrelink / child support / pension
+  - pattern: "Direct Credit (?:Pension )?\\d+ CHILDASSISTPYMT"
+    canonical: "Child Assist Payment"
+  - pattern: "Direct Credit Pension \\d+"
+    canonical: "Centrelink Pension"
+  - pattern: "Direct Credit (?:Pension )?XX\\d+ CHILDASSISTPYMT"
+    canonical: "Child Assist Payment"
+  - pattern: "Direct Credit (?:Pension )?XX\\d+"
+    canonical: "Centrelink Pension"
+  - pattern: "Direct Credit \\d+ ECONOMIC SUPPORT"
+    canonical: "Economic Support Payment"
+  - pattern: "Direct Credit XX\\d+ COST OF LIVING"
+    canonical: "Cost of Living Payment"
+  # NDIS
+  - pattern: "Direct Credit \\d+ NDIS NSW"
+    canonical: "NDIS Payment"
+  - pattern: "Direct Credit XX\\d+ NDIS NSW"
+    canonical: "NDIS Payment"
+  # HCF
+  - pattern: "Direct Credit \\d+ HCF"
+    canonical: "HCF Health"
+  - pattern: "Direct Credit XX\\d+ HCF"
+    canonical: "HCF Health"
+  # BUPA
+  - pattern: "Direct Credit \\d+ BUPA"
+    canonical: "BUPA"
+  - pattern: "Direct Credit XX\\d+ BUPA"
+    canonical: "BUPA"
+  # American Express payment
+  - pattern: "Direct Debit \\d+ AMERICAN EXPRESS"
+    canonical: "American Express Payment"
+  - pattern: "Direct Debit XX\\d+ AMERICAN EXPRESS"
+    canonical: "American Express Payment"
+  # OMF International: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Omf"
+    canonical: "OMF International"
+  # Pioneers of Australia: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Pioneers"
+    canonical: "Pioneers of Australia"
+  # Hollard Insurance: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Hollard"
+    canonical: "Hollard Insurance"
+  # Hubhello: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Hubhello"
+    canonical: "Hubhello"
+  # Australian Fellowship: consolidate non-AFES variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Australian Fello"
+    canonical: "AFES (Donation)"
+  # FMC: consolidate variants
+  - pattern: "Direct Credit (?:XX)?\\d+ Fmc"
+    canonical: "FMC"
+  # PAYMENT FROM / TRANSFER FROM Tam S: extract to Joint Account
+  - pattern: "(?:Payment|Transfer) From Tam S"
+    canonical: "Joint Account (Tam)"
+  # BPAY Payment
+  - pattern: "^(?:Bpay|BPAY) Payment.*$"
+    canonical: "BPAY Payment"
+  # Online Payment Received
+  - pattern: "^Online Payment Received.*$"
+    canonical: "Online Payment Received"
+  # Internal Transfer → consolidate with Internal Account Transfer
+  - pattern: "^Internal Transfer.*$"
+    canonical: "Internal Account Transfer"
+  # IFTTT Strava
+  - pattern: "^Ifttt Strava Activity.*$"
+    canonical: "IFTTT Strava"
+  # International Transaction Fee (including Rebate)
+  - pattern: "^International Transaction Fee.*$"
+    canonical: "International Transaction Fee"
+  # Repayment/Payment: consolidate variants
+  - pattern: "^Repayment/Payment.*$"
+    canonical: "Repayment/Payment"
+  # Salary Deposit via receipt
+  - pattern: "^Salary - Salary Deposit.*$"
+    canonical: "Salary Deposit"
+  # Strathfield Council: consolidate
+  - pattern: "^Strathfield Council.*"
+    canonical: "Strathfield Council"
+  # Sydney Water: consolidate
+  - pattern: "^Sydney Water.*"
+    canonical: "Sydney Water"
+  # EnergyAustralia: consolidate
+  - pattern: "^Energyaustralia.*"
+    canonical: "EnergyAustralia"
+  # Transfer to Other Bank: consolidate
+  - pattern: "^Transfer to Other Bank.*"
+    canonical: "Transfer to Other Bank"
+  - pattern: "^Transfer to CBA.*"
+    canonical: "Transfer to CBA"
+
+# Merchant identity mappings (regex pattern -> canonical form)
+# {location} is a placeholder replaced with the extracted location
+merchant_mappings:
+  # Amazon variants
+  - pattern: "^AMAZON MKTPL\\*.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON MKTPLC.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON MARKETPLACE.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON AU.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON RETA\\*.*"
+    canonical: "Amazon Marketplace"
+  - pattern: "^AMAZON\\.COM\\*.*"
+    canonical: "Amazon.com"
+  - pattern: "^AMAZON PRIME VIDEO.*"
+    canonical: "Amazon Prime Video"
+
+  # Apple variants (non-salary)
+  - pattern: "^APPLE STORE R\\d+ R\\d+ (.+)"
+    canonical: "Apple Store {1}"
+  - pattern: "^APPLE\\.COM/BILL.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/AU.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/HK.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE\\.COM/US.*"
+    canonical: "Apple.com"
+  - pattern: "^APPLE CAFFE (.+)"
+    canonical: "Apple Cafe {1}"
+  - pattern: "^APPLE ESPR BAR (.+)"
+    canonical: "Apple Espresso Bar {1}"
+  - pattern: "^APPLE PARK (.+)"
+    canonical: "Apple Park {1}"
+  - pattern: "^APPLE FITNESS.*"
+    canonical: "Apple Fitness Center"
+
+  # AFES (non-salary: spending/donation)
+  - pattern: "^AFES KINGSFORD.*"
+    canonical: "AFES Kingsford"
+  - pattern: "^AFES OFFICE.*"
+    canonical: "AFES Office Kingsford"
+
+  # 7-Eleven: strip store ID, keep location
+  - pattern: "^7-ELEVEN \\d+ (.+)"
+    canonical: "7-Eleven {1}"
+  - pattern: "^7-ELEVEN XXXXX.*"
+    canonical: "7-Eleven"
+  - pattern: "^7-Eleven$"
+    canonical: "7-Eleven"
+
+  # Chain stores: strip codes, keep location
+  - pattern: "^ALDI STORES - (.+)"
+    canonical: "Aldi {1}"
+
+  - pattern: "^COLES \\d+ (.+)"
+    canonical: "Coles {1}"
+  - pattern: "^COLES EXPRESS \\d+ (.+)"
+    canonical: "Coles Express {1}"
+
+  - pattern: "^BWS \\d+ (.+)"
+    canonical: "BWS {1}"
+
+  - pattern: "^WW METRO \\d+ (.+)"
+    canonical: "Woolworths Metro {1}"
+
+  - pattern: "^WOOLWORTHS \\d+ WEST RYDE.*"
+    canonical: "Woolworths West Ryde"
+  - pattern: "^WOOLWORTHS \\d+ (.+)"
+    canonical: "Woolworths {1}"
+
+  # KFC: strip prefix store numbers
+  - pattern: "^\\d+_[A-Z_]+_KFC (.+)"
+    canonical: "KFC {1}"
+  - pattern: "^\\d+_KFC (.+)"
+    canonical: "KFC {1}"
+
+  # Schools
+  - pattern: "^0SCHOOLSONLINE \\d+ (.+)"
+    canonical: "SchoolsOnline {1}"
+  - pattern: "^0STRATHFLD S PS \\d+ (.+)"
+    canonical: "Strathfield South PS {1}"
+  - pattern: "^0SUMMER HILL PS \\d+ (.+)"
+    canonical: "Summer Hill PS {1}"
+
+  # Gong Cha: remaps first, generic capture
+  - pattern: "^GONG CHA AND HOTSTAR.*"
+    canonical: "Gong Cha Burwood"
+  - pattern: "^GONG CHA AUSTRALIA.*"
+    canonical: "Gong Cha"
+  - pattern: "^GONG CHA (.+)"
+    canonical: "Gong Cha {1}"
+
+  # ATM withdrawals: extract location
+  - pattern: "^CBA ATM (.+?) NSW \\d+"
+    canonical: "ATM {1}"
+  - pattern: "^Wdl ATM CBA ATM (.+?) NSW \\d+"
+    canonical: "ATM {1}"
+
+  # Transport NSW: consolidate all variants
+  - pattern: "^\\d+ TFNSW.*"
+    canonical: "Transport NSW"
+  - pattern: "^TRANSPORTFORNSWTRAVEL.*"
+    canonical: "Transport NSW"
+  - pattern: "^TRANSPORTFORNSW\\s.*"
+    canonical: "Transport NSW"
+  - pattern: "^Transport for Nsw.*"
+    canonical: "Transport NSW"
+  - pattern: "^Transport for NSW.*"
+    canonical: "Transport NSW"
+  - pattern: "^TFNSW.*"
+    canonical: "Transport NSW"
+  - pattern: "^TransportNSW.*"
+    canonical: "Transport NSW"
+
+  # Airbnb: strip booking codes
+  - pattern: "^AIRBNB \\* [A-Z0-9]+ (.+)"
+    canonical: "Airbnb {1}"
+  - pattern: "^AIRBNB PAYMENTS.*"
+    canonical: "Airbnb"
+
+  # Grab: strip trip codes
+  - pattern: "^GRAB\\.COM \\*[A-Z0-9-]+ (.+)"
+    canonical: "Grab {1}"
+
+  # eBay: strip order codes
+  - pattern: "^eBay O\\*[\\dX-]+ (.+)"
+    canonical: "eBay {1}"
+  - pattern: "^eBay Commerce.*"
+    canonical: "eBay"
+  - pattern: "^eBay$"
+    canonical: "eBay"
+
+  # Google
+  - pattern: "^GOOGLE\\*YOUTUBE.*"
+    canonical: "YouTube Premium"
+
+  # Revolut: strip account codes
+  - pattern: "^Revolut\\*\\*\\d+\\*.*"
+    canonical: "Revolut"
+  - pattern: "^Revolut\\*\\*\\d+\\*$"
+    canonical: "Revolut"
+
+  # Loan Repayment: consolidate account numbers
+  - pattern: "^Loan Repayment.*"
+    canonical: "Loan Repayment"
+
+  # Canva: strip order codes
+  - pattern: "^Canva\\*.*"
+    canonical: "Canva"
+
+  # Netflix: consolidate
+  - pattern: "^Netflix\\.?[Cc]om.*"
+    canonical: "Netflix"
+  - pattern: "^Netflix Australia.*"
+    canonical: "Netflix"
+
+  # Powershop: consolidate
+  - pattern: "^(?i)Powershopaustralia.*"
+    canonical: "Powershop"
+
+  # Microsoft 365: consolidate
+  - pattern: "^Microsoft\\*Microsoft 365.*"
+    canonical: "Microsoft 365"
+
+  # Scan QR Code: consolidate
+  - pattern: "^Scan Qr Code.*"
+    canonical: "Scan QR Code"
+
+  # Kafe Kooks: consolidate
+  - pattern: "^Kafe Kooks.*Ultimo.*"
+    canonical: "Kafe Kooks Ultimo"
+  - pattern: "^Kafe Kooks (.+)"
+    canonical: "Kafe Kooks {1}"
+
+  # Double Chin Eats: consolidate
+  - pattern: "^Double Chin Eats.*(?:Mar|Martin).*Sydney.*"
+    canonical: "Double Chin Eats Sydney"
+
+  # Les Nereides: consolidate
+  - pattern: "^Les Nereides.*Paddington.*"
+    canonical: "Les Nereides Paddington"
+
+  # Other Bank: consolidate
+  - pattern: "^Other Bank.*"
+    canonical: "Other Bank Transfer"
+
+  # Evergreen Gc: consolidate
+  - pattern: "^Evergreen Gc.*Burwood.*"
+    canonical: "Evergreen GC Burwood"
+
+  # Cornerstone Presbyterian: consolidate
+  - pattern: "^Cornerstone Presbyterian.*"
+    canonical: "Cornerstone Presbyterian Church"
+
+  # Heinemann: strip store codes
+  - pattern: "^Heinemann - \\d+ (.+)"
+    canonical: "Heinemann {1}"
+
+  # Kim Sun Young: consolidate
+  - pattern: "^Kim Sun Young Hair.*"
+    canonical: "Kim Sun Young Hair"
+  - pattern: "^Kim Sun Young Nail.*"
+    canonical: "Kim Sun Young Nail"
+
+  # The Smelly Cheesecake: generic capture (truncated name handled in pattern)
+  - pattern: "^The Smelly Chees(?:ecake)? (.+)"
+    canonical: "The Smelly Cheesecake {1}"
+  - pattern: "^The Smelly Ch.*"
+    canonical: "The Smelly Cheesecake"
+
+  # Reuben Hills: consolidate
+  - pattern: "^Reuben Hills.*"
+    canonical: "Reuben Hills"
+
+  # Farmers Fresh: generic location capture
+  - pattern: "^Farmers Fresh (.+)"
+    canonical: "Farmers Fresh {1}"
+
+  # Stock Market Kitchen: consolidate
+  - pattern: "^Stock Market Kitch.*"
+    canonical: "Stock Market Kitchen"
+
+  # Milk Flower: Macquarie = Macquarie Park, generic for rest
+  - pattern: "^Milk Flower Macquari.*"
+    canonical: "Milk Flower Macquarie Park"
+  - pattern: "^Milk Flower (.+)"
+    canonical: "Milk Flower {1}"
+
+  # W Cosmetics: generic location capture
+  - pattern: "^W Cosmetics (.+)"
+    canonical: "W Cosmetics {1}"
+
+  # El Jannah Burwood: consolidate
+  - pattern: "^El Jannah Burwood.*"
+    canonical: "El Jannah Burwood"
+
+  # Sephora: consolidate
+  - pattern: "^Sephora Australia.*"
+    canonical: "Sephora"
+
+  # Uniqlo: consolidate
+  - pattern: "^Uniqlo Australia.*"
+    canonical: "Uniqlo"
+
+  # Just Fry: consolidate
+  - pattern: "^Just Fry.*Strathfield.*"
+    canonical: "Just Fry Strathfield"
+
+  # Dorothy Cowie: consolidate
+  - pattern: "^Dorothy Cowie Scho.*"
+    canonical: "Dorothy Cowie School"
+  - pattern: "^Dorothy Cowie Shop.*"
+    canonical: "Dorothy Cowie Shop"
+
+  # Hook Line and Sinker: generic capture (truncated name handled)
+  - pattern: "^Hook Line (?:and|&) Sin(?:ker)? (.+)"
+    canonical: "Hook Line and Sinker {1}"
+  - pattern: "^Hook Line (?:and|&) Sin.*"
+    canonical: "Hook Line and Sinker"
+
+  # Red Pepper Club: catch-all (has PTY LTD in name variants)
+  - pattern: "^Red Pepper Clu.*"
+    canonical: "Red Pepper Club"
+
+  # Guzman Y Gomez: consolidate
+  - pattern: "^Guzman Y Gomez Broadway.*"
+    canonical: "Guzman Y Gomez Broadway"
+  - pattern: "^Guzman Y Gomez (.+)"
+    canonical: "Guzman Y Gomez {1}"
+  - pattern: "^Guzman Y Gomez$"
+    canonical: "Guzman Y Gomez"
+
+  # Din Tai Fung: consolidate
+  - pattern: "^Din Tai Fung Martin.*"
+    canonical: "Din Tai Fung Sydney"
+  - pattern: "^Din Tai Fung (.+)"
+    canonical: "Din Tai Fung {1}"
+  - pattern: "^Din Tai Fung$"
+    canonical: "Din Tai Fung"
+
+  # Taste of Shanghai: consolidate truncations
+  - pattern: "^Taste of Shanghai Burw.*"
+    canonical: "Taste of Shanghai Burwood"
+
+  # Bakers Delight: generic capture (stage 3 handles truncations)
+  - pattern: "^Bakers Delight (.+)"
+    canonical: "Bakers Delight {1}"
+
+  # Starbucks: remaps via store code capture, then strip store codes
+  - pattern: "^Starbucks Coffee B\\d+ Central Park.*"
+    canonical: "Starbucks Chippendale"
+  - pattern: "^Starbucks Coffee B\\d+ Macquarie.*"
+    canonical: "Starbucks North Ryde"
+  - pattern: "^Starbucks Coffee B\\d+ Broadway.*"
+    canonical: "Starbucks Ultimo"
+  - pattern: "^Starbucks Coffee B\\d+ (.+)"
+    canonical: "Starbucks {1}"
+  - pattern: "^Starbucks Coffee B\\d+$"
+    canonical: "Starbucks"
+
+  # Ghost Locomotion: consolidate
+  - pattern: "^Ghost Locomotion Australia.*"
+    canonical: "Ghost Locomotion"
+  - pattern: "^Ghost Locomotion Nelson.*"
+    canonical: "Ghost Locomotion (Salary)"
+  - pattern: "^Ghost Locomotion Nt .*"
+    canonical: "Ghost Locomotion"
+
+  # M & J Company: consolidate
+  - pattern: "^M & J Company.*"
+    canonical: "M & J Company"
+
+  # Crust Pizza Croydon: consolidate
+  - pattern: "^Croydon\\* Crust.*"
+    canonical: "Crust Pizza Croydon"
+
+  # W Retail Group: consolidate
+  - pattern: "^W Retail Group.*"
+    canonical: "W Retail Group"
+
+  # Beem It: strip receipt details
+  - pattern: "^Beem It.*$"
+    canonical: "Beem It"
+
+  # Cardless Cash: consolidate
+  - pattern: "^Cardless Cash.*$"
+    canonical: "Cardless Cash"
+
+  # PayPal merchants: strip receipt details and reference codes
+  - pattern: "^PayPal \\*Nintendo.*$"
+    canonical: "PayPal Nintendo"
+  - pattern: "^PayPal \\*Uber.*$"
+    canonical: "PayPal Uber"
+  - pattern: "^PayPal \\*Steam Games.*$"
+    canonical: "PayPal Steam Games"
+  - pattern: "^PayPal \\*eBay.*$"
+    canonical: "PayPal eBay"
+  - pattern: "^PayPal \\*Airbnb.*$"
+    canonical: "PayPal Airbnb"
+  - pattern: "^PayPal \\*Kogan.*$"
+    canonical: "PayPal Kogan"
+  - pattern: "^PayPal \\*Freelancer.*$"
+    canonical: "PayPal Freelancer"
+  - pattern: "^PayPal \\*Service NSW.*$"
+    canonical: "PayPal Service NSW"
+  - pattern: "^PayPal \\*Woolworths.*$"
+    canonical: "PayPal Woolworths"
+  - pattern: "^PayPal \\*Sydneywater.*$"
+    canonical: "PayPal Sydney Water"
+  - pattern: "^PayPal \\*Nrmainsura.*$"
+    canonical: "PayPal NRMA Insurance"
+  - pattern: "^PayPal \\*Insuranceau.*$"
+    canonical: "PayPal Insurance Australia"
+  - pattern: "^PayPal \\*Hoverdotcom.*$"
+    canonical: "PayPal Hover"
+  - pattern: "^PayPal \\*Greaterunio.*$"
+    canonical: "PayPal Greater Union"
+  - pattern: "^PayPal \\*Trybooking.*$"
+    canonical: "PayPal TryBooking"
+  # PayPal catch-all: strip masked reference codes (Xxxxxx1234)
+  - pattern: "^PayPal \\*(.+?)\\s+[Xx]{4,}\\d+.*$"
+    canonical: "PayPal {1}"
+  - pattern: "^PayPal \\*(.+?)\\s+\\d{8,}.*$"
+    canonical: "PayPal {1}"
+  - pattern: "^PayPal \\*(.+?)\\s+[A-Z0-9]$"
+    canonical: "PayPal {1}"
+  - pattern: "^PayPal \\*(.+?)\\s+\\d\\s*$"
+    canonical: "PayPal {1}"
+  - pattern: "^PayPal UBER$"
+    canonical: "PayPal Uber"
+
+  # Aussie Broadband: consolidate truncations
+  - pattern: "^Aussie Broadband Limit.*"
+    canonical: "Aussie Broadband"
+  - pattern: "^Aussie Broadband Limited.*"
+    canonical: "Aussie Broadband"
+  - pattern: "^Aussie Broadband PTY.*"
+    canonical: "Aussie Broadband"
+
+  # Edition Roasters: strip store codes
+  - pattern: "^Edition Roasters \\w+ \\d+ (.+)"
+    canonical: "Edition Roasters {1}"
+  - pattern: "^Edition Roasters \\w+ (.+)"
+    canonical: "Edition Roasters {1}"
+  - pattern: "^Edition Roasters$"
+    canonical: "Edition Roasters"
+
+  # Hero Sushi: remaps first, then generic capture
+  - pattern: "^Hero Sushi Gateway.*"
+    canonical: "Hero Sushi Sydney"
+  - pattern: "^Hero Sushi Broadway.*"
+    canonical: "Hero Sushi Broadway"
+  - pattern: "^Hero Sushi (.+)"
+    canonical: "Hero Sushi {1}"
+
+  # Vodafone: consolidate
+  - pattern: "^Vodafone \\*?Australia.*"
+    canonical: "Vodafone Australia"
+  - pattern: "^Vodafone Hutchison.*"
+    canonical: "Vodafone Australia"
+
+  # UBER: consolidate
+  - pattern: "^UBER Trip.*"
+    canonical: "Uber Trip"
+  - pattern: "^UBER \\*Trip.*"
+    canonical: "Uber Trip"
+  - pattern: "^UBER Eats.*"
+    canonical: "Uber Eats"
+  - pattern: "^UBER \\*Eats.*"
+    canonical: "Uber Eats"
+  - pattern: "^UBER \\*Ride.*"
+    canonical: "Uber Trip"
+
+  # Regiment: consolidate spelling variants
+  - pattern: "^Regiment Spec.*"
+    canonical: "Regiment Coffee"
+
+  # EG Fuelco/Group: store 1460 = Strathfield, generic for rest
+  - pattern: "^Eg (?:Fuelco|Group) 1460.*"
+    canonical: "EG Fuelco Strathfield"
+  - pattern: "^Eg (?:Fuelco|Group) \\d+ (.+)"
+    canonical: "EG Fuelco {1}"
+
+  # Gumption: consolidate
+  - pattern: "^Gumption.*"
+    canonical: "Gumption Coffee"
+
+  # Interest: consolidate banking
+  - pattern: "^Interest Charge[ds]?.*"
+    canonical: "Interest Charged"
+  - pattern: "^Interest Adjustment.*"
+    canonical: "Interest Adjustment"
+  - pattern: "^Interest Correction.*"
+    canonical: "Interest Correction"
+
+  # Stitch Coffee: keep Broadway explicit (Broadway Haymarket multi-location)
+  - pattern: "^Stitch Coffee Broadway.*"
+    canonical: "Stitch Coffee Broadway"
+  - pattern: "^Stitch Coffee (.+)"
+    canonical: "Stitch Coffee {1}"
+
+  # McDonald's: remaps first, then generic capture
+  - pattern: "^Mcdonald'?s?$"
+    canonical: "McDonald's"
+  - pattern: "^McDonald'?s? Dt \\d+ (.+)"
+    canonical: "McDonald's {1}"
+  - pattern: "^McDonald'?s? Dt \\d+$"
+    canonical: "McDonald's"
+  # Remaps (location aliases)
+  - pattern: "^McDonald'?s? (?:the )?Strand.*"
+    canonical: "McDonald's The Strand Sydney"
+  - pattern: "^McDonald'?s? Pmatta.*"
+    canonical: "McDonald's North Parramatta"
+  - pattern: "^McDonald'?s? Syd(?:ney)? (?:Domesti|Intern|Int Ai|Airport).*"
+    canonical: "McDonald's Sydney Airport"
+  - pattern: "^McDonald'?s? (?:Gateway|Plaza).*Sydney.*"
+    canonical: "McDonald's Sydney"
+  - pattern: "^McDonald'?s? Strathfield.*"
+    canonical: "McDonald's Strathfield South"
+  - pattern: "^McDonald'?s? Croydon P(?:rk|ark).*"
+    canonical: "McDonald's Croydon Park"
+  - pattern: "^McDonald'?s? Wynyard.*"
+    canonical: "McDonald's Wynyard"
+  - pattern: "^McDonald'?s? Five Dock.*"
+    canonical: "McDonald's Five Dock"
+  # Generic patterns (strip store numbers, capture location)
+  - pattern: "^McDonald'?s? \\d+ (.+)"
+    canonical: "McDonald's {1}"
+  - pattern: "^McDonald'?s? (.+?)\\s+\\d+\\s+\\1.*"
+    canonical: "McDonald's {1}"
+  - pattern: "^McDonald'?s? (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "McDonald's {2}"
+  - pattern: "^McDonald'?s? (.+?)\\s+\\d+$"
+    canonical: "McDonald's {1}"
+  - pattern: "^McDonald'?s? (.+)"
+    canonical: "McDonald's {1}"
+
+  # Amazon: consolidate
+  - pattern: "^Amazon Retail\\*.*"
+    canonical: "Amazon Marketplace"
+
+  # Best Mart: generic location capture
+  - pattern: "^Best Mart (.+)"
+    canonical: "Best Mart {1}"
+
+  # Monkey House: generic capture
+  - pattern: "^Monkey House (.+)"
+    canonical: "Monkey House {1}"
+
+  # The Local Enfield: consolidate
+  - pattern: "^The Local Enfield.*"
+    canonical: "The Local Enfield"
+
+  # Mandoo: generic capture
+  - pattern: "^The Mandoo Dumpling$"
+    canonical: "The Mandoo"
+  - pattern: "^The Mandoo (.+)"
+    canonical: "The Mandoo {1}"
+
+  # Chemist Warehouse: generic location capture
+  - pattern: "^Chemist Warehouse (.+)"
+    canonical: "Chemist Warehouse {1}"
+
+  # Coles: strip store numbers and consolidate
+  - pattern: "^Coles Express (.+?)\\s+\\d*\\s*(.+)"
+    canonical: "Coles Express {1}"
+  - pattern: "^Coles Express (.+)"
+    canonical: "Coles Express {1}"
+  - pattern: "^Coles Online.*"
+    canonical: "Coles Online"
+  # Remaps
+  - pattern: "^Coles York St.*"
+    canonical: "Coles Sydney"
+  - pattern: "^Coles Sydney City.*"
+    canonical: "Coles Sydney"
+  - pattern: "^Coles the (.+)"
+    canonical: "Coles The {1}"
+  # Generic patterns (strip store numbers, capture location)
+  - pattern: "^Coles (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Coles {1}"
+  - pattern: "^Coles (.+?)\\s*-\\s*\\d+\\s+(.+)"
+    canonical: "Coles {1}"
+  - pattern: "^Coles (.+?)\\s+\\d+$"
+    canonical: "Coles {1}"
+  - pattern: "^Coles \\d+$"
+    canonical: "Coles"
+  - pattern: "^Coles (.+)"
+    canonical: "Coles {1}"
+
+  # Woolworths: remaps first, then generic
+  - pattern: "^Woolworths Group Limited.*"
+    canonical: "Woolworths Online"
+  - pattern: "^Woolworths Online.*"
+    canonical: "Woolworths Online"
+  - pattern: "^Woolworths Gift Cards.*"
+    canonical: "Woolworths Gift Cards"
+  # Remaps (location aliases)
+  - pattern: "^Woolworths St Rathfield.*"
+    canonical: "Woolworths Strathfield"
+  - pattern: "^Woolworths Macquar.*"
+    canonical: "Woolworths North Ryde"
+  - pattern: "^Woolworths Town Ha.*"
+    canonical: "Woolworths Town Hall Sydney"
+  - pattern: "^Woolworths Metro Pitt.*"
+    canonical: "Woolworths Metro Sydney"
+  - pattern: "^Woolworths N(?:orth)? S(?:trathfield)?.*"
+    canonical: "Woolworths North Strathfield"
+  - pattern: "^Woolworths/(.+?)\\s+(?:Pl|St).*"
+    canonical: "Woolworths {1}"
+  # Known store numbers
+  - pattern: "^Woolworths 1624$"
+    canonical: "Woolworths Strathfield"
+  - pattern: "^Woolworths 1614$"
+    canonical: "Woolworths Burwood"
+  - pattern: "^Woolworths \\d+$"
+    canonical: "Woolworths"
+  # Generic location capture
+  - pattern: "^Woolworths (.+)"
+    canonical: "Woolworths {1}"
+
+  # Service NSW: consolidate
+  - pattern: "^Service NSW \\d+ (.+)"
+    canonical: "Service NSW {1}"
+  - pattern: "^Service NSW (.+)"
+    canonical: "Service NSW {1}"
+  - pattern: "^Service NSW$"
+    canonical: "Service NSW"
+
+  # Wilson Parking: consolidate
+  - pattern: "^Wilson Parking.*"
+    canonical: "Wilson Parking"
+
+  # Lotus Entertainment: consolidate
+  - pattern: "^Lotus Entertainment Gr.*Burwood.*"
+    canonical: "Lotus Entertainment Burwood"
+  - pattern: "^Lotus Entertainment.*"
+    canonical: "Lotus Entertainment"
+
+  # Ippudo: consolidate
+  - pattern: "^Ippudo Australia.*"
+    canonical: "Ippudo"
+
+  # Point Parking: consolidate
+  - pattern: "^Point Parking.*"
+    canonical: "Point Parking"
+
+  # Yayoi: consolidate
+  - pattern: "^Yayoi Teishoku Jap.*Sydney.*"
+    canonical: "Yayoi Sydney"
+  - pattern: "^Yayoi Teishoku Jap.*"
+    canonical: "Yayoi"
+  - pattern: "^Yayoi Teishoku Japanese (.+)"
+    canonical: "Yayoi {1}"
+
+  # Cornerstone Cafe UTS: consolidate
+  - pattern: "^Cornerstone Cafe UTS.*"
+    canonical: "Cornerstone Cafe UTS"
+  - pattern: "^Cornerstone Cafe U.*"
+    canonical: "Cornerstone Cafe UTS"
+
+  # VN City: consolidate (keep explicit due to multi-location payees)
+  - pattern: "^Vn City.*Strathfield.*"
+    canonical: "VN City Strathfield"
+  - pattern: "^Vn City Sydney.*"
+    canonical: "VN City Sydney"
+  - pattern: "^Vn City Melbourne.*"
+    canonical: "VN City Melbourne"
+  - pattern: "^Vn City (.+)"
+    canonical: "VN City {1}"
+
+  # David Jones: consolidate
+  - pattern: "^David Jones.*Burwood.*"
+    canonical: "David Jones Burwood"
+  - pattern: "^David Jones Elizabeth.*"
+    canonical: "David Jones Sydney"
+  - pattern: "^David Jones (.+)"
+    canonical: "David Jones {1}"
+
+  # Adairs: normalise variants
+  - pattern: "^ADAIRS RETAILS GROUP.*"
+    canonical: "Adairs Online"
+  - pattern: "^ADAIRS ONLINE.*"
+    canonical: "Adairs Online"
+  - pattern: "^ADAIRS (.+)"
+    canonical: "Adairs {1}"
+
+  # --- Cluster-derived consolidation (iter 022) ---
+
+  # Wok N Bbq Chinese Restaurant: truncation variants
+  - pattern: "^Wok N Bbq Chinese Rest?a?u?r?a?n?t? (.+)"
+    canonical: "Wok N BBQ Chinese Restaurant {1}"
+
+  # Gnt Services: consolidation
+  - pattern: "^Gnt Services.*North Strathfield.*"
+    canonical: "GNT Services North Strathfield"
+
+  # Bespoke Letterpress: strip middle truncation
+  - pattern: "^Bespoke Letterpress.*Bowral.*"
+    canonical: "Bespoke Letterpress Bowral"
+
+  # Cathay Pacific: strip terminal code
+  - pattern: "^Cathay Pacific Airways.*Sydney.*"
+    canonical: "Cathay Pacific Airways Sydney"
+
+  # The Sneaker Laundry: consolidate with/without Lab
+  - pattern: "^The Sneaker Laundry.*Sydney.*"
+    canonical: "The Sneaker Laundry Sydney"
+
+  # Kitchen by Mike: strip duplicate word
+  - pattern: "^Kitchen by Mike.*Sydney.*"
+    canonical: "Kitchen by Mike Sydney"
+
+  # C Major Cafe: truncation
+  - pattern: "^C Major Cafe and Desse?r?t?s? (.+)"
+    canonical: "C Major Cafe and Dessert {1}"
+
+  # Bathers Pavilion: strip terminal code
+  - pattern: "^Bathers Pavilion X\\d+ (.+)"
+    canonical: "Bathers Pavilion {1}"
+
+  # Sydney Airport: strip terminal code
+  - pattern: "^Sydney Airport Sxx\\d+ (.+)"
+    canonical: "Sydney Airport {1}"
+
+  # Prosperous Lgj Group: strip store number
+  - pattern: "^Prosperous Lgj Group \\d* ?(.+)"
+    canonical: "Prosperous LGJ Group {1}"
+
+  # Dental Corporation: strip suffix
+  - pattern: "^Dental Corporation.*/L? ?(.+)"
+    canonical: "Dental Corporation {1}"
+
+  # Unibros UTS: strip duplicate name
+  - pattern: "^Unibros UTS.*Ultimo.*"
+    canonical: "Unibros UTS Ultimo"
+  - pattern: "^Uni Bros UTS.*Ultimo.*"
+    canonical: "Uni Bros UTS Ultimo"
+
+  # Merchants of Ultimo: consolidate
+  - pattern: "^Merchants of Ultimo.*Broadway.*"
+    canonical: "Merchants of Ultimo Broadway"
+
+  # Kingpin Bowling: generic capture
+  - pattern: "^Kingpin Bowling (.+)"
+    canonical: "Kingpin Bowling {1}"
+
+  # Ippudo: strip dash variant
+  - pattern: "^Ippudo.*Westfield.*Sydney.*"
+    canonical: "Ippudo Westfield Sydney"
+
+  # Discount General: consolidate truncation
+  - pattern: "^Discount General.*Burwood.*"
+    canonical: "Discount General Burwood"
+
+  # Rickshaw International: truncation
+  - pattern: "^Rickshaw Internation?a?l? (.+)"
+    canonical: "Rickshaw International {1}"
+
+  # Burwood Pharmacy: truncation
+  - pattern: "^Burwood Pharmacy.*Burwood.*"
+    canonical: "Burwood Pharmacy Burwood"
+
+  # Mediconsul Wellhams: truncation
+  - pattern: "^Mediconsul Wellhams Pha?r?m?a?c?y? (.+)"
+    canonical: "Mediconsul Wellhams Pharmacy {1}"
+
+  # Sushia Broadway: strip store codes
+  - pattern: "^Sushia Broadway.*Broadway.*"
+    canonical: "Sushia Broadway"
+
+  # Pop Mart: truncation
+  - pattern: "^Pop Mart Oceania Li? (.+)"
+    canonical: "Pop Mart Oceania {1}"
+
+
+  # Huntley Projects: strip store number
+  - pattern: "^Huntley Projects CBD \\d* ?(.+)"
+    canonical: "Huntley Projects CBD {1}"
+
+  # 1915 Lanzhou Beef Noodle: truncation
+  - pattern: "^1915 Lanzhou Beef No?o?d?l?e?s? (.+)"
+    canonical: "1915 Lanzhou Beef Noodle {1}"
+
+  # Sushi World Macquarie: truncation
+  - pattern: "^Sushi World.*Macquarie Park.*"
+    canonical: "Sushi World Macquarie Park"
+
+  # Ticketek Web: truncation
+  - pattern: "^Ticketek Web Sy?d?n?e?y? (.+)"
+    canonical: "Ticketek Web {1}"
+
+  # La Lune Market: generic capture
+  - pattern: "^La Lune Market (.+)"
+    canonical: "La Lune Market {1}"
+
+  # Naya AUS Group: strip store number
+  - pattern: "^Naya AUS Group \\d* ?(.+)"
+    canonical: "Naya AUS Group {1}"
+
+  # Kmart: strip store number
+  - pattern: "^Kmart (?:Broadway )?\\d+ (.+)"
+    canonical: "Kmart {1}"
+  - pattern: "^Kmart (.+)"
+    canonical: "Kmart {1}"
+
+  # Top Impression Bakery: strip store number
+  - pattern: "^Top Impression Bakery \\d* ?(.+)"
+    canonical: "Top Impression Bakery {1}"
+
+  # Kopi-Tiam: normalise separator
+  - pattern: "^Kopi-Tiam.*Spice Alley (.+)"
+    canonical: "Kopi-Tiam Spice Alley {1}"
+
+  # Salt Meats Cheese: strip store number
+  - pattern: "^Salt Meats Cheese Cq \\d* ?(.+)"
+    canonical: "Salt Meats Cheese CQ {1}"
+
+  # Edomae Sushi: strip duplicate name
+  - pattern: "^Edomae Sushi.*Burwood.*"
+    canonical: "Edomae Sushi Burwood"
+
+  # Knight's Coffee & Tea: strip store number
+  - pattern: "^Knight'?s? Coffee & Tea \\d* ?(.+)"
+    canonical: "Knight's Coffee & Tea {1}"
+
+  # Mee the Noodle House: normalise dash
+  - pattern: "^Mee.*the Noodle House (.+)"
+    canonical: "Mee The Noodle House {1}"
+
+  # Three Mothers Kitchen: truncation
+  - pattern: "^Three Mothers Kitche?n? (.+)"
+    canonical: "Three Mothers Kitchen {1}"
+
+  # Double Barral Coffee: truncation
+  - pattern: "^Double Barral Coff?e?e? (.+)"
+    canonical: "Double Barral Coffee {1}"
+
+  # Lil Miss Collins: truncation
+  - pattern: "^Lil Miss Collins B? ?(.+)"
+    canonical: "Lil Miss Collins {1}"
+
+  # Fresh Seafood Strathfield: truncation
+  - pattern: "^Fresh Seafood Str?a?t?h?f?i?e?l?d? (.+)"
+    canonical: "Fresh Seafood {1}"
+
+  # Decathlon Australia: strip suffix
+  - pattern: "^Decathlon Australia.*Tempe.*"
+    canonical: "Decathlon Tempe"
+
+  # Single O Surry Hills: deduplicate location
+  - pattern: "^Single O-Surry Hills.*"
+    canonical: "Single O Surry Hills"
+
+  # Ho Jiak Strathfield: strip trailing state
+  - pattern: "^Ho Jiak.*Strathfield.*"
+    canonical: "Ho Jiak Strathfield"
+
+  # Mad Wholefoods: strip middle code
+  - pattern: "^Mad Wholefoods.*Summer Hill.*"
+    canonical: "Mad Wholefoods Summer Hill"
+
+  # Harvey Norman: strip store code
+  - pattern: "^Harvey Norman Av/It.*Auburn.*"
+    canonical: "Harvey Norman Auburn"
+
+  # Sahara Turkish Restaurant: truncation
+  - pattern: "^Sahara Turkish Resta?u?r?a?n?t?.*"
+    canonical: "Sahara Turkish Restaurant"
+
+  # Alo-Ban: truncation
+  - pattern: "^Alo-Ban.*Inst?o? (.+)"
+    canonical: "Alo-Ban {1}"
+
+  # Prijm Investments: strip suffix
+  - pattern: "^Prijm Investments L? ?(.+)"
+    canonical: "Prijm Investments {1}"
+
+  # Pho Life Pho Sure: strip suffix
+  - pattern: "^Pho Life Pho Sure L? ?(.+)"
+    canonical: "Pho Life Pho Sure {1}"
+
+  # The Missing Piece: truncation
+  - pattern: "^The Missing Piece C? ?Macquarie Park.*"
+    canonical: "The Missing Piece Macquarie Park"
+
+  # Sushi Hub World Tower: truncation
+  - pattern: "^Sushi Hub World Towe?r? (.+)"
+    canonical: "Sushi Hub World Tower {1}"
+
+  # Friendly Grocer: truncation
+  - pattern: "^Friendly Grocer Croy?d?o?n? (.+)"
+    canonical: "Friendly Grocer {1}"
+
+  # Lanzhou Lamian: truncation
+  - pattern: "^Lanzhou Lamian Beef (.+)"
+    canonical: "Lanzhou Lamian Beef {1}"
+
+  # Oliver Brown: truncation
+  - pattern: "^Oliver Brown Strathfiel? (.+)"
+    canonical: "Oliver Brown {1}"
+
+  # Anything Dance: truncation
+  - pattern: "^Anything Dance Croyd?o?n? (.+)"
+    canonical: "Anything Dance {1}"
+
+  # Tom's Project: truncation
+  - pattern: "^Tom'?s? Project.*Burwood.*"
+    canonical: "Tom's Project Burwood"
+
+  # Concord Bakehouse: strip suffix
+  - pattern: "^Concord Bakehouse Concord\\d*"
+    canonical: "Concord Bakehouse Concord"
+
+  # ATM Burwood: strip terminal letter
+  - pattern: "^ATM 210 Burwood [A-Za-z]$"
+    canonical: "ATM Burwood"
+
+  # Estimated Investment Returns: strip date
+  - pattern: "^Estimated Investment Returns Since \\d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) Xx\\d{2} - (.+)"
+    canonical: "Estimated Investment Returns - {1}"
+
+  # Duo Strathfield: deduplicate location (Square terminal doubles the name)
+  - pattern: "^Duo (?:Duo )?Strathfie?l?d? ?Strathfield.*"
+    canonical: "Duo Strathfield"
+  - pattern: "^Duo (?:Duo )?Strathfield$"
+    canonical: "Duo Strathfield"
+
+  # Z Cosme: deduplicate name
+  - pattern: "^Z Cosme(?:tics)? Z Cosme(?:tics)? (.+)"
+    canonical: "Z Cosmetics {1}"
+  - pattern: "^Z Cosme(?:tics)? (.+)"
+    canonical: "Z Cosmetics {1}"
+
+  # Apple Espresso Bar: strip terminal code
+  - pattern: "^Apple Espresso Bar [A-Z]p\\d+ (.+)"
+    canonical: "Apple Espresso Bar {1}"
+
+  # Whsmith: strip terminal number
+  - pattern: "^Whsmith Sydt1 Arrival\\d? (.+)"
+    canonical: "WHSmith Sydney T1 {1}"
+
+  # Rhodes Phoenix Chinese: strip number
+  - pattern: "^Rhodes Phoenix Chines \\d* ?(.+)"
+    canonical: "Rhodes Phoenix Chinese {1}"
+
+  # Dutch Smuggler: deduplicate location
+  - pattern: "^Dutch Smuggler Sydney P? ?Sydney.*"
+    canonical: "Dutch Smuggler Sydney"
+  - pattern: "^Dutch Smuggler Sydney$"
+    canonical: "Dutch Smuggler Sydney"
+
+  # Palm Beach Wine Co: deduplicate location
+  - pattern: "^Palm Beach Wine Co.*Palm Beach.*"
+    canonical: "Palm Beach Wine Co"
+  - pattern: "^Palm Beach Wine Co$"
+    canonical: "Palm Beach Wine Co"
+
+  # The Knox Made in Watson: truncation
+  - pattern: "^The Knox Made in Watso?n? (.+)"
+    canonical: "The Knox Made In Watson {1}"
+
+  # Berkelo: strip suffix
+  - pattern: "^Berkelo.*Mona Vale.*"
+    canonical: "Berkelo Mona Vale"
+
+  # Eg Fuelco Marsfield: truncation
+  - pattern: "^Eg Fuelco Marsfiel? (.+)"
+    canonical: "EG Fuelco {1}"
+
+  # Ice Kirin Bar: truncation
+  - pattern: "^Ice Kirin Bar Burw?o?o?d? (.+)"
+    canonical: "Ice Kirin Bar {1}"
+
+  # The Body Shop QVB: strip store code
+  - pattern: "^The Body Shop.*QVB.*Sydney.*"
+    canonical: "The Body Shop QVB Sydney"
+
+  # Barrenjoey House: normalise spacing
+  - pattern: "^Barrenjoey ?house (.+)"
+    canonical: "Barrenjoey House {1}"
+
+  # The Sports Basement: strip store number
+  - pattern: "^The Sports Basement \\d* ?(.+)"
+    canonical: "The Sports Basement {1}"
+
+  # --- Chain batch cleanup (iter 030) ---
+
+  # Officeworks: consolidate store numbers and locations
+  - pattern: "^Officeworks \\d+ (.+)"
+    canonical: "Officeworks {1}"
+  - pattern: "^Officeworks (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Officeworks {1}"
+  - pattern: "^Officeworks (.+?)\\s*-\\s*(.+)"
+    canonical: "Officeworks {2}"
+  - pattern: "^Officeworks (.+?)\\s+[A-Z][a-z]+ St.*"
+    canonical: "Officeworks {1}"
+
+  # Bunnings: consolidate
+  - pattern: "^Bunnings (?:Warehouse|Group)\\s+(?:LTD|Limited).*"
+    canonical: "Bunnings Online"
+  - pattern: "^Bunnings Warehouse \\d+ (.+)"
+    canonical: "Bunnings {1}"
+  - pattern: "^Bunnings Warehouse (.+)"
+    canonical: "Bunnings {1}"
+  - pattern: "^Bunnings Group LTD (.+)"
+    canonical: "Bunnings {1}"
+
+  # Ampol: consolidate store codes
+  - pattern: "^Ampol (.+?)\\s+\\d+F\\s+(.+)"
+    canonical: "Ampol {1}"
+  - pattern: "^Ampol (.+?)\\s+\\d+F$"
+    canonical: "Ampol {1}"
+  - pattern: "^Ampol (.+?)\\s+X\\d+\\s+(.+)"
+    canonical: "Ampol {1}"
+
+  # Target: strip store numbers
+  - pattern: "^Target \\d+ (.+)"
+    canonical: "Target {1}"
+  - pattern: "^Target (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Target {1}"
+  - pattern: "^Target Xxxxx.*"
+    canonical: "Target"
+
+  # Eb Games: strip store numbers
+  - pattern: "^Eb Games Australia.*"
+    canonical: "EB Games Online"
+  - pattern: "^Eb Games (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "EB Games {1}"
+  - pattern: "^Eb Games (.+)"
+    canonical: "EB Games {1}"
+
+  # Daiso: strip store codes
+  - pattern: "^Daiso \\((.+?)\\).*"
+    canonical: "Daiso {1}"
+  - pattern: "^Daiso (.+?)\\s+(?:X|Xx)\\d+\\s+(.+)"
+    canonical: "Daiso {1}"
+  - pattern: "^Daiso (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Daiso {1}"
+  - pattern: "^Daiso (.+?)\\).*"
+    canonical: "Daiso {1}"
+
+  # Parknpay: consolidate locations
+  - pattern: "^Parknpay Nsw\\*(.+?)\\s+(?:St Leonards|Xxxxxx\\d+).*"
+    canonical: "ParkNPay {1}"
+  - pattern: "^Parknpay Nsw\\*(.+)"
+    canonical: "ParkNPay {1}"
+
+  # DoorDash: strip merchant codes
+  - pattern: "^Dd \\*DoorDash (.+?)\\s+Melbourne.*"
+    canonical: "DoorDash {1}"
+  - pattern: "^Dd \\*DoorDash (.+?)\\s+(.+)"
+    canonical: "DoorDash {1}"
+
+  # Themulia.Com: strip booking codes
+  - pattern: "^Themulia\\.Com \\*(.+?)\\s+(.+)"
+    canonical: "Themulia.com {1}"
+  - pattern: "^Themulia\\.Com.*"
+    canonical: "Themulia.com"
+
+  # NRMA: consolidate
+  - pattern: "^Nrma (?:Insurance|LTD|Motoring).*"
+    canonical: "NRMA"
+  - pattern: "^Nrma Pbtm.*"
+    canonical: "NRMA"
+
+  # American Express: consolidate
+  - pattern: "^American Express (?:Australia|Payment|\\d+|-|$).*"
+    canonical: "American Express"
+
+  # Insurance Australia Group: consolidate
+  - pattern: "^Insurance Australia Group.*"
+    canonical: "Insurance Australia Group"
+
+  # Mpass: strip terminal codes
+  - pattern: "^Mpass \\*(.+?)\\s+(?:Medipass|Melbourne).*"
+    canonical: "Medipass {1}"
+  - pattern: "^Mpass \\*(.+)"
+    canonical: "Medipass {1}"
+
+  # EnergyAustralia: consolidate variants
+  - pattern: "^EnergyAustralia$"
+    canonical: "EnergyAustralia"
+
+  # Receipt prefixed entries: strip receipt number
+  - pattern: "^Receipt \\d+(.+?)\\s+(.+)"
+    canonical: "{1}"
+  - pattern: "^Receipt \\d+(.+)"
+    canonical: "{1}"
+
+  # Your X Balance: consolidate currency
+  - pattern: "^Your [A-Z]{3} Balance$"
+    canonical: "Wise Currency Balance"
+
+  # Lush Food: normalise accent, generic capture
+  - pattern: "^Lush Food Caf(?:é|e) (.+)"
+    canonical: "Lush Food Cafe {1}"
+
+  # Han Sang: remap 8-14 → West Melbourne, generic for rest
+  - pattern: "^Han Sang 8-14.*"
+    canonical: "Han Sang West Melbourne"
+  - pattern: "^Han Sang (.+)"
+    canonical: "Han Sang {1}"
+
+  # Machi: remap Central → Chippendale, generic for rest
+  - pattern: "^Machi.*Central.*"
+    canonical: "Machi Central Chippendale"
+  - pattern: "^Machi[- ]+(.+)"
+    canonical: "Machi {1}"
+
+  # Refund: consolidate Beem It variants
+  - pattern: "^Refund Purchase,?\\s+Beem It.*"
+    canonical: "Refund Beem It"
+
+  # Strathfield Council: consolidate
+  - pattern: "^Strathfield Council.*"
+    canonical: "Strathfield Council"
+
+  # Strathfield Veggie: consolidate truncation
+  - pattern: "^Strathfield Veggie S(?:he)?.*"
+    canonical: "Strathfield Veggie Shed"
+
+  # Interest Charges: consolidate
+  - pattern: "^Interest Charges$"
+    canonical: "Interest Charged"
+  - pattern: "^Interest Correction.*"
+    canonical: "Interest Correction"
+
+  # Meriden School: consolidate
+  - pattern: "^Meriden (?:School|P&F).*Strathfield.*"
+    canonical: "Meriden School Strathfield"
+
+  # Cotton On: consolidate
+  - pattern: "^Cotton on Body.*"
+    canonical: "Cotton On Body"
+  - pattern: "^Cotton on.*"
+    canonical: "Cotton On"
+
+  # Kmart: consolidate store numbers
+  - pattern: "^Kmart Burwood.*"
+    canonical: "Kmart Burwood"
+  - pattern: "^Kmart Online.*"
+    canonical: "Kmart Online"
+  - pattern: "^Kmart (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Kmart {1}"
+  - pattern: "^Kmart (.+?)\\s+\\d+$"
+    canonical: "Kmart {1}"
+
+  # Starbucks: remaps first, then generic
+  - pattern: "^Starbucks Central Park.*"
+    canonical: "Starbucks Chippendale"
+  - pattern: "^Starbucks Macquarie.*"
+    canonical: "Starbucks North Ryde"
+  - pattern: "^Starbucks Broadway.*"
+    canonical: "Starbucks Ultimo"
+  - pattern: "^Starbucks (.+)"
+    canonical: "Starbucks {1}"
+
+  # Ippudo: consolidate truncated locations
+  - pattern: "^Ippudo.*Macquarie.*"
+    canonical: "Ippudo Macquarie"
+  - pattern: "^Ippudo Ma .*"
+    canonical: "Ippudo"
+
+  # Lovisa: consolidate
+  - pattern: "^Lovisa(?:\\.Com)?\\s+(?:Australia|\\d+).*"
+    canonical: "Lovisa Online"
+  - pattern: "^Lovisa QVB.*"
+    canonical: "Lovisa Sydney"
+  - pattern: "^Lovisa \\d+ (.+)"
+    canonical: "Lovisa {1}"
+
+  # Lindt: consolidate
+  - pattern: "^Lindt (?:&|&Amp;|and) Spr(?:ü|u)ngli.*"
+    canonical: "Lindt"
+  - pattern: "^Lindt (.+)"
+    canonical: "Lindt {1}"
+
+  # Haigh's: consolidate
+  - pattern: "^Haigh'S - X\\d+ (.+)"
+    canonical: "Haigh's {1}"
+  - pattern: "^Haigh'S Broadway.*"
+    canonical: "Haigh's Broadway"
+
+  # Heinemann: consolidate
+  - pattern: "^Heinemann (?:Depart|Duty Free).*Mascot.*"
+    canonical: "Heinemann Sydney Airport"
+
+  # Yo-Chi: strip store codes
+  - pattern: "^Yo-Chi (.+?)\\s+(?:X\\d+|\\d{4})\\s+(.+)"
+    canonical: "Yo-Chi {1}"
+  - pattern: "^Yo-Chi (.+?)\\s+\\d+\\s+(.+)"
+    canonical: "Yo-Chi {1}"
+
+  # Sports Basement: consolidate
+  - pattern: "^(?:The )?Sports Basement.*Sunnyvale.*"
+    canonical: "Sports Basement Sunnyvale"
+  - pattern: "^(?:The )?Sports Basement.*San Francisco.*"
+    canonical: "Sports Basement San Francisco"
+
+  # Heritage Coffee: consolidate
+  - pattern: "^Heritage Coffee Summer.*"
+    canonical: "Heritage Coffee Summer Hill"
+
+  # Luneburger: consolidate
+  - pattern: "^Luneburger (?:Australia )?(?:C|Cent|QVB|Qv).*(?:Sydney|Darlinghurst).*"
+    canonical: "Luneburger Sydney"
+  - pattern: "^Luneburger German Baker.*"
+    canonical: "Luneburger North Ryde"
+
+  # Cafe Sienna: consolidate
+  - pattern: "^Cafe Sienna.*Burwood.*"
+    canonical: "Cafe Sienna Burwood"
+
+  # Good Venture Partners: consolidate
+  - pattern: "^Good Ven(?:ture|tre).*Strathfield.*"
+    canonical: "Good Venture Partners Strathfield"
+
+  # Auvers Cafe: consolidate
+  - pattern: "^Auvers (?:Cafe|Ingens).*(?:Rhodes|Haymarket).*"
+    canonical: "Auvers Cafe"
+  - pattern: "^Auvers Cafe.*"
+    canonical: "Auvers Cafe"
+
+  # Hong Kong Bing Sutt: consolidate
+  - pattern: "^Hong Kong Bing Sutt.*Burwood.*"
+    canonical: "Hong Kong Bing Sutt Burwood"
+
+  # Priceline Pharmacy (Pline Ph): consolidate
+  - pattern: "^Pline Ph (.+)"
+    canonical: "Priceline Pharmacy {1}"
+
+  # Dopa: consolidate
+  - pattern: "^Dopa Donburi.*Martin.*"
+    canonical: "Dopa Donburi Martin Place"
+  - pattern: "^Dopa Martin.*"
+    canonical: "Dopa Martin Place"
+  - pattern: "^Dopa Donburi.*Milkba.*"
+    canonical: "Dopa North Ryde"
+  - pattern: "^Dopa by Devon.*"
+    canonical: "Dopa by Devon Sydney"
+  - pattern: "^Dopa Sydney$"
+    canonical: "Dopa Sydney"
+
+  # --- More chain cleanup (iter 032) ---
+
+  # Ghost Locomotion: consolidate
+  - pattern: "^Ghost Locomotion Australia.*"
+    canonical: "Ghost Locomotion"
+
+  # Memocorp: consolidate truncations
+  - pattern: "^Memocorp Australia.*Strathfield.*"
+    canonical: "Memocorp Australia Strathfield"
+  - pattern: "^Memocorp Australia.*"
+    canonical: "Memocorp Australia Strathfield"
+
+  # The Avenue: consolidate
+  - pattern: "^The Avenue.*Newington.*"
+    canonical: "The Avenue Newington"
+
+  # Linkt: consolidate
+  - pattern: "^Linkt Sydney.*"
+    canonical: "Linkt"
+
+  # David Jones: consolidate Limited variants
+  - pattern: "^David Jones Limited.*"
+    canonical: "David Jones Online"
+
+  # Guzman Y Gomez: consolidate GYG variant
+  - pattern: "^Guzman Y Gomez - Gyg (.+)"
+    canonical: "Guzman Y Gomez {1}"
+  - pattern: "^Guzman Y Gomez Martin.*"
+    canonical: "Guzman Y Gomez Sydney"
+
+  # Sushi Hub QVB: consolidate
+  - pattern: "^Sushi Hub QVB.*"
+    canonical: "Sushi Hub QVB Sydney"
+
+  # Sushi Naya: remaps first, generic for rest
+  - pattern: "^Sushi Naya Westfield.*"
+    canonical: "Sushi Naya Burwood"
+  - pattern: "^Sushi Naya Martin.*"
+    canonical: "Sushi Naya Sydney"
+  - pattern: "^Sushi Naya (.+)"
+    canonical: "Sushi Naya {1}"
+
+  # Sushi World: strip dash prefix
+  - pattern: "^Sushi World - (.+?)\\s+(.+)"
+    canonical: "Sushi World {1}"
+  - pattern: "^Sushi World - (.+)"
+    canonical: "Sushi World {1}"
+
+  # Pop Mart: consolidate Oceania
+  - pattern: "^Pop Mart Oceania.*"
+    canonical: "Pop Mart"
+
+  # Dorothy Cowie: consolidate truncation
+  - pattern: "^Dorothy Cowie School.*"
+    canonical: "Dorothy Cowie School"
+
+  # Eat Istanbul: Martin → Sydney remap, generic for rest
+  - pattern: "^Eat Istanbul Martin.*"
+    canonical: "Eat Istanbul Sydney"
+  - pattern: "^Eat Istanbul (.+)"
+    canonical: "Eat Istanbul {1}"
+
+  # Ivy: consolidate
+  - pattern: "^Ivy - Mumu.*"
+    canonical: "Ivy Mumu Sydney"
+
+  # Tea Spot: consolidate
+  - pattern: "^Tea Spot.*Burwood.*"
+    canonical: "Tea Spot Burwood"
+
+  # Leible Coffee: consolidate
+  - pattern: "^Leible Coffee.*"
+    canonical: "Leible Coffee Sydney"
+
+
+
+  # Priceline Pharmacy: consolidate Wyny
+  - pattern: "^Priceline Pharmacy Wyny.*"
+    canonical: "Priceline Pharmacy Sydney"
+
+  # Mrs Stephanie Wong: strip memo from merchant-typed entries
+  - pattern: "^Mrs Stephanie Wong .+"
+    canonical: "Mrs Stephanie Wong"
+
+  # Note: Fast Transfer From entries are handled by transfer_entity_extraction
+
+
+
+  # Macquarie University: consolidate
+  - pattern: "^Macquarie University.*"
+    canonical: "Macquarie University"
+
+  # Meet Fresh: consolidate
+  - pattern: "^Meet Fresh.*Burwood.*"
+    canonical: "Meet Fresh Burwood"
+  - pattern: "^Meet Fresh \\d+ (.+)"
+    canonical: "Meet Fresh {1}"
+
+  # Sharon Law: strip memo
+  - pattern: "^Sharon Law .+"
+    canonical: "Sharon Law"
+
+  # Maenam Lao: consolidate
+  - pattern: "^Maenam Lao Thai.*Strathfield.*"
+    canonical: "Maenam Lao Thai Strathfield"
+  - pattern: "^Maenam Lao.*Melbourne.*"
+    canonical: "Maenam Lao Melbourne"
+
+  # Yakitori Jin: consolidate
+  - pattern: "^Yakitori Jin$"
+    canonical: "Yakitori Jin"
+
+  # --- Iter 033: remaining small chain cleanup ---
+
+
+  # Cornerstone Concord: strip terminal code
+  - pattern: "^Cornerstone Concord.*"
+    canonical: "Cornerstone Concord"
+
+  # Kmart Burwood: strip store number
+  - pattern: "^Kmart Burwood \\d+.*"
+    canonical: "Kmart Burwood"
+
+  # Interpark UTS: consolidate
+  - pattern: "^Interpark UTS.*"
+    canonical: "Interpark UTS Ultimo"
+
+  # Healthy Care Burwood: consolidate
+  - pattern: "^Healthy Care Burwood.*"
+    canonical: "Healthy Care Burwood"
+
+  # Greenway Meat: consolidate
+  - pattern: "^Greenway Meat and Fd.*"
+    canonical: "Greenway Meat Strathfield"
+
+  # Newyen Investment: consolidate
+  - pattern: "^Newyen Investment.*"
+    canonical: "Newyen Investment Crows Nest"
+
+  # Amorepacific: consolidate
+  - pattern: "^Amorepacific Austral.*"
+    canonical: "Amorepacific Burwood"
+
+  # Visco Universal: consolidate
+  - pattern: "^Visco Universal.*"
+    canonical: "Visco Universal"
+
+  # Jfc Strathfield: consolidate
+  - pattern: "^Jfc Strathfield.*"
+    canonical: "JFC Strathfield"
+
+  # Komart: consolidate
+  - pattern: "^Komart(?:\\s+North\\s+Strat)?$"
+    canonical: "Komart North Strathfield"
+
+  # Dorothy Cowie School: consolidate truncation
+  - pattern: "^Dorothy Cowie School of Danc.*"
+    canonical: "Dorothy Cowie School"
+
+  # Contribution Tax: consolidate
+  - pattern: "^Contribution Tax Adjustment$"
+    canonical: "Contribution Tax"
+
+  # Strathfield Council: consolidate Crn
+  - pattern: "^Strathfield Council - Crn$"
+    canonical: "Strathfield Council"
+
+  # Daiso Burwood: consolidate
+  - pattern: "^Daiso Burwood.*"
+    canonical: "Daiso Burwood"
+
+  # Miniso Burwood: consolidate
+  - pattern: "^Miniso Burwood.*"
+    canonical: "Miniso Burwood"
+
+
+  # Manish Seneviratne: strip memo
+  - pattern: "^Manish Seneviratne .+"
+    canonical: "Manish Seneviratne"
+
+  # David Greenaway: strip memo
+  - pattern: "^David Greenaway .+"
+    canonical: "David Greenaway"
+
+  # Johnny Tam: strip memo
+  - pattern: "^Johnny Tam .+"
+    canonical: "Johnny Tam"
+
+  # Roger Chan: strip memo
+  - pattern: "^Roger Chan .+"
+    canonical: "Roger Chan"
+
+  # Kobe Cc Tsang: strip memo
+  - pattern: "^Kobe Cc Tsang .+"
+    canonical: "Kobe Cc Tsang"
+
+  # Amznprimeau: consolidate
+  - pattern: "^Amznprimeau Membership.*"
+    canonical: "Amazon Prime"
+
+  # ANZ Internet Banking BPAY: consolidate
+  - pattern: "^ANZ Internet Banking Bpay.*"
+    canonical: "ANZ BPAY"
+
+  # Flower Power: consolidate
+  - pattern: "^Flower Power.*Enfield.*"
+    canonical: "Flower Power Enfield"
+  - pattern: "^Flower Power$"
+    canonical: "Flower Power"
+
+  # Officeworks North Ryde: consolidate
+  - pattern: "^Officeworks North Ryde.*"
+    canonical: "Officeworks North Ryde"
+
+  # Bp Enfield: consolidate
+  - pattern: "^Bp Enfield.*"
+    canonical: "BP Enfield"
+
+
+  # Ausko Cooperation: consolidate
+  - pattern: "^Ausko Cooperation.*"
+    canonical: "Ausko Cooperation Concord"
+
+  # Gnt Services: consolidate
+  - pattern: "^Gnt Services$"
+    canonical: "GNT Services North Strathfield"
+
+
+  # Campion Education: consolidate
+  - pattern: "^Campion Education$"
+    canonical: "Campion Education"
+
+  # Mancini S Pizzeria: consolidate
+  - pattern: "^Mancini S Pizzeria.*"
+    canonical: "Mancini's Pizzeria Belfield"
+
+  # Mancinis Wood: consolidate
+  - pattern: "^Mancinis Wood Melbourne.*"
+    canonical: "Mancinis Wood Melbourne"
+
+
+  # --- Internal transfer consolidation (iter 028) ---
+
+  # Internal Transfer: typed as merchant, not banking_operation
+  - pattern: "^Internal Transfer$"
+    canonical: "Internal Account Transfer"
+
+  # Repayment/Payment: consolidate variants
+  - pattern: "^Repayment/Payment.*"
+    canonical: "Repayment/Payment"
+
+  # Tam S Tam L N: deposit/transfer variants typed as merchant
+  - pattern: "^Tam S S? &? ?Tam L N?.*"
+    canonical: "Joint Account (Tam)"
+  - pattern: "^Tam S Tam L.*"
+    canonical: "Joint Account (Tam)"
+
+  # --- Banking entity consolidation (iter 027) ---
+
+  # OMF International: consolidate extracted variants
+  - pattern: "^Omf(?:\\s+International)?$"
+    canonical: "OMF International"
+
+  # Hollard Insurance: consolidate variants
+  - pattern: "^Hollard(?:Ins|\\s+Insurance).*"
+    canonical: "Hollard Insurance"
+
+  # Pioneers of Australia: consolidate truncated
+  - pattern: "^Pioneers of(?:\\s+Aust(?:ralia)?)?$"
+    canonical: "Pioneers of Australia"
+
+  # FMC: consolidate
+  - pattern: "^Fmc$"
+    canonical: "FMC"
+
+  # --- Cluster-derived consolidation (iter 024) ---
+
+  # International Transaction Fee: consolidate (typed as merchant, not banking_operation)
+  - pattern: "^International Transaction Fee.*"
+    canonical: "International Transaction Fee"
+
+  # Papparich: consolidate truncated locations
+  - pattern: "^Papparich Macquarie.*"
+    canonical: "Papparich Macquarie Park"
+  - pattern: "^Papparich (.+)"
+    canonical: "Papparich {1}"
+
+  # ATM Burwood: strip terminal letter (comes through banking_entity_extraction as "210 BURWOOD X")
+  - pattern: "^ATM 210 Burwood [A-Za-z]$"
+    canonical: "ATM Burwood"
+
+  # Jason Hui: truncation
+  - pattern: "^Jason Hu$"
+    canonical: "Jason Hui"
+
+  # Airport Retail Enterprises: truncation
+  - pattern: "^Airport Retail Enter?p?r?i?s?e?s? (.+)"
+    canonical: "Airport Retail Enterprises {1}"
+
+  # Burwood Discount Chemist: with/without location
+  - pattern: "^Burwood Discount Chemist.*Burwood.*"
+    canonical: "Burwood Discount Chemist Burwood"
+
+  # PayPal BudgetPetProducts: truncation
+  - pattern: "^PayPal \\*Budgetpetpr.*"
+    canonical: "PayPal Budget Pet Products"
+
+  # Cash Deposit Beem It: strip receipt
+  - pattern: "^Cash Deposit.*Beem It.*"
+    canonical: "Cash Deposit Beem It"
+
+  # Saidgani Musaev: strip memo from transfer
+  - pattern: "^Saidgani Musaev.*"
+    canonical: "Saidgani Musaev"
+
+  # Mrs Stephanie Wong Deposit: strip receipt
+  - pattern: "^Mrs Stephanie Wong Deposit.*"
+    canonical: "Mrs Stephanie Wong"
+
+  # Tam S & Tam L N Deposit: strip receipt
+  - pattern: "^(?:Tam S & Tam L N|Joint Account \\(Tam\\)) Deposit.*"
+    canonical: "Joint Account (Tam)"
+
+  # --- Business entities appearing in transfers (not person names) ---
+
+  # AES: electrician
+  - pattern: "^Aes$"
+    canonical: "AES Electrical"
+
+  # Tan Hands: physiotherapy
+  - pattern: "^Tan Hands.*"
+    canonical: "Tan Hands Physiotherapy"
+
+  # Focus: business
+  - pattern: "^Focus$"
+    canonical: "Focus"
+
+  # Genesis Gardens: lawnmowing service
+  - pattern: "^Genesis Gardens.*"
+    canonical: "Genesis Gardens"
+
+  # Oilstone: training and professional development
+  - pattern: "^Oilstone.*"
+    canonical: "Oilstone"
+
+  # ING Bank: transfers
+  - pattern: "^Ing$"
+    canonical: "ING"
+
+  # Cs Education: consolidate with/without location
+  - pattern: "^Cs Education.*"
+    canonical: "CS Education Strathfield"
+  - pattern: "^Cs$"
+    canonical: "CS Education Strathfield"
+
+  # Early Purpose: business
+  - pattern: "^Early Purpose.*"
+    canonical: "Early Purpose"
+
+  # Baked Beats: business
+  - pattern: "^Baked Beats.*"
+    canonical: "Baked Beats"
+
+  # Slower Deeper Wiser: business
+  - pattern: "^Slower Deeper Wiser.*"
+    canonical: "Slower Deeper Wiser"
+
+  # Soulgram Partners: business
+  - pattern: "^Soulgram Partners.*"
+    canonical: "Soulgram Partners"
+
+# Default locations for singleton merchants (appended when bare name matches)
+# Key = canonical merchant name, Value = default location
+default_locations:
+  Hanaro Mart: Strathfield
+  Malay Express: Strathfield
+  Red Pepper Club: Strathfield
+  Caffe Relax'N: Strathfield
+  W Retail Group: Strathfield
+  Paminggo: Strathfield
+  Pre-Uni New College: Strathfield
+  Good Venture Partners: Strathfield
+  Maenam Lao Thai: Strathfield
+  Double Barral Coffee: Burwood
+  Logans Pianos Hire: Burwood
+  Hook Line and Sinker: Burwood
+  My Mr Stonebowl: Burwood
+  Burwood Council: Burwood
+  Lotus Entertainment: Burwood
+  Yilan Group: Burwood
+  Burwood Discount Chemist: Burwood
+  Tea Spot: Burwood
+  Bespoke Letterpress: Bowral
+  Koorong Books: West Ryde
+  Huntley Projects CBD: Sydney
+  Dutch Smuggler: Sydney
+  Myeong Dong: North Strathfield
+  La Lune Market: North Strathfield
+  Pochanara: Newington
+  The Avenue: Newington
+  Yun Zhou: Macquarie Park
+  Zipby Limited: South Granville
+  40 Grains Thai: Summer Hill
+  Ashfield Apothecary: Ashfield
+  Coronation Pharmacy: Enfield
+
+# Patterns to strip from merchant names (case-insensitive, applied with re.sub)
+strip_patterns:
+  # PTY LTD variants (anywhere in string, not just at end)
+  - pattern: "\\s+PTY\\.?\\s*LTD?\\.?"
+    name: "PTY LTD"
+  - pattern: "\\s+P/L(?=\\s|$)"
+    name: "P/L"
+  - pattern: "\\s+PTY\\.?(?=\\s|$)"
+    name: "PTY alone"
+
+# Internal account transfers (own CBA accounts by masked number)
+internal_account_mappings:
+  - pattern: "^Transfer (?:to|from) xx\\d{4}\\b.*$"
+    canonical: "Internal Account Transfer"
+  - pattern: "^from account xx\\d{4}$"
+    canonical: "Internal Account Transfer"
+  - pattern: "^to account xx\\d{4}$"
+    canonical: "Internal Account Transfer"
+
+# For transfers: extract the person/entity name
+transfer_entity_extraction:
+  # Fast Transfer From PERSON, to PayID Phone, MEMO
+  - pattern: "^Fast Transfer From (.+?),\\s*to PayID.*$"
+    group: 1
+  # Fast Transfer From PERSON, MEMO, MEMO
+  - pattern: "^Fast Transfer From (.+?),\\s*(.+)$"
+    group: 1
+  # From ENTITY - REFERENCE
+  - pattern: "^From (.+?)\\s*-\\s*.*$"
+    group: 1
+  # From Account
+  - pattern: "^From Account (.+)$"
+    group: 1
+  # Transfer To ENTITY CommBank App MEMO
+  - pattern: "^Transfer To (.+?)\\s+CommBank App.*$"
+    group: 1
+  # Transfer To ENTITY, CommBank App MEMO
+  - pattern: "^Transfer To (.+?),\\s*CommBank App.*$"
+    group: 1
+  # Transfer To ENTITY, PayID ... from CommBank App, MEMO
+  - pattern: "^Transfer To (.+?),\\s*PayID.*$"
+    group: 1
+  # To ENTITY - MEMO
+  - pattern: "^To (.+?)\\s*-\\s*.*$"
+    group: 1
+  # Transfer to PERSON - Receipt NNN To NUMBERS
+  - pattern: "^Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # Mortgage - Transfer to PERSON - Receipt
+  - pattern: "^Mortgage.*Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # Amex - Transfer to PERSON
+  - pattern: "^Amex.*Transfer to (.+?)\\s*-\\s*Receipt.*$"
+    group: 1
+  # TRANSFER FROM ENTITY REF
+  - pattern: "^TRANSFER FROM (.+?)\\s+/REF/.*$"
+    group: 1
+  # Transfer From PERSON MEMO
+  - pattern: "^Transfer From (.+?)\\s+(.+)$"
+    group: 1
+  # Transfer from PERSON NetBank MEMO
+  - pattern: "^Transfer from (.+?)\\s+NetBank.*$"
+    group: 1
+  # ANZ MOBILE BANKING PAYMENT NNN TO Person
+  - pattern: "^ANZ MOBILE BANKING PAYMENT \\d+ TO (.+)$"
+    group: 1
+  # PERSON Name - Osko Payment to (outgoing, capture name before " - Osko")
+  - pattern: "^(.+?)\\s*-\\s*Osko Payment to\\s.*$"
+    group: 1
+  # PERSON Name [MEMO] - Osko Payment - Receipt (incoming)
+  # Person names are typically ALL CAPS or Title Case; memo follows
+  - pattern: "^((?:[A-Z][A-Z ]+[A-Z])|(?:[A-Z][a-z]+(?: [A-Z][a-z]+)*))\\s+.+?\\s*-\\s*Osko Payment\\s*-\\s*Receipt.*$"
+    group: 1
+  # PERSON Name - Osko Payment - Receipt (incoming, no memo)
+  - pattern: "^(.+?)\\s+-\\s*Osko Payment\\s*-\\s*Receipt.*$"
+    group: 1
+
+# For banking operations: extract the entity name
+banking_entity_extraction:
+  # Direct Credit NNNNNN ENTITY, REFERENCE
+  - pattern: "^Direct Credit (?:Pension )?(?:XX)?\\d+ (.+?)(?:[\\s,]\\s*(?:\\d|[A-Z]{3,}|\\w+\\d).*)$"
+    group: 1
+  # Direct Debit NNNNNN ENTITY, REFERENCE
+  - pattern: "^Direct Debit (?:XX)?\\d+ (.+?)(?:[\\s,]\\s*(?:\\d|[A-Z]{3,}).*)$"
+    group: 1
+  # Wdl ATM CBA ATM LOCATION
+  - pattern: "^Wdl ATM CBA ATM (.+?)\\s+NSW.*$"
+    group: 1
+    prefix: "ATM"
+  # CASH DEPOSIT, CBA ATM LOCATION
+  - pattern: "^CASH DEPOSIT,\\s*CBA ATM (.+?)\\s+NSW.*$"
+    group: 1
+    prefix: "ATM Deposit"
+
+# Merchant groups for dedup scoring (location variants count as one merchant)
+merchant_groups:
+  - group: "McDonald's"
+    pattern: "^McDonald's\\b"
+  - group: "Woolworths"
+    pattern: "^Woolworths\\b"
+  - group: "Coles"
+    pattern: "^Coles\\b"
+  - group: "Coles Express"
+    pattern: "^Coles Express\\b"
+  - group: "Hero Sushi"
+    pattern: "^Hero Sushi\\b"
+  - group: "Starbucks"
+    pattern: "^Starbucks\\b"
+  - group: "Chemist Warehouse"
+    pattern: "^Chemist Warehouse\\b"
+  - group: "7-Eleven"
+    pattern: "^7-Eleven\\b"
+  - group: "Woolworths Metro"
+    pattern: "^Woolworths Metro\\b"
+  - group: "KFC"
+    pattern: "^KFC\\b"
+  - group: "Aldi"
+    pattern: "^Aldi\\b"
+  - group: "BWS"
+    pattern: "^BWS\\b"
+  - group: "EG Fuelco"
+    pattern: "^EG Fuelco\\b"
+  - group: "Bakers Delight"
+    pattern: "^Bakers Delight\\b"
+  - group: "Gong Cha"
+    pattern: "^Gong Cha\\b"
+  - group: "Kmart"
+    pattern: "^Kmart\\b"
+  - group: "Officeworks"
+    pattern: "^Officeworks\\b"
+  - group: "Bunnings"
+    pattern: "^Bunnings\\b"
+  - group: "Target"
+    pattern: "^Target\\b"
+  - group: "Daiso"
+    pattern: "^Daiso\\b"
+  - group: "VN City"
+    pattern: "^VN City\\b"
+  - group: "David Jones"
+    pattern: "^David Jones\\b"
+  - group: "Machi"
+    pattern: "^Machi\\b"
+  - group: "ATM"
+    pattern: "^ATM\\b"
+  - group: "Service NSW"
+    pattern: "^Service NSW\\b"
+  - group: "Han Sang"
+    pattern: "^Han Sang\\b"
+  - group: "Dopa"
+    pattern: "^Dopa\\b"
+  - group: "Sushi Naya"
+    pattern: "^Sushi Naya\\b"
+  - group: "Sushi World"
+    pattern: "^Sushi World\\b"
