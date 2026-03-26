@@ -328,3 +328,182 @@ impl CompiledExpandRules {
         Ok(Self { patterns, locations })
     }
 }
+
+// ── Stage 4: Identify ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct IdentifyRulesYaml {
+    #[serde(default)]
+    persons_strip_memo: Vec<String>,
+    #[serde(default)]
+    persons: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    employers: Vec<EmployerYaml>,
+    #[serde(default)]
+    banking_identity_mappings: Vec<PatternCanonicalYaml>,
+    #[serde(default)]
+    merchant_mappings: Vec<PatternCanonicalYaml>,
+    #[serde(default)]
+    default_locations: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    strip_patterns: Vec<StripPatternYaml>,
+    #[serde(default)]
+    internal_account_mappings: Vec<PatternCanonicalYaml>,
+    #[serde(default)]
+    transfer_entity_extraction: Vec<EntityExtractionYaml>,
+    #[serde(default)]
+    banking_entity_extraction: Vec<EntityExtractionYaml>,
+    #[serde(default)]
+    merchant_groups: Vec<MerchantGroupYaml>,
+}
+
+#[derive(Deserialize)]
+struct EmployerYaml {
+    patterns: Vec<String>,
+    canonical: String,
+}
+
+#[derive(Deserialize)]
+struct PatternCanonicalYaml {
+    pattern: String,
+    canonical: String,
+}
+
+#[derive(Deserialize)]
+struct StripPatternYaml {
+    pattern: String,
+    #[allow(dead_code)]
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct EntityExtractionYaml {
+    pattern: String,
+    group: Option<usize>,
+    prefix: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct MerchantGroupYaml {
+    pattern: String,
+    group: String,
+}
+
+pub(super) struct CompiledPatternCanonical {
+    pub(super) re: Re,
+    pub(super) canonical: String,
+}
+
+pub(super) struct CompiledEntityExtraction {
+    pub(super) re: Re,
+    pub(super) group: usize,
+    pub(super) prefix: Option<String>,
+}
+
+pub(super) struct CompiledMerchantGroup {
+    pub(super) re: Re,
+    pub(super) group: String,
+}
+
+pub(super) struct Employer {
+    pub(super) patterns_upper: Vec<String>,
+    pub(super) canonical: String,
+}
+
+pub struct CompiledIdentifyRules {
+    pub(super) persons_strip_memo: Vec<String>,
+    pub(super) persons: std::collections::HashMap<String, String>,
+    pub(super) persons_upper: std::collections::HashMap<String, String>,
+    pub(super) employers: Vec<Employer>,
+    pub(super) banking_identity_mappings: Vec<CompiledPatternCanonical>,
+    pub(super) merchant_mappings: Vec<CompiledPatternCanonical>,
+    pub(super) default_locations: std::collections::HashMap<String, (String, String)>,
+    pub(super) strip_patterns: Vec<Re>,
+    pub(super) internal_account_mappings: Vec<CompiledPatternCanonical>,
+    pub(super) transfer_entity_extraction: Vec<CompiledEntityExtraction>,
+    pub(super) banking_entity_extraction: Vec<CompiledEntityExtraction>,
+    pub(super) merchant_groups: Vec<CompiledMerchantGroup>,
+    pub(super) capture_noise: Re,
+    pub(super) title_re: Re,
+}
+
+impl CompiledIdentifyRules {
+    pub fn load(rules_dir: &Path) -> Result<Self> {
+        let yaml: IdentifyRulesYaml = load_yaml(rules_dir, "identify.yaml")?;
+
+        let compile_pc = |items: Vec<PatternCanonicalYaml>, ctx: &str| -> Result<Vec<CompiledPatternCanonical>> {
+            items.into_iter().map(|p| {
+                Ok(CompiledPatternCanonical {
+                    re: compile_icase(&p.pattern, ctx)?,
+                    canonical: p.canonical,
+                })
+            }).collect()
+        };
+
+        let compile_ee = |items: Vec<EntityExtractionYaml>, ctx: &str| -> Result<Vec<CompiledEntityExtraction>> {
+            items.into_iter().map(|e| {
+                Ok(CompiledEntityExtraction {
+                    re: compile_icase(&e.pattern, ctx)?,
+                    group: e.group.unwrap_or(1),
+                    prefix: e.prefix,
+                })
+            }).collect()
+        };
+
+        // Build case-insensitive persons lookup
+        let mut persons_upper = std::collections::HashMap::new();
+        for (k, v) in &yaml.persons {
+            persons_upper.insert(k.to_uppercase(), v.clone());
+        }
+
+        // Build default_locations: key.upper() -> (key, location)
+        let default_locations = yaml.default_locations.into_iter()
+            .map(|(k, v)| (k.to_uppercase(), (k, v)))
+            .collect();
+
+        let capture_noise = compile_re(
+            concat!(
+                "(?i)(?:",
+                "\\s+\\\\.*",
+                "|\\s+\\S*\\d{2,}\\S*$",
+                "|\\s+(?:NSW|Nsw|VIC|Vic|QLD|Qld|SA|WA|TAS|Tas|ACT|Act|NT)\\b.*$",
+                "|\\s+(?:AU|AUS|Australia)\\b.*$",
+                "|\\s*PTY\\.?\\s*LTD?\\.?",
+                "|\\s+P/L(?=\\s|$)",
+                "|\\s+PTY\\.?(?=\\s|$)",
+                "|\\s*-\\s*$",
+                ")"
+            ),
+            "capture noise",
+        )?;
+
+        let title_re = compile_icase("^(?:Mr|Mrs|Ms|Miss|Elder)\\s+", "title")?;
+
+        Ok(Self {
+            persons_strip_memo: yaml.persons_strip_memo,
+            persons: yaml.persons,
+            persons_upper,
+            employers: yaml.employers.into_iter().map(|e| Employer {
+                patterns_upper: e.patterns.into_iter().map(|p| p.to_uppercase()).collect(),
+                canonical: e.canonical,
+            }).collect(),
+            banking_identity_mappings: compile_pc(yaml.banking_identity_mappings, "banking identity")?,
+            merchant_mappings: compile_pc(yaml.merchant_mappings, "merchant mapping")?,
+            default_locations,
+            strip_patterns: yaml.strip_patterns.into_iter()
+                .map(|s| compile_icase(&s.pattern, "strip pattern"))
+                .collect::<Result<_>>()?,
+            internal_account_mappings: compile_pc(yaml.internal_account_mappings, "internal account")?,
+            transfer_entity_extraction: compile_ee(yaml.transfer_entity_extraction, "transfer entity")?,
+            banking_entity_extraction: compile_ee(yaml.banking_entity_extraction, "banking entity")?,
+            merchant_groups: yaml.merchant_groups.into_iter().map(|g| {
+                Ok(CompiledMerchantGroup {
+                    re: compile_icase(&g.pattern, "merchant group")?,
+                    group: g.group,
+                })
+            }).collect::<Result<_>>()?,
+            capture_noise,
+            title_re,
+        })
+    }
+}
