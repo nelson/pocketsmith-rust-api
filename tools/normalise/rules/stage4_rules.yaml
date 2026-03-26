@@ -119,6 +119,24 @@ banking_identity_mappings:
     canonical: "American Express Payment"
   - pattern: "Direct Debit XX\\d+ AMERICAN EXPRESS"
     canonical: "American Express Payment"
+  # OMF International: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Omf"
+    canonical: "OMF International"
+  # Pioneers of Australia: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Pioneers"
+    canonical: "Pioneers of Australia"
+  # Hollard Insurance: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Hollard"
+    canonical: "Hollard Insurance"
+  # Hubhello: consolidate variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Hubhello"
+    canonical: "Hubhello"
+  # Australian Fellowship: consolidate non-AFES variants
+  - pattern: "Direct Debit (?:XX)?\\d+ Australian Fello"
+    canonical: "AFES (Donation)"
+  # FMC: consolidate variants
+  - pattern: "Direct Credit (?:XX)?\\d+ Fmc"
+    canonical: "FMC"
   # BPAY Payment
   - pattern: "^(?:Bpay|BPAY) Payment.*$"
     canonical: "BPAY Payment"
@@ -1022,6 +1040,24 @@ merchant_mappings:
   # Coles Broadway: strip store number
   - pattern: "^Coles Broadway \\d*$"
     canonical: "Coles Broadway"
+
+  # --- Banking entity consolidation (iter 027) ---
+
+  # OMF International: consolidate extracted variants
+  - pattern: "^Omf(?:\\s+International)?$"
+    canonical: "OMF International"
+
+  # Hollard Insurance: consolidate variants
+  - pattern: "^Hollard(?:Ins|\\s+Insurance).*"
+    canonical: "Hollard Insurance"
+
+  # Pioneers of Australia: consolidate truncated
+  - pattern: "^Pioneers of(?:\\s+Aust(?:ralia)?)?$"
+    canonical: "Pioneers of Australia"
+
+  # FMC: consolidate
+  - pattern: "^Fmc$"
+    canonical: "FMC"
 
   # --- Cluster-derived consolidation (iter 024) ---
 

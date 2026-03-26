@@ -25,3 +25,4 @@ iteration	score	delta	hypothesis	outcome
 024	93.23	+0.04	Final cluster cleanup (CommInsure, Intl Txn Fee, Papparich, ATM, etc.)	kept
 025	93.23	+0.00	Truncated-location prefix dedup in stage5 (word[i] prefix of word[i+1])	kept
 026	93.24	+0.01	Gateway prefix stripping (EFTPOS, EZI*, DNH*, PP*, LIGHTSPEED*, LIME*, EB*)	kept
+027	93.28	+0.04	Banking entity extraction fixes (OMF, Pioneers, Hollard, Hubhello, FMC)	kept
