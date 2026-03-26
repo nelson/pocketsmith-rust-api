@@ -28,3 +28,4 @@ iteration	score	delta	hypothesis	outcome
 027	93.28	+0.04	Banking entity extraction fixes (OMF, Pioneers, Hollard, Hubhello, FMC)	kept
 028	93.30	+0.02	Internal transfer consolidation + Tam/Repayment variants	kept
 029	93.32	+0.02	PayPal reference code stripping and merchant consolidation	kept
+030	93.40	+0.08	Chain merchant batch: Woolworths, McDonald's, Coles, Officeworks, Bunnings, Ampol, etc.	kept
