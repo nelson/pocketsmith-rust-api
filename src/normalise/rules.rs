@@ -507,3 +507,42 @@ impl CompiledIdentifyRules {
         })
     }
 }
+
+// ── Stage 5: Cleanup ────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct CleanupRulesYaml {
+    #[serde(default)]
+    uppercase_exceptions: Vec<String>,
+    #[serde(default)]
+    lowercase_exceptions: Vec<String>,
+    #[serde(default)]
+    trailing_noise: Vec<TrailingNoiseYaml>,
+}
+
+#[derive(Deserialize)]
+struct TrailingNoiseYaml {
+    pattern: String,
+}
+
+pub struct CompiledCleanupRules {
+    pub(super) upper_set: std::collections::HashSet<String>,
+    pub(super) lower_set: std::collections::HashSet<String>,
+    pub(super) trailing: Vec<Re>,
+}
+
+impl CompiledCleanupRules {
+    pub fn load(rules_dir: &Path) -> Result<Self> {
+        let yaml: CleanupRulesYaml = load_yaml(rules_dir, "cleanup.yaml")?;
+        let upper_set = yaml.uppercase_exceptions.into_iter()
+            .map(|w| w.to_uppercase())
+            .collect();
+        let lower_set = yaml.lowercase_exceptions.into_iter()
+            .map(|w| w.to_lowercase())
+            .collect();
+        let trailing = yaml.trailing_noise.into_iter()
+            .map(|t| compile_icase(&t.pattern, "trailing noise"))
+            .collect::<Result<_>>()?;
+        Ok(Self { upper_set, lower_set, trailing })
+    }
+}
