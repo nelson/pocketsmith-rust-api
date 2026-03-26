@@ -85,10 +85,12 @@ fn smart_title_case(text: &str, upper_set: &HashSet<String>, lower_set: &HashSet
             result.push(upper);
         } else if lower_set.contains(&word.to_lowercase()) && i > 0 {
             result.push(word.to_lowercase());
-        } else if word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) && word.len() > 1 {
+        } else if word.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_uppercase())
+            && word.chars().filter(|c| c.is_alphabetic()).count() > 1
+        {
             // All-caps word: title case it
             result.push(title_case_word(word));
-        } else if word.chars().next().map_or(false, |c| c.is_uppercase()) {
+        } else if word.chars().find(|c| c.is_alphabetic()).map_or(false, |c| c.is_uppercase()) {
             // Already has some capitalisation, keep it
             result.push(word.to_string());
         } else {
@@ -100,17 +102,19 @@ fn smart_title_case(text: &str, upper_set: &HashSet<String>, lower_set: &HashSet
 }
 
 fn title_case_word(word: &str) -> String {
-    let mut chars = word.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => {
-            let mut s = c.to_uppercase().to_string();
-            for ch in chars {
-                s.extend(ch.to_lowercase());
-            }
-            s
+    let mut result = String::new();
+    let mut found_alpha = false;
+    for c in word.chars() {
+        if !found_alpha && c.is_alphabetic() {
+            result.extend(c.to_uppercase());
+            found_alpha = true;
+        } else if found_alpha {
+            result.extend(c.to_lowercase());
+        } else {
+            result.push(c);
         }
     }
+    result
 }
 
 const BRAND_PRESERVES: &[(&str, &str)] = &[
