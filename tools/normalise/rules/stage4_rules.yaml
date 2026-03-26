@@ -277,13 +277,13 @@ merchant_mappings:
   - pattern: "^0SUMMER HILL PS \\d+ (.+)"
     canonical: "Summer Hill PS {1}"
 
-  # Gong Cha: keep location
-  - pattern: "^GONG CHA STRATHFIELD.*"
-    canonical: "Gong Cha Strathfield"
-  - pattern: "^GONG CHA AUSTRALIA.*"
-    canonical: "Gong Cha"
+  # Gong Cha: remaps first, generic capture
   - pattern: "^GONG CHA AND HOTSTAR.*"
     canonical: "Gong Cha Burwood"
+  - pattern: "^GONG CHA AUSTRALIA.*"
+    canonical: "Gong Cha"
+  - pattern: "^GONG CHA (.+)"
+    canonical: "Gong Cha {1}"
 
   # ATM withdrawals: extract location
   - pattern: "^CBA ATM (.+?) NSW \\d+"
@@ -397,21 +397,17 @@ merchant_mappings:
   - pattern: "^Kim Sun Young Nail.*"
     canonical: "Kim Sun Young Nail"
 
-  # The Smelly Cheesecake: consolidate truncations
-  - pattern: "^The Smelly Chees.*Strathfield.*"
-    canonical: "The Smelly Cheesecake Strathfield"
-  - pattern: "^The Smelly Ch.*Melbourne.*"
-    canonical: "The Smelly Cheesecake Melbourne"
-  - pattern: "^The Smelly Chees.*Charlestown.*"
-    canonical: "The Smelly Cheesecake Charlestown"
+  # The Smelly Cheesecake: generic capture (truncated name handled in pattern)
+  - pattern: "^The Smelly Chees(?:ecake)? (.+)"
+    canonical: "The Smelly Cheesecake {1}"
+  - pattern: "^The Smelly Ch.*"
+    canonical: "The Smelly Cheesecake"
 
   # Reuben Hills: consolidate
   - pattern: "^Reuben Hills.*"
     canonical: "Reuben Hills"
 
-  # Farmers Fresh: consolidate truncations
-  - pattern: "^Farmers Fresh Burw.*"
-    canonical: "Farmers Fresh Burwood"
+  # Farmers Fresh: generic location capture
   - pattern: "^Farmers Fresh (.+)"
     canonical: "Farmers Fresh {1}"
 
@@ -419,15 +415,13 @@ merchant_mappings:
   - pattern: "^Stock Market Kitch.*"
     canonical: "Stock Market Kitchen"
 
-  # Milk Flower: consolidate
-  - pattern: "^Milk Flower Macquar.*"
+  # Milk Flower: Macquarie = Macquarie Park, generic for rest
+  - pattern: "^Milk Flower Macquari.*"
     canonical: "Milk Flower Macquarie Park"
   - pattern: "^Milk Flower (.+)"
     canonical: "Milk Flower {1}"
 
-  # W Cosmetics: consolidate
-  - pattern: "^W Cosmetics Burwood.*"
-    canonical: "W Cosmetics Burwood"
+  # W Cosmetics: generic location capture
   - pattern: "^W Cosmetics (.+)"
     canonical: "W Cosmetics {1}"
 
@@ -453,18 +447,14 @@ merchant_mappings:
   - pattern: "^Dorothy Cowie Shop.*"
     canonical: "Dorothy Cowie Shop"
 
-  # Hook Line and Sinker: consolidate truncations
-  - pattern: "^Hook Line (?:and|&) Sin.*Burwood.*"
-    canonical: "Hook Line and Sinker Burwood"
-  - pattern: "^Hook Line (?:and|&) Sinker.*"
-    canonical: "Hook Line and Sinker"
+  # Hook Line and Sinker: generic capture (truncated name handled)
+  - pattern: "^Hook Line (?:and|&) Sin(?:ker)? (.+)"
+    canonical: "Hook Line and Sinker {1}"
   - pattern: "^Hook Line (?:and|&) Sin.*"
     canonical: "Hook Line and Sinker"
 
-  # Red Pepper Club: consolidate
-  - pattern: "^Red Pepper Clu.*Strathfield.*"
-    canonical: "Red Pepper Club Strathfield"
-  - pattern: "^Red Pepper Club.*"
+  # Red Pepper Club: catch-all (has PTY LTD in name variants)
+  - pattern: "^Red Pepper Clu.*"
     canonical: "Red Pepper Club"
 
   # Guzman Y Gomez: consolidate
@@ -487,13 +477,17 @@ merchant_mappings:
   - pattern: "^Taste of Shanghai Burw.*"
     canonical: "Taste of Shanghai Burwood"
 
-  # Bakers Delight Bwood: consolidate truncations
-  - pattern: "^Bakers Delight Bwoo?d?.*Burwood.*"
-    canonical: "Bakers Delight Burwood"
+  # Bakers Delight: generic capture (stage 3 handles truncations)
   - pattern: "^Bakers Delight (.+)"
     canonical: "Bakers Delight {1}"
 
-  # Starbucks: strip store codes
+  # Starbucks: remaps via store code capture, then strip store codes
+  - pattern: "^Starbucks Coffee B\\d+ Central Park.*"
+    canonical: "Starbucks Chippendale"
+  - pattern: "^Starbucks Coffee B\\d+ Macquarie.*"
+    canonical: "Starbucks North Ryde"
+  - pattern: "^Starbucks Coffee B\\d+ Broadway.*"
+    canonical: "Starbucks Ultimo"
   - pattern: "^Starbucks Coffee B\\d+ (.+)"
     canonical: "Starbucks {1}"
   - pattern: "^Starbucks Coffee B\\d+$"
@@ -508,8 +502,6 @@ merchant_mappings:
     canonical: "Ghost Locomotion"
 
   # M & J Company: consolidate
-  - pattern: "^M & J Company.*Strathfield.*"
-    canonical: "M & J Company Strathfield"
   - pattern: "^M & J Company.*"
     canonical: "M & J Company"
 
@@ -518,8 +510,6 @@ merchant_mappings:
     canonical: "Crust Pizza Croydon"
 
   # W Retail Group: consolidate
-  - pattern: "^W Retail Group.*Strathfield.*"
-    canonical: "W Retail Group Strathfield"
   - pattern: "^W Retail Group.*"
     canonical: "W Retail Group"
 
@@ -590,17 +580,13 @@ merchant_mappings:
   - pattern: "^Edition Roasters$"
     canonical: "Edition Roasters"
 
-  # Hero Sushi: consolidate truncated locations
-  - pattern: "^Hero Sushi Broadw.*"
-    canonical: "Hero Sushi Broadway"
+  # Hero Sushi: remaps first, then generic capture
+  - pattern: "^Hero Sushi Gateway.*"
+    canonical: "Hero Sushi Sydney"
   - pattern: "^Hero Sushi Broadway.*"
     canonical: "Hero Sushi Broadway"
-  - pattern: "^Hero Sushi Strath.*"
-    canonical: "Hero Sushi Strathfield"
-  - pattern: "^Hero Sushi Burwood.*"
-    canonical: "Hero Sushi Burwood"
-  - pattern: "^Hero Sushi$"
-    canonical: "Hero Sushi"
+  - pattern: "^Hero Sushi (.+)"
+    canonical: "Hero Sushi {1}"
 
   # Vodafone: consolidate
   - pattern: "^Vodafone \\*?Australia.*"
@@ -624,11 +610,9 @@ merchant_mappings:
   - pattern: "^Regiment Spec.*"
     canonical: "Regiment Coffee"
 
-  # EG Fuelco/Group: consolidate by location
-  - pattern: "^Eg (?:Fuelco|Group) 1460 Strathfiel.*"
+  # EG Fuelco/Group: store 1460 = Strathfield, generic for rest
+  - pattern: "^Eg (?:Fuelco|Group) 1460.*"
     canonical: "EG Fuelco Strathfield"
-  - pattern: "^Eg (?:Fuelco|Group) 1460 (.+)"
-    canonical: "EG Fuelco {1}"
   - pattern: "^Eg (?:Fuelco|Group) \\d+ (.+)"
     canonical: "EG Fuelco {1}"
 
@@ -644,45 +628,37 @@ merchant_mappings:
   - pattern: "^Interest Correction.*"
     canonical: "Interest Correction"
 
-  # Stitch Coffee: consolidate locations
+  # Stitch Coffee: keep Broadway explicit (Broadway Haymarket multi-location)
   - pattern: "^Stitch Coffee Broadway.*"
     canonical: "Stitch Coffee Broadway"
   - pattern: "^Stitch Coffee (.+)"
     canonical: "Stitch Coffee {1}"
 
-  # McDonald's: consolidate by location
+  # McDonald's: remaps first, then generic capture
   - pattern: "^Mcdonald'?s?$"
     canonical: "McDonald's"
   - pattern: "^McDonald'?s? Dt \\d+ (.+)"
     canonical: "McDonald's {1}"
   - pattern: "^McDonald'?s? Dt \\d+$"
     canonical: "McDonald's"
+  # Remaps (location aliases)
   - pattern: "^McDonald'?s? (?:the )?Strand.*"
     canonical: "McDonald's The Strand Sydney"
-  - pattern: "^McDonald'?s? Heathcote.*"
-    canonical: "McDonald's Heathcote"
-  - pattern: "^McDonald'?s? Bomaderry.*"
-    canonical: "McDonald's Bomaderry"
-  - pattern: "^McDonald'?s? Rhodes.*"
-    canonical: "McDonald's Rhodes"
-  - pattern: "^McDonald'?s? Wollongong.*"
-    canonical: "McDonald's Wollongong"
   - pattern: "^McDonald'?s? Pmatta.*"
     canonical: "McDonald's North Parramatta"
   - pattern: "^McDonald'?s? Syd(?:ney)? (?:Domesti|Intern|Int Ai|Airport).*"
     canonical: "McDonald's Sydney Airport"
   - pattern: "^McDonald'?s? (?:Gateway|Plaza).*Sydney.*"
     canonical: "McDonald's Sydney"
-  - pattern: "^McDonald'?s? Wynyard.*"
-    canonical: "McDonald's Wynyard"
   - pattern: "^McDonald'?s? Strathfield.*"
     canonical: "McDonald's Strathfield South"
   - pattern: "^McDonald'?s? Croydon P(?:rk|ark).*"
     canonical: "McDonald's Croydon Park"
+  - pattern: "^McDonald'?s? Wynyard.*"
+    canonical: "McDonald's Wynyard"
   - pattern: "^McDonald'?s? Five Dock.*"
     canonical: "McDonald's Five Dock"
-  - pattern: "^McDonald'?s? Hurstville.*"
-    canonical: "McDonald's Hurstville"
+  # Generic patterns (strip store numbers, capture location)
   - pattern: "^McDonald'?s? \\d+ (.+)"
     canonical: "McDonald's {1}"
   - pattern: "^McDonald'?s? (.+?)\\s+\\d+\\s+\\1.*"
@@ -698,35 +674,25 @@ merchant_mappings:
   - pattern: "^Amazon Retail\\*.*"
     canonical: "Amazon Marketplace"
 
-  # Best Mart: consolidate
-  - pattern: "^Best Mart Strathfield.*"
-    canonical: "Best Mart Strathfield"
+  # Best Mart: generic location capture
   - pattern: "^Best Mart (.+)"
     canonical: "Best Mart {1}"
 
-  # Monkey House: consolidate truncations
-  - pattern: "^Monkey House (?:Cafe )?(?:M )?Strathfiel.*"
-    canonical: "Monkey House Strathfield"
-  - pattern: "^Monkey House Strathf.*"
-    canonical: "Monkey House Strathfield"
+  # Monkey House: generic capture
+  - pattern: "^Monkey House (.+)"
+    canonical: "Monkey House {1}"
 
   # The Local Enfield: consolidate
   - pattern: "^The Local Enfield.*"
     canonical: "The Local Enfield"
 
-  # Mandoo: consolidate
-  - pattern: "^The Mandoo.*Strathfield.*"
-    canonical: "The Mandoo Strathfield"
-  - pattern: "^The Mandoo (?:Dumpling)?\\s*Melbourne.*"
-    canonical: "The Mandoo Melbourne"
+  # Mandoo: generic capture
   - pattern: "^The Mandoo Dumpling$"
     canonical: "The Mandoo"
+  - pattern: "^The Mandoo (.+)"
+    canonical: "The Mandoo {1}"
 
-  # Chemist Warehouse: consolidate truncated locations
-  - pattern: "^Chemist Warehouse Strat.*"
-    canonical: "Chemist Warehouse Strathfield"
-  - pattern: "^Chemist Warehouse Burwo?.*"
-    canonical: "Chemist Warehouse Burwood"
+  # Chemist Warehouse: generic location capture
   - pattern: "^Chemist Warehouse (.+)"
     canonical: "Chemist Warehouse {1}"
 
@@ -737,18 +703,14 @@ merchant_mappings:
     canonical: "Coles Express {1}"
   - pattern: "^Coles Online.*"
     canonical: "Coles Online"
-  - pattern: "^Coles Burwood.*"
-    canonical: "Coles Burwood"
-  - pattern: "^Coles Broadway.*"
-    canonical: "Coles Broadway"
-  - pattern: "^Coles Macquarie.*"
-    canonical: "Coles Macquarie Park"
-  - pattern: "^Coles Sydney City.*"
-    canonical: "Coles Sydney"
+  # Remaps
   - pattern: "^Coles York St.*"
     canonical: "Coles Sydney"
-  - pattern: "^Coles Concord \\d+.*"
-    canonical: "Coles Concord"
+  - pattern: "^Coles Sydney City.*"
+    canonical: "Coles Sydney"
+  - pattern: "^Coles the (.+)"
+    canonical: "Coles The {1}"
+  # Generic patterns (strip store numbers, capture location)
   - pattern: "^Coles (.+?)\\s+\\d+\\s+(.+)"
     canonical: "Coles {1}"
   - pattern: "^Coles (.+?)\\s*-\\s*\\d+\\s+(.+)"
@@ -757,51 +719,39 @@ merchant_mappings:
     canonical: "Coles {1}"
   - pattern: "^Coles \\d+$"
     canonical: "Coles"
-  - pattern: "^Coles Rhodes.*"
-    canonical: "Coles Rhodes"
-  - pattern: "^Coles the (.+)"
-    canonical: "Coles The {1}"
+  - pattern: "^Coles (.+)"
+    canonical: "Coles {1}"
 
-  # Woolworths: consolidate variants (keep location)
+  # Woolworths: remaps first, then generic
   - pattern: "^Woolworths Group Limited.*"
     canonical: "Woolworths Online"
   - pattern: "^Woolworths Online.*"
     canonical: "Woolworths Online"
   - pattern: "^Woolworths Gift Cards.*"
     canonical: "Woolworths Gift Cards"
-  - pattern: "^Woolworths Broadwa.*"
-    canonical: "Woolworths Broadway"
-  - pattern: "^Woolworths N(?:orth)? S(?:trathfield)?.*"
-    canonical: "Woolworths North Strathfield"
-  - pattern: "^Woolworths Strathfie.*"
-    canonical: "Woolworths Strathfield"
+  # Remaps (location aliases)
   - pattern: "^Woolworths St Rathfield.*"
     canonical: "Woolworths Strathfield"
   - pattern: "^Woolworths Macquar.*"
     canonical: "Woolworths North Ryde"
-  - pattern: "^Woolworths Mona Va.*"
-    canonical: "Woolworths Mona Vale"
-  - pattern: "^Woolworths Shell C.*"
-    canonical: "Woolworths Shell Cove"
   - pattern: "^Woolworths Town Ha.*"
     canonical: "Woolworths Town Hall Sydney"
   - pattern: "^Woolworths Metro Pitt.*"
     canonical: "Woolworths Metro Sydney"
-  - pattern: "^Woolworths Metro Kirribill.*"
-    canonical: "Woolworths Metro Kirribilli"
+  - pattern: "^Woolworths N(?:orth)? S(?:trathfield)?.*"
+    canonical: "Woolworths North Strathfield"
   - pattern: "^Woolworths/(.+?)\\s+(?:Pl|St).*"
     canonical: "Woolworths {1}"
-  # Known store numbers (from receipt-only payees)
+  # Known store numbers
   - pattern: "^Woolworths 1624$"
     canonical: "Woolworths Strathfield"
   - pattern: "^Woolworths 1614$"
     canonical: "Woolworths Burwood"
-  - pattern: "^Woolworths 1315$"
-    canonical: "Woolworths"
-  - pattern: "^Woolworths 1550$"
-    canonical: "Woolworths"
   - pattern: "^Woolworths \\d+$"
     canonical: "Woolworths"
+  # Generic location capture
+  - pattern: "^Woolworths (.+)"
+    canonical: "Woolworths {1}"
 
   # Service NSW: consolidate
   - pattern: "^Service NSW \\d+ (.+)"
@@ -843,7 +793,7 @@ merchant_mappings:
   - pattern: "^Cornerstone Cafe U.*"
     canonical: "Cornerstone Cafe UTS"
 
-  # VN City: consolidate
+  # VN City: consolidate (keep explicit due to multi-location payees)
   - pattern: "^Vn City.*Strathfield.*"
     canonical: "VN City Strathfield"
   - pattern: "^Vn City Sydney.*"
@@ -925,11 +875,9 @@ merchant_mappings:
   - pattern: "^Merchants of Ultimo.*Broadway.*"
     canonical: "Merchants of Ultimo Broadway"
 
-  # Kingpin Bowling: consolidate truncated locations
-  - pattern: "^Kingpin Bowling.*North Strathfield.*"
-    canonical: "Kingpin Bowling North Strathfield"
-  - pattern: "^Kingpin Bowling.*North Strathfau.*"
-    canonical: "Kingpin Bowling North Strathfield"
+  # Kingpin Bowling: generic capture
+  - pattern: "^Kingpin Bowling (.+)"
+    canonical: "Kingpin Bowling {1}"
 
   # Ippudo: strip dash variant
   - pattern: "^Ippudo.*Westfield.*Sydney.*"
@@ -959,9 +907,6 @@ merchant_mappings:
   - pattern: "^Pop Mart Oceania Li? (.+)"
     canonical: "Pop Mart Oceania {1}"
 
-  # Starbucks the Rocks: deduplicate location
-  - pattern: "^Starbucks the Rocks.*"
-    canonical: "Starbucks The Rocks"
 
   # Huntley Projects: strip store number
   - pattern: "^Huntley Projects CBD \\d* ?(.+)"
@@ -979,11 +924,9 @@ merchant_mappings:
   - pattern: "^Ticketek Web Sy?d?n?e?y? (.+)"
     canonical: "Ticketek Web {1}"
 
-  # La Lune Market: consolidate
-  - pattern: "^La Lune Market.*North Strathfield.*"
-    canonical: "La Lune Market North Strathfield"
-  - pattern: "^La Lune Market.*North Strathfau.*"
-    canonical: "La Lune Market North Strathfield"
+  # La Lune Market: generic capture
+  - pattern: "^La Lune Market (.+)"
+    canonical: "La Lune Market {1}"
 
   # Naya AUS Group: strip store number
   - pattern: "^Naya AUS Group \\d* ?(.+)"
@@ -1283,24 +1226,20 @@ merchant_mappings:
   - pattern: "^Your [A-Z]{3} Balance$"
     canonical: "Wise Currency Balance"
 
-  # Lush Food: normalise accent
-  - pattern: "^Lush Food Caf(?:é|e).*Strathfield.*"
-    canonical: "Lush Food Cafe Strathfield"
+  # Lush Food: normalise accent, generic capture
+  - pattern: "^Lush Food Caf(?:é|e) (.+)"
+    canonical: "Lush Food Cafe {1}"
 
-  # Han Sang: consolidate
-  - pattern: "^Han Sang.*(?:Instore|Xxxxxx).*Strathfield.*"
-    canonical: "Han Sang Strathfield"
-  - pattern: "^Han Sang Strathfield.*"
-    canonical: "Han Sang Strathfield"
+  # Han Sang: remap 8-14 → West Melbourne, generic for rest
+  - pattern: "^Han Sang 8-14.*"
+    canonical: "Han Sang West Melbourne"
   - pattern: "^Han Sang (.+)"
     canonical: "Han Sang {1}"
 
-  # Machi: consolidate
-  - pattern: "^Machi.*Strath.*"
-    canonical: "Machi Strathfield"
+  # Machi: remap Central → Chippendale, generic for rest
   - pattern: "^Machi.*Central.*"
     canonical: "Machi Central Chippendale"
-  - pattern: "^Machi - (.+)"
+  - pattern: "^Machi[- ]+(.+)"
     canonical: "Machi {1}"
 
   # Refund: consolidate Beem It variants
@@ -1341,15 +1280,15 @@ merchant_mappings:
   - pattern: "^Kmart (.+?)\\s+\\d+$"
     canonical: "Kmart {1}"
 
-  # Starbucks: consolidate
+  # Starbucks: remaps first, then generic
   - pattern: "^Starbucks Central Park.*"
     canonical: "Starbucks Chippendale"
   - pattern: "^Starbucks Macquarie.*"
     canonical: "Starbucks North Ryde"
   - pattern: "^Starbucks Broadway.*"
     canonical: "Starbucks Ultimo"
-  - pattern: "^Starbucks the Rocks.*"
-    canonical: "Starbucks The Rocks"
+  - pattern: "^Starbucks (.+)"
+    canonical: "Starbucks {1}"
 
   # Ippudo: consolidate truncated locations
   - pattern: "^Ippudo.*Macquarie.*"
@@ -1410,8 +1349,6 @@ merchant_mappings:
   # Good Venture Partners: consolidate
   - pattern: "^Good Ven(?:ture|tre).*Strathfield.*"
     canonical: "Good Venture Partners Strathfield"
-  - pattern: "^Good Venture Partners$"
-    canonical: "Good Venture Partners Strathfield"
 
   # Auvers Cafe: consolidate
   - pattern: "^Auvers (?:Cafe|Ingens).*(?:Rhodes|Haymarket).*"
@@ -1454,8 +1391,6 @@ merchant_mappings:
   # The Avenue: consolidate
   - pattern: "^The Avenue.*Newington.*"
     canonical: "The Avenue Newington"
-  - pattern: "^The Avenue$"
-    canonical: "The Avenue Newington"
 
   # Linkt: consolidate
   - pattern: "^Linkt Sydney.*"
@@ -1475,13 +1410,13 @@ merchant_mappings:
   - pattern: "^Sushi Hub QVB.*"
     canonical: "Sushi Hub QVB Sydney"
 
-  # Sushi Naya: strip store codes
-  - pattern: "^Sushi Naya.*Chippendale.*"
-    canonical: "Sushi Naya Chippendale"
-  - pattern: "^Sushi Naya Martin.*"
-    canonical: "Sushi Naya Sydney"
+  # Sushi Naya: remaps first, generic for rest
   - pattern: "^Sushi Naya Westfield.*"
     canonical: "Sushi Naya Burwood"
+  - pattern: "^Sushi Naya Martin.*"
+    canonical: "Sushi Naya Sydney"
+  - pattern: "^Sushi Naya (.+)"
+    canonical: "Sushi Naya {1}"
 
   # Sushi World: strip dash prefix
   - pattern: "^Sushi World - (.+?)\\s+(.+)"
@@ -1497,11 +1432,11 @@ merchant_mappings:
   - pattern: "^Dorothy Cowie School.*"
     canonical: "Dorothy Cowie School"
 
-  # Eat Istanbul: consolidate
-  - pattern: "^Eat Istanbul Macqu.*"
-    canonical: "Eat Istanbul Macquarie Park"
+  # Eat Istanbul: Martin → Sydney remap, generic for rest
   - pattern: "^Eat Istanbul Martin.*"
     canonical: "Eat Istanbul Sydney"
+  - pattern: "^Eat Istanbul (.+)"
+    canonical: "Eat Istanbul {1}"
 
   # Ivy: consolidate
   - pattern: "^Ivy - Mumu.*"
@@ -1510,22 +1445,12 @@ merchant_mappings:
   # Tea Spot: consolidate
   - pattern: "^Tea Spot.*Burwood.*"
     canonical: "Tea Spot Burwood"
-  - pattern: "^Tea Spot$"
-    canonical: "Tea Spot Burwood"
 
   # Leible Coffee: consolidate
   - pattern: "^Leible Coffee.*"
     canonical: "Leible Coffee Sydney"
 
-  # Bakers Delight: consolidate Bwood
-  - pattern: "^Bakers Delight Bwood.*"
-    canonical: "Bakers Delight Burwood"
-  - pattern: "^Bakers Delight Dic.*"
-    canonical: "Bakers Delight Dickson"
 
-  # Hero Sushi: consolidate Gateway
-  - pattern: "^Hero Sushi Gatewa.*"
-    canonical: "Hero Sushi Sydney"
 
   # Priceline Pharmacy: consolidate Wyny
   - pattern: "^Priceline Pharmacy Wyny.*"
@@ -1537,15 +1462,7 @@ merchant_mappings:
 
   # Note: Fast Transfer From entries are handled by transfer_entity_extraction
 
-  # Han Sang: consolidate Melbourne variant
-  - pattern: "^Han Sang 8-14.*"
-    canonical: "Han Sang West Melbourne"
 
-  # La Lune: consolidate
-  - pattern: "^La Lune Mark(?:et)?.*North Strathfield.*"
-    canonical: "La Lune Market North Strathfield"
-  - pattern: "^La Lune Mark(?:et)?.*Fortitude.*"
-    canonical: "La Lune Market"
 
   # Macquarie University: consolidate
   - pattern: "^Macquarie University.*"
@@ -1564,8 +1481,6 @@ merchant_mappings:
   # Maenam Lao: consolidate
   - pattern: "^Maenam Lao Thai.*Strathfield.*"
     canonical: "Maenam Lao Thai Strathfield"
-  - pattern: "^Maenam Lao Thai$"
-    canonical: "Maenam Lao Thai Strathfield"
   - pattern: "^Maenam Lao.*Melbourne.*"
     canonical: "Maenam Lao Melbourne"
 
@@ -1575,9 +1490,6 @@ merchant_mappings:
 
   # --- Iter 033: remaining small chain cleanup ---
 
-  # Woolworths Strathfield: strip cash out suffix
-  - pattern: "^Woolworths Strathfield NSW.*"
-    canonical: "Woolworths Strathfield"
 
   # Cornerstone Concord: strip terminal code
   - pattern: "^Cornerstone Concord.*"
@@ -1590,10 +1502,6 @@ merchant_mappings:
   # Interpark UTS: consolidate
   - pattern: "^Interpark UTS.*"
     canonical: "Interpark UTS Ultimo"
-
-  # Hanaro Mart: consolidate
-  - pattern: "^Hanaro Mart$"
-    canonical: "Hanaro Mart Strathfield"
 
   # Healthy Care Burwood: consolidate
   - pattern: "^Healthy Care Burwood.*"
@@ -1615,81 +1523,17 @@ merchant_mappings:
   - pattern: "^Visco Universal.*"
     canonical: "Visco Universal"
 
-  # Dutch Smuggler: consolidate
-  - pattern: "^Dutch Smuggler$"
-    canonical: "Dutch Smuggler Sydney"
-
   # Jfc Strathfield: consolidate
   - pattern: "^Jfc Strathfield.*"
     canonical: "JFC Strathfield"
-
-  # Myeong Dong: consolidate
-  - pattern: "^Myeong Dong$"
-    canonical: "Myeong Dong North Strathfield"
-
-  # Pochanara: consolidate
-  - pattern: "^Pochanara$"
-    canonical: "Pochanara Newington"
-
-  # Yun Zhou: consolidate
-  - pattern: "^Yun Zhou$"
-    canonical: "Yun Zhou Macquarie Park"
 
   # Komart: consolidate
   - pattern: "^Komart(?:\\s+North\\s+Strat)?$"
     canonical: "Komart North Strathfield"
 
-  # Zipby Limited: consolidate
-  - pattern: "^Zipby Limited$"
-    canonical: "Zipby Limited South Granville"
-
-  # Malay Express: consolidate
-  - pattern: "^Malay Express$"
-    canonical: "Malay Express Strathfield"
-
   # Dorothy Cowie School: consolidate truncation
   - pattern: "^Dorothy Cowie School of Danc.*"
     canonical: "Dorothy Cowie School"
-
-  # Red Pepper Club: consolidate
-  - pattern: "^Red Pepper Club$"
-    canonical: "Red Pepper Club Strathfield"
-
-  # Double Barral Coffee: consolidate
-  - pattern: "^Double Barral Coffee$"
-    canonical: "Double Barral Coffee Burwood"
-
-  # Logans Pianos: consolidate
-  - pattern: "^Logans Pianos Hire$"
-    canonical: "Logans Pianos Hire Burwood"
-
-  # Bespoke Letterpress: consolidate
-  - pattern: "^Bespoke Letterpress$"
-    canonical: "Bespoke Letterpress Bowral"
-
-  # Huntley Projects CBD: consolidate
-  - pattern: "^Huntley Projects CBD$"
-    canonical: "Huntley Projects CBD Sydney"
-
-  # W Retail Group: consolidate
-  - pattern: "^W Retail Group$"
-    canonical: "W Retail Group Strathfield"
-
-  # Koorong Books: consolidate
-  - pattern: "^Koorong Books$"
-    canonical: "Koorong Books West Ryde"
-
-  # Caffe Relax'N: consolidate
-  - pattern: "^Caffe Relax'N$"
-    canonical: "Caffe Relax'N Strathfield"
-
-  # Hook Line and Sinker: consolidate
-  - pattern: "^Hook Line and Sinker$"
-    canonical: "Hook Line and Sinker Burwood"
-
-  # My Mr Stonebowl: consolidate
-  - pattern: "^My Mr Stonebowl$"
-    canonical: "My Mr Stonebowl Burwood"
 
   # Contribution Tax: consolidate
   - pattern: "^Contribution Tax Adjustment$"
@@ -1707,9 +1551,6 @@ merchant_mappings:
   - pattern: "^Miniso Burwood.*"
     canonical: "Miniso Burwood"
 
-  # Coles Broadway: strip trailing number
-  - pattern: "^Coles Broadway \\d+$"
-    canonical: "Coles Broadway"
 
   # Manish Seneviratne: strip memo
   - pattern: "^Manish Seneviratne .+"
@@ -1753,37 +1594,15 @@ merchant_mappings:
   - pattern: "^Bp Enfield.*"
     canonical: "BP Enfield"
 
-  # 40 Grains Thai: consolidate
-  - pattern: "^40 Grains Thai$"
-    canonical: "40 Grains Thai Summer Hill"
-
-  # Ashfield Apothecary: consolidate
-  - pattern: "^Ashfield Apothecary$"
-    canonical: "Ashfield Apothecary Ashfield"
 
   # Ausko Cooperation: consolidate
   - pattern: "^Ausko Cooperation.*"
     canonical: "Ausko Cooperation Concord"
 
-  # Coronation Pharmacy: consolidate
-  - pattern: "^Coronation Pharmacy$"
-    canonical: "Coronation Pharmacy Enfield"
-
   # Gnt Services: consolidate
   - pattern: "^Gnt Services$"
     canonical: "GNT Services North Strathfield"
 
-  # La Lune Market: consolidate bare
-  - pattern: "^La Lune Market$"
-    canonical: "La Lune Market North Strathfield"
-
-  # Paminggo: consolidate
-  - pattern: "^Paminggo$"
-    canonical: "Paminggo Strathfield"
-
-  # Pre-Uni New College: consolidate
-  - pattern: "^Pre-Uni New College$"
-    canonical: "Pre-Uni New College Strathfield"
 
   # Campion Education: consolidate
   - pattern: "^Campion Education$"
@@ -1797,17 +1616,6 @@ merchant_mappings:
   - pattern: "^Mancinis Wood Melbourne.*"
     canonical: "Mancinis Wood Melbourne"
 
-  # Burwood Council: consolidate
-  - pattern: "^Burwood Council$"
-    canonical: "Burwood Council Burwood"
-
-  # Lotus Entertainment: consolidate bare
-  - pattern: "^Lotus Entertainment$"
-    canonical: "Lotus Entertainment Burwood"
-
-  # Yilan Group: consolidate
-  - pattern: "^Yilan Group$"
-    canonical: "Yilan Group Burwood"
 
   # --- Internal transfer consolidation (iter 028) ---
 
@@ -1867,16 +1675,8 @@ merchant_mappings:
   - pattern: "^Airport Retail Enter?p?r?i?s?e?s? (.+)"
     canonical: "Airport Retail Enterprises {1}"
 
-  # McDonald's: Dt (drive-through) variant
-  - pattern: "^McDonald'?s? Dt \\d+ (.+)"
-    canonical: "McDonald's {1}"
-  - pattern: "^Mcdonald'?s? \\d+ (.+)"
-    canonical: "McDonald's {1}"
-
   # Burwood Discount Chemist: with/without location
   - pattern: "^Burwood Discount Chemist.*Burwood.*"
-    canonical: "Burwood Discount Chemist Burwood"
-  - pattern: "^Burwood Discount Chemist$"
     canonical: "Burwood Discount Chemist Burwood"
 
   # PayPal BudgetPetProducts: truncation
@@ -1898,6 +1698,41 @@ merchant_mappings:
   # Tam S & Tam L N Deposit: strip receipt
   - pattern: "^(?:Tam S & Tam L N|Joint Account \\(Tam\\)) Deposit.*"
     canonical: "Joint Account (Tam)"
+
+# Default locations for singleton merchants (appended when bare name matches)
+# Key = canonical merchant name, Value = default location
+default_locations:
+  Hanaro Mart: Strathfield
+  Malay Express: Strathfield
+  Red Pepper Club: Strathfield
+  Caffe Relax'N: Strathfield
+  W Retail Group: Strathfield
+  Paminggo: Strathfield
+  Pre-Uni New College: Strathfield
+  Good Venture Partners: Strathfield
+  Maenam Lao Thai: Strathfield
+  Double Barral Coffee: Burwood
+  Logans Pianos Hire: Burwood
+  Hook Line and Sinker: Burwood
+  My Mr Stonebowl: Burwood
+  Burwood Council: Burwood
+  Lotus Entertainment: Burwood
+  Yilan Group: Burwood
+  Burwood Discount Chemist: Burwood
+  Tea Spot: Burwood
+  Bespoke Letterpress: Bowral
+  Koorong Books: West Ryde
+  Huntley Projects CBD: Sydney
+  Dutch Smuggler: Sydney
+  Myeong Dong: North Strathfield
+  La Lune Market: North Strathfield
+  Pochanara: Newington
+  The Avenue: Newington
+  Yun Zhou: Macquarie Park
+  Zipby Limited: South Granville
+  40 Grains Thai: Summer Hill
+  Ashfield Apothecary: Ashfield
+  Coronation Pharmacy: Enfield
 
 # Patterns to strip from merchant names (case-insensitive, applied with re.sub)
 strip_patterns:
@@ -1992,3 +1827,64 @@ banking_entity_extraction:
   - pattern: "^CASH DEPOSIT,\\s*CBA ATM (.+?)\\s+NSW.*$"
     group: 1
     prefix: "ATM Deposit"
+
+# Merchant groups for dedup scoring (location variants count as one merchant)
+merchant_groups:
+  - group: "McDonald's"
+    pattern: "^McDonald's\\b"
+  - group: "Woolworths"
+    pattern: "^Woolworths\\b"
+  - group: "Coles"
+    pattern: "^Coles\\b"
+  - group: "Coles Express"
+    pattern: "^Coles Express\\b"
+  - group: "Hero Sushi"
+    pattern: "^Hero Sushi\\b"
+  - group: "Starbucks"
+    pattern: "^Starbucks\\b"
+  - group: "Chemist Warehouse"
+    pattern: "^Chemist Warehouse\\b"
+  - group: "7-Eleven"
+    pattern: "^7-Eleven\\b"
+  - group: "Woolworths Metro"
+    pattern: "^Woolworths Metro\\b"
+  - group: "KFC"
+    pattern: "^KFC\\b"
+  - group: "Aldi"
+    pattern: "^Aldi\\b"
+  - group: "BWS"
+    pattern: "^BWS\\b"
+  - group: "EG Fuelco"
+    pattern: "^EG Fuelco\\b"
+  - group: "Bakers Delight"
+    pattern: "^Bakers Delight\\b"
+  - group: "Gong Cha"
+    pattern: "^Gong Cha\\b"
+  - group: "Kmart"
+    pattern: "^Kmart\\b"
+  - group: "Officeworks"
+    pattern: "^Officeworks\\b"
+  - group: "Bunnings"
+    pattern: "^Bunnings\\b"
+  - group: "Target"
+    pattern: "^Target\\b"
+  - group: "Daiso"
+    pattern: "^Daiso\\b"
+  - group: "VN City"
+    pattern: "^VN City\\b"
+  - group: "David Jones"
+    pattern: "^David Jones\\b"
+  - group: "Machi"
+    pattern: "^Machi\\b"
+  - group: "ATM"
+    pattern: "^ATM\\b"
+  - group: "Service NSW"
+    pattern: "^Service NSW\\b"
+  - group: "Han Sang"
+    pattern: "^Han Sang\\b"
+  - group: "Dopa"
+    pattern: "^Dopa\\b"
+  - group: "Sushi Naya"
+    pattern: "^Sushi Naya\\b"
+  - group: "Sushi World"
+    pattern: "^Sushi World\\b"

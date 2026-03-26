@@ -95,9 +95,22 @@ def score_disambiguation(results: list[dict], disambig: dict, conn: sqlite3.Conn
 
 
 def score_dedup(results: list[dict]) -> float:
-    """Score S_dedup: deduplication rate with sigmoid scaling."""
+    """Score S_dedup: deduplication rate with sigmoid scaling.
+
+    For grouped merchants (location variants), count the group name
+    instead of individual canonicals toward unique-normalised count.
+    """
     originals = {r["original"] for r in results}
-    normalised = {r["final"] for r in results}
+
+    # Build grouped normalised set: replace grouped merchant canonicals with group name
+    normalised = set()
+    for r in results:
+        group = r.get("merchant_group")
+        if group:
+            normalised.add(group)
+        else:
+            normalised.add(r["final"])
+
     raw_unique = len(originals)
     norm_unique = len(normalised)
 

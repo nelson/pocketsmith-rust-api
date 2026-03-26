@@ -1,0 +1,503 @@
+Dry run: would update 217 of 21353 transactions
+[
+  {
+    "original": "SANTOS, KEVIN SUMMER HILL",
+    "final": "Santos, Kevin Summer Hill",
+    "type": "merchant",
+    "stages": {
+      "s1": "SANTOS, KEVIN SUMMER HILL",
+      "s3": "SANTOS, KEVIN SUMMER HILL",
+      "s4": "SANTOS, KEVIN SUMMER HILL"
+    }
+  },
+  {
+    "original": "REGIMENT SPECIALITY CAF Sydney",
+    "final": "Regiment Coffee",
+    "type": "merchant",
+    "stages": {
+      "s1": "REGIMENT SPECIALITY CAF SYDNEY",
+      "s3": "REGIMENT SPECIALITY CAF SYDNEY",
+      "s4": "Regiment Coffee"
+    }
+  },
+  {
+    "original": "MICROSOFT*MICROSOFT 365 P - Visa Purchase - Receipt 118925In MSBILL.INFO Date 01 Nov 2020 Card 462263xxxxxx9172",
+    "final": "Microsoft 365",
+    "type": "merchant",
+    "stages": {
+      "s1": "MICROSOFT*MICROSOFT 365 P",
+      "s3": "MICROSOFT*MICROSOFT 365 P",
+      "s4": "Microsoft 365"
+    }
+  },
+  {
+    "original": "VRBO HAC59BJ2 HOMEAWAY XXXXXXX7003",
+    "final": "Vrbo Hac59Bj2 Homeaway Xxxxxxx7003",
+    "type": "merchant",
+    "stages": {
+      "s1": "VRBO HAC59BJ2 HOMEAWAY XXXXXXX7003",
+      "s3": "VRBO HAC59BJ2 HOMEAWAY XXXXXXX7003",
+      "s4": "VRBO HAC59BJ2 HOMEAWAY XXXXXXX7003"
+    }
+  },
+  {
+    "original": "Interpark UTS Ultimo NS AUS, Card xx0723, Value date: 13/10/2025",
+    "final": "Interpark UTS Ultimo",
+    "type": "merchant",
+    "stages": {
+      "s1": "INTERPARK UTS ULTIMO",
+      "s3": "INTERPARK UTS ULTIMO",
+      "s4": "Interpark UTS Ultimo"
+    }
+  },
+  {
+    "original": "WOOLWORTHS 1761 MARSFIE MARSFIELD",
+    "final": "Woolworths Marsfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "WOOLWORTHS 1761 MARSFIE MARSFIELD",
+      "s3": "WOOLWORTHS 1761 MARSFIELD MARSFIELD",
+      "s4": "Woolworths MARSFIELD"
+    }
+  },
+  {
+    "original": "VISCO UNIVERSAL PTY LT - Visa Purchase - Receipt 1X9647In SURRY HILLS Date 24 Feb 2022 Card 4X2263xxxxxx9172",
+    "final": "Visco Universal",
+    "type": "merchant",
+    "stages": {
+      "s1": "VISCO UNIVERSAL",
+      "s3": "VISCO UNIVERSAL",
+      "s4": "Visco Universal"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "Transfer To Ningjia Wang CommBank App Cake",
+    "final": "Ningjia Wang",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO NINGJIA WANG COMMBANK APP CAKE",
+      "s3": "TRANSFER TO NINGJIA WANG COMMBANK APP CAKE",
+      "s4": "Ningjia Wang"
+    }
+  },
+  {
+    "original": "Internal Transfer - Internal Transfer - Receipt 121541 Savings Maximiser 0083463484",
+    "final": "Internal Account Transfer",
+    "type": "merchant",
+    "stages": {
+      "s1": "INTERNAL TRANSFER",
+      "s3": "INTERNAL TRANSFER",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "APPLE.COM/BILL SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/BILL SYDNEY",
+      "s3": "APPLE.COM/BILL SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "TENCENT SHENZHEN",
+    "final": "Tencent Shenzhen",
+    "type": "merchant",
+    "stages": {
+      "s1": "TENCENT SHENZHEN",
+      "s3": "TENCENT SHENZHEN",
+      "s4": "TENCENT SHENZHEN"
+    }
+  },
+  {
+    "original": "Platinum Annual Travel Credit",
+    "final": "Platinum Annual Travel",
+    "type": "merchant",
+    "stages": {
+      "s1": "PLATINUM ANNUAL TRAVEL CREDIT",
+      "s3": "PLATINUM ANNUAL TRAVEL CREDIT",
+      "s4": "PLATINUM ANNUAL TRAVEL CREDIT"
+    }
+  },
+  {
+    "original": "Transfer from xx9549 CommBank app, Phebe flowers",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX9549 COMMBANK APP, PHEBE FLOWERS",
+      "s3": "TRANSFER FROM XX9549 COMMBANK APP, PHEBE FLOWERS",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "POINT PARKING PTY LTD DRUMMOYNE NS AUS Card xx3772 Value Date: 28/09/2022",
+    "final": "Point Parking",
+    "type": "merchant",
+    "stages": {
+      "s1": "POINT PARKING PTY LTD DRUMMOYNE",
+      "s3": "POINT PARKING PTY LTD DRUMMOYNE",
+      "s4": "Point Parking"
+    }
+  },
+  {
+    "original": "ONLINE PAYMENT RECEIVED - THANKYOU W5816",
+    "final": "Online Payment Received",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "ONLINE PAYMENT RECEIVED - THANKYOU W5816",
+      "s3": "ONLINE PAYMENT RECEIVED - THANKYOU W5816",
+      "s4": "Online Payment Received"
+    }
+  },
+  {
+    "original": "Transfer to other Bank NetBank, CONGiving",
+    "final": "Other Bank NetBank",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO OTHER BANK NETBANK, CONGIVING",
+      "s3": "TRANSFER TO OTHER BANK NETBANK, CONGIVING",
+      "s4": "other Bank NetBank"
+    }
+  },
+  {
+    "original": "CUZ TOP RYDE PTY. LTD. RHODES",
+    "final": "Cuz Top Ryde Rhodes",
+    "type": "merchant",
+    "stages": {
+      "s1": "CUZ TOP RYDE PTY. LTD. RHODES",
+      "s3": "CUZ TOP RYDE PTY. LTD. RHODES",
+      "s4": "CUZ TOP RYDE RHODES"
+    }
+  },
+  {
+    "original": "BEAUTYWRKS HA & S PL STRATHFIELD NS AUS, Card xx0723, Value date: 30/10/2025",
+    "final": "Beautywrks Ha & S Pl Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "BEAUTYWRKS HA & S PL STRATHFIELD",
+      "s3": "BEAUTYWRKS HA & S PL STRATHFIELD",
+      "s4": "BEAUTYWRKS HA & S PL STRATHFIELD"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "ADIDAS AUSTRALIA PTY LI MULGRAVE",
+    "final": "Adidas Australia Li Mulgrave",
+    "type": "merchant",
+    "stages": {
+      "s1": "ADIDAS AUSTRALIA PTY LI MULGRAVE",
+      "s3": "ADIDAS AUSTRALIA PTY LI MULGRAVE",
+      "s4": "ADIDAS AUSTRALIA LI MULGRAVE"
+    }
+  },
+  {
+    "original": "UBER EATS HELP.UBER.COM",
+    "final": "UBER Eats",
+    "type": "merchant",
+    "stages": {
+      "s1": "UBER EATS HELP.UBER.COM",
+      "s3": "UBER EATS HELP.UBER.COM",
+      "s4": "Uber Eats"
+    }
+  },
+  {
+    "original": "Direct Credit 475789 Tam S S & Tam L Funds transfer",
+    "final": "Tam S &",
+    "type": "banking_operation",
+    "stages": {
+      "s1": "DIRECT CREDIT 475789 TAM S S & TAM L FUNDS TRANSFER",
+      "s3": "DIRECT CREDIT 475789 TAM S S & TAM L FUNDS TRANSFER",
+      "s4": "Tam S S &"
+    }
+  },
+  {
+    "original": "KMART MIRANDA 1371 MIRANDA",
+    "final": "Kmart Miranda 1371 Miranda",
+    "type": "merchant",
+    "stages": {
+      "s1": "KMART MIRANDA 1371 MIRANDA",
+      "s3": "KMART MIRANDA 1371 MIRANDA",
+      "s4": "Kmart MIRANDA 1371 MIRANDA"
+    }
+  },
+  {
+    "original": "Transfer To Soulgram Partners, CommBank App Cleaning",
+    "final": "Soulgram Partners",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO SOULGRAM PARTNERS, COMMBANK APP CLEANING",
+      "s3": "TRANSFER TO SOULGRAM PARTNERS, COMMBANK APP CLEANING",
+      "s4": "Soulgram Partners"
+    }
+  },
+  {
+    "original": "STITCH COFFEE BROADWAY Ultimo",
+    "final": "Stitch Coffee Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "STITCH COFFEE BROADWAY ULTIMO",
+      "s3": "STITCH COFFEE BROADWAY ULTIMO",
+      "s4": "Stitch Coffee Broadway"
+    }
+  },
+  {
+    "original": "Bathers Pavilion Mosman NS AUS Card xx0008 Value Date: 29/10/2021",
+    "final": "Bathers Pavilion Mosman",
+    "type": "merchant",
+    "stages": {
+      "s1": "BATHERS PAVILION MOSMAN",
+      "s3": "BATHERS PAVILION MOSMAN",
+      "s4": "BATHERS PAVILION MOSMAN"
+    }
+  },
+  {
+    "original": "CSC ASHFIELD MALL PTY L ASHFIELD MALL",
+    "final": "Csc Ashfield Mall L Ashfield Mall",
+    "type": "merchant",
+    "stages": {
+      "s1": "CSC ASHFIELD MALL PTY L ASHFIELD MALL",
+      "s3": "CSC ASHFIELD MALL PTY L ASHFIELD MALL",
+      "s4": "CSC ASHFIELD MALL L ASHFIELD MALL"
+    }
+  },
+  {
+    "original": "TRANSPORTFORNSWTRAVEL SYDNEY",
+    "final": "Transport NSW",
+    "type": "merchant",
+    "stages": {
+      "s1": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s3": "TRANSPORTFORNSWTRAVEL SYDNEY",
+      "s4": "Transport NSW"
+    }
+  },
+  {
+    "original": "MALACCA STRAITS BROADWA ULTIMO",
+    "final": "Malacca Straits Broadway Ultimo",
+    "type": "merchant",
+    "stages": {
+      "s1": "MALACCA STRAITS BROADWA ULTIMO",
+      "s3": "MALACCA STRAITS BROADWAY ULTIMO",
+      "s4": "MALACCA STRAITS BROADWAY ULTIMO"
+    }
+  },
+  {
+    "original": "Transfer To Johnny Chung Leung T CommBank App Gardening",
+    "final": "Johnny Chung Leung T",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO JOHNNY CHUNG LEUNG T COMMBANK APP GARDENING",
+      "s3": "TRANSFER TO JOHNNY CHUNG LEUNG T COMMBANK APP GARDENING",
+      "s4": "Johnny Chung Leung T"
+    }
+  },
+  {
+    "original": "ANZ MOBILE BANKING PAYMENT 083939 TO S TAM",
+    "final": "S Tam",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "ANZ MOBILE BANKING PAYMENT 083939 TO S TAM",
+      "s3": "ANZ MOBILE BANKING PAYMENT 083939 TO S TAM",
+      "s4": "S TAM"
+    }
+  },
+  {
+    "original": "GUMPTION COFFEE SYDNEY",
+    "final": "Gumption Coffee",
+    "type": "merchant",
+    "stages": {
+      "s1": "GUMPTION COFFEE SYDNEY",
+      "s3": "GUMPTION COFFEE SYDNEY",
+      "s4": "Gumption Coffee"
+    }
+  },
+  {
+    "original": "Transfer to xx8005 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO XX8005 COMMBANK APP",
+      "s3": "TRANSFER TO XX8005 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "BROOKLYN BRIDGE DELI MA SYDNEY",
+    "final": "Brooklyn Bridge Deli Ma Sydney",
+    "type": "merchant",
+    "stages": {
+      "s1": "BROOKLYN BRIDGE DELI MA SYDNEY",
+      "s3": "BROOKLYN BRIDGE DELI MA SYDNEY",
+      "s4": "BROOKLYN BRIDGE DELI MA SYDNEY"
+    }
+  },
+  {
+    "original": "HAPPY DAZE CAFE Ashfield",
+    "final": "Happy Daze Cafe Ashfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "HAPPY DAZE CAFE ASHFIELD",
+      "s3": "HAPPY DAZE CAFE ASHFIELD",
+      "s4": "HAPPY DAZE CAFE ASHFIELD"
+    }
+  },
+  {
+    "original": "Transfer To Nepal Team, CommBank App From Soph",
+    "final": "Nepal Team",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO NEPAL TEAM, COMMBANK APP FROM SOPH",
+      "s3": "TRANSFER TO NEPAL TEAM, COMMBANK APP FROM SOPH",
+      "s4": "Nepal Team"
+    }
+  },
+  {
+    "original": "THE LOCAL ENFIELD Croydon Park",
+    "final": "The Local Enfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "THE LOCAL ENFIELD CROYDON PARK",
+      "s3": "THE LOCAL ENFIELD CROYDON PARK",
+      "s4": "The Local Enfield"
+    }
+  },
+  {
+    "original": "The Island Cafe Norah Head NS AUS Card xx1737 Value Date: 26/11/2021",
+    "final": "The Island Cafe Norah Head",
+    "type": "merchant",
+    "stages": {
+      "s1": "THE ISLAND CAFE NORAH HEAD",
+      "s3": "THE ISLAND CAFE NORAH HEAD",
+      "s4": "THE ISLAND CAFE NORAH HEAD"
+    }
+  },
+  {
+    "original": "PADDLE.NET* FASTMAIL LONDON",
+    "final": "Paddle.Net* Fastmail London",
+    "type": "merchant",
+    "stages": {
+      "s1": "PADDLE.NET* FASTMAIL LONDON",
+      "s3": "PADDLE.NET* FASTMAIL LONDON",
+      "s4": "PADDLE.NET* FASTMAIL LONDON"
+    }
+  },
+  {
+    "original": "STITCH COFFEE BROADWAY Haymarket",
+    "final": "Stitch Coffee Broadway",
+    "type": "merchant",
+    "stages": {
+      "s1": "STITCH COFFEE BROADWAY HAYMARKET",
+      "s3": "STITCH COFFEE BROADWAY HAYMARKET",
+      "s4": "Stitch Coffee Broadway"
+    }
+  },
+  {
+    "original": "Transfer from xx8820 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s3": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "FARMERS FRESH RHODES RHODES NS AUS, Card xx3772, Value date: 01/02/2023",
+    "final": "Farmers Fresh Rhodes",
+    "type": "merchant",
+    "stages": {
+      "s1": "FARMERS FRESH RHODES RHODES",
+      "s3": "FARMERS FRESH RHODES RHODES",
+      "s4": "Farmers Fresh RHODES"
+    }
+  },
+  {
+    "original": "APPLE.COM/AU SYDNEY",
+    "final": "Apple.com",
+    "type": "merchant",
+    "stages": {
+      "s1": "APPLE.COM/AU SYDNEY",
+      "s3": "APPLE.COM/AU SYDNEY",
+      "s4": "Apple.com"
+    }
+  },
+  {
+    "original": "SEPHORA AUSTRALIA - PIT SYDNEY",
+    "final": "Sephora",
+    "type": "merchant",
+    "stages": {
+      "s1": "SEPHORA AUSTRALIA - PIT SYDNEY",
+      "s3": "SEPHORA AUSTRALIA - PIT SYDNEY",
+      "s4": "Sephora"
+    }
+  },
+  {
+    "original": "POCKETSMITH POCKETSMITH DUNEDIN",
+    "final": "PocketSmith Dunedin",
+    "type": "merchant",
+    "stages": {
+      "s1": "POCKETSMITH POCKETSMITH DUNEDIN",
+      "s3": "POCKETSMITH POCKETSMITH DUNEDIN",
+      "s4": "POCKETSMITH POCKETSMITH DUNEDIN"
+    }
+  },
+  {
+    "original": "Koomi Strathfield NS AUS, Card xx3772, Value date: 27/05/2023",
+    "final": "Koomi Strathfield",
+    "type": "merchant",
+    "stages": {
+      "s1": "KOOMI STRATHFIELD",
+      "s3": "KOOMI STRATHFIELD",
+      "s4": "KOOMI STRATHFIELD"
+    }
+  },
+  {
+    "original": "Transfer to xx8005 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_out",
+    "stages": {
+      "s1": "TRANSFER TO XX8005 COMMBANK APP",
+      "s3": "TRANSFER TO XX8005 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  },
+  {
+    "original": "Transfer from xx8820 CommBank app",
+    "final": "Internal Account Transfer",
+    "type": "transfer_in",
+    "stages": {
+      "s1": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s3": "TRANSFER FROM XX8820 COMMBANK APP",
+      "s4": "Internal Account Transfer"
+    }
+  }
+]

@@ -13,13 +13,16 @@ from .db_utils import clone_db, change_reason, get_all_payees, batch_update_paye
 
 def load_all_rules(rules_dir: str) -> dict:
     """Load rules for all stages."""
-    return {
+    rules = {
         "stage1": stage1_strip.load_rules(rules_dir),
         "stage2": stage2_classify.load_rules(rules_dir),
         "stage3": stage3_expand.load_rules(rules_dir),
         "stage4": stage4_identity.load_rules(rules_dir),
         "stage5": stage5_cleanup.load_rules(rules_dir),
     }
+    # Share known_locations from stage 3 into stage 4 for capture cleanup
+    rules["stage4"]["_known_locations"] = rules["stage3"].get("_location_patterns", [])
+    return rules
 
 
 def normalise_payee(original_payee: str, rules: dict) -> tuple[str, dict]:

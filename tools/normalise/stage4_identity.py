@@ -36,7 +36,59 @@ def load_rules(rules_dir: str) -> dict:
     for b in rules.get("banking_identity_mappings", []):
         b["_re"] = re.compile(b["pattern"], re.IGNORECASE)
 
+    # Build case-insensitive default_locations lookup
+    default_locs = rules.get("default_locations", {})
+    rules["_default_locations"] = {k.upper(): (k, v) for k, v in default_locs.items()}
+
+    # Pre-compile merchant group patterns
+    rules["_merchant_groups"] = []
+    for g in rules.get("merchant_groups", []):
+        rules["_merchant_groups"].append((
+            re.compile(g["pattern"], re.IGNORECASE),
+            g["group"],
+        ))
+
     return rules
+
+
+# Patterns to strip from capture group values (trailing noise)
+_CAPTURE_NOISE = re.compile(
+    r'(?:'
+    r'\s+\\.*'                          # backslash-prefixed terminal data
+    r'|\s+\S*\d{2,}\S*$'               # terminal codes (word containing 2+ digits at end)
+    r'|\s+(?:NSW|Nsw|VIC|Vic|QLD|Qld|SA|WA|TAS|Tas|ACT|Act|NT)\b.*$'  # state abbrevs
+    r'|\s+(?:AU|AUS|Australia)\b.*$'    # country
+    r'|\s*PTY\.?\s*LTD?\.?'            # PTY LTD variants
+    r'|\s+P/L(?=\s|$)'                 # P/L
+    r'|\s+PTY\.?(?=\s|$)'              # PTY alone
+    r'|\s*-\s*$'                        # trailing dash/hyphen
+    r')',
+    re.IGNORECASE,
+)
+
+
+def _clean_capture(value: str, rules: dict) -> str:
+    """Strip trailing noise from a capture group value."""
+    result = value.strip()
+    # Iteratively strip trailing noise (max 3 passes)
+    for _ in range(3):
+        cleaned = _CAPTURE_NOISE.sub('', result).strip()
+        if cleaned == result:
+            break
+        result = cleaned
+    # Remove duplicate trailing location (e.g., "Fairy Meadow Fairy Meadow" → "Fairy Meadow")
+    for pattern, loc_name in rules.get("_known_locations", []):
+        if pattern.search(result):
+            upper = result.upper()
+            loc_upper = loc_name.upper()
+            first = upper.find(loc_upper)
+            if first >= 0:
+                second = upper.find(loc_upper, first + len(loc_upper))
+                if second >= 0:
+                    # Drop the trailing duplicate location
+                    result = result[:second].strip()
+                    break
+    return result
 
 
 def _apply_merchant_mappings(payee: str, rules: dict) -> Optional[str]:
@@ -50,7 +102,7 @@ def _apply_merchant_mappings(payee: str, rules: dict) -> Optional[str]:
                 placeholder = f"{{{i}}}"
                 if placeholder in canonical:
                     try:
-                        canonical = canonical.replace(placeholder, m.group(i).strip())
+                        canonical = canonical.replace(placeholder, _clean_capture(m.group(i), rules))
                     except IndexError:
                         canonical = canonical.replace(placeholder, "")
             return canonical.strip()
@@ -208,6 +260,20 @@ def apply(payee: str, original_payee: str, payee_type: str, metadata: dict, rule
         result = _strip_suffixes(payee, rules)
         if result != payee:
             metadata["pty_stripped"] = True
+
+        # Check default_locations: if bare merchant name matches, append location
+        default_locs = rules.get("_default_locations", {})
+        loc_entry = default_locs.get(result.upper())
+        if loc_entry:
+            canonical_name, location = loc_entry
+            result = f"{canonical_name} {location}"
+            metadata["default_location"] = location
+
+        # Tag merchant group if applicable
+        for grp_re, grp_name in rules.get("_merchant_groups", []):
+            if grp_re.search(result):
+                metadata["merchant_group"] = grp_name
+                break
 
         return result, metadata
 
