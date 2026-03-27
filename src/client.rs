@@ -109,7 +109,10 @@ impl PocketSmithClient {
         params: &TransactionParams,
         page: u32,
     ) -> Result<Vec<Transaction>> {
-        let mut query: Vec<(&str, String)> = vec![("page".into(), page.to_string())];
+        let mut query: Vec<(&str, String)> = vec![
+            ("page".into(), page.to_string()),
+            ("per_page".into(), "100".to_string()),
+        ];
 
         if let Some(ref v) = params.start_date {
             query.push(("start_date", v.clone()));
