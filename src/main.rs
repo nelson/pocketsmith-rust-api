@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 
 use pocketsmith_sync::client::PocketSmithClient;
 use pocketsmith_sync::db;
-use pocketsmith_sync::models::TransactionParams;
 
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -13,49 +12,5 @@ fn main() -> Result<()> {
     let client = PocketSmithClient::new(api_key);
     let conn = db::initialize("pocketsmith.db")?;
 
-    // 1. Fetch current user
-    println!("Fetching user...");
-    let user = client.get_me()?;
-    println!("  user: {} (id={})", user.name.as_deref().unwrap_or("?"), user.id);
-    db::upsert_user(&conn, &user)?;
-    let user_id = user.id;
-
-    // 2. Fetch transaction accounts
-    println!("Fetching transaction accounts...");
-    let ta_list = client.get_transaction_accounts(user_id)?;
-    println!("  {} transaction accounts", ta_list.len());
-    for ta in &ta_list {
-        db::upsert_transaction_account(&conn, ta)?;
-    }
-
-    // 3. Fetch categories
-    println!("Fetching categories...");
-    let categories = client.get_categories(user_id)?;
-    println!("  {} top-level categories", categories.len());
-    for cat in &categories {
-        db::upsert_category(&conn, cat)?;
-    }
-
-    // 4. Fetch all transactions (paginated)
-    println!("Fetching transactions...");
-    let transactions = client.get_all_transactions(user_id, &TransactionParams::default())?;
-    println!("  {} total transactions", transactions.len());
-
-    // Batch insert in a SQLite transaction for performance
-    db::with_change_reason(&conn, "pocketsmith", |conn| {
-        let tx = conn.unchecked_transaction()?;
-        for txn in &transactions {
-            db::upsert_transaction(&tx, txn)?;
-        }
-        tx.commit()?;
-        Ok(())
-    })?;
-
-    println!("Sync complete!");
-    println!("  Users: 1");
-    println!("  Transaction accounts: {}", ta_list.len());
-    println!("  Categories: {}", categories.len());
-    println!("  Transactions: {}", transactions.len());
-
-    Ok(())
+    pocketsmith_sync::sync::pull(&client, &conn)
 }
