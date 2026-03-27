@@ -41,6 +41,20 @@ fn clear_change_reason(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+pub fn get_last_sync(conn: &Connection) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT value FROM _sync_metadata WHERE key = 'last_synced_at'")?;
+    Ok(stmt.query_row([], |row| row.get(0)).ok())
+}
+
+pub fn set_last_sync(conn: &Connection, timestamp: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO _sync_metadata (key, value) VALUES ('last_synced_at', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [timestamp],
+    )?;
+    Ok(())
+}
+
 pub fn with_change_reason<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
@@ -155,6 +169,27 @@ pub(crate) mod test_helpers {
 mod tests {
     use super::*;
     use test_helpers::*;
+
+    #[test]
+    fn test_get_last_sync_returns_none_when_empty() {
+        let conn = test_db();
+        assert_eq!(get_last_sync(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn test_set_and_get_last_sync() {
+        let conn = test_db();
+        set_last_sync(&conn, "2024-06-15T10:00:00Z").unwrap();
+        assert_eq!(get_last_sync(&conn).unwrap().as_deref(), Some("2024-06-15T10:00:00Z"));
+    }
+
+    #[test]
+    fn test_set_last_sync_overwrites() {
+        let conn = test_db();
+        set_last_sync(&conn, "2024-01-01T00:00:00Z").unwrap();
+        set_last_sync(&conn, "2024-06-15T10:00:00Z").unwrap();
+        assert_eq!(get_last_sync(&conn).unwrap().as_deref(), Some("2024-06-15T10:00:00Z"));
+    }
 
     #[test]
     fn test_initialize_creates_all_tables() {
