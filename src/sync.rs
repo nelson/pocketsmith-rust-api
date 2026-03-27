@@ -24,8 +24,9 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     }
 
     let last_sync = db::get_last_sync(conn)?;
+    let updated_since = last_sync.as_ref().map(|(_, ts)| ts.clone());
     let params = TransactionParams {
-        updated_since: last_sync.clone(),
+        updated_since,
         ..Default::default()
     };
 
@@ -44,8 +45,8 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     })?;
 
     let now = chrono::Utc::now().to_rfc3339();
-    db::set_last_sync(conn, &now)?;
-    println!("Sync complete (last_sync={})", now);
+    let version = db::insert_sync(conn, &now, transactions.len() as i64)?;
+    println!("Sync complete (version={}, last_sync={})", version, now);
 
     Ok(())
 }
