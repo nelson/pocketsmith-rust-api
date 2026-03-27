@@ -1,7 +1,8 @@
 pub(crate) const SCHEMA: &str = "
-CREATE TABLE IF NOT EXISTS _sync_metadata (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS _sync_history (
+    version              INTEGER PRIMARY KEY,
+    synced_at            TEXT NOT NULL,
+    transactions_updated INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS _transaction_history_reason (
