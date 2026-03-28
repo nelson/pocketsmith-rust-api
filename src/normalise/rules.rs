@@ -425,6 +425,9 @@ pub struct CompiledIdentifyRules {
     pub(super) merchant_groups: Vec<CompiledMerchantGroup>,
     pub(super) capture_noise: Re,
     pub(super) title_re: Re,
+    /// Known location names (uppercase) for deduplicating capture group output.
+    /// Injected from expand rules after loading.
+    pub(super) known_locations: Vec<String>,
 }
 
 impl CompiledIdentifyRules {
@@ -504,6 +507,7 @@ impl CompiledIdentifyRules {
             }).collect::<Result<_>>()?,
             capture_noise,
             title_re,
+            known_locations: Vec::new(),
         })
     }
 }

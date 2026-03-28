@@ -21,11 +21,15 @@ pub struct PipelineRules {
 
 impl PipelineRules {
     pub fn load(rules_dir: &Path) -> Result<Self> {
+        let expand = CompiledExpandRules::load(rules_dir)?;
+        let mut identify = CompiledIdentifyRules::load(rules_dir)?;
+        // Share known locations from expand stage into identify stage for capture dedup
+        identify.known_locations = expand.locations.iter().map(|l| l.name.to_uppercase()).collect();
         Ok(Self {
             strip: CompiledStripRules::load(rules_dir)?,
             classify: CompiledClassifyRules::load(rules_dir)?,
-            expand: CompiledExpandRules::load(rules_dir)?,
-            identify: CompiledIdentifyRules::load(rules_dir)?,
+            expand,
+            identify,
             cleanup: CompiledCleanupRules::load(rules_dir)?,
         })
     }
