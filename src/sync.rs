@@ -38,7 +38,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     let now = chrono::Utc::now().to_rfc3339();
     let version = db::insert_sync(conn, &now, transactions.len() as i64)?;
 
-    db::with_change_reason(conn, "pocketsmith", Some(version), |conn| {
+    db::with_change_context(conn, "pocketsmith", Some(version), |conn| {
         let tx = conn.unchecked_transaction()?;
         for txn in &transactions {
             db::upsert_transaction(&tx, txn)?;
