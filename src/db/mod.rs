@@ -30,42 +30,43 @@ pub fn initialize_in_memory() -> Result<Connection> {
     Ok(conn)
 }
 
-fn set_transaction_change_context(conn: &Connection, reason: &str, sync_version: Option<i64>) -> Result<()> {
-    conn.execute("DELETE FROM _transaction_change_context", [])?;
-    conn.execute(
-        "INSERT INTO _transaction_change_context (reason, _sync_version) VALUES (?1, ?2)",
-        rusqlite::params![reason, sync_version],
-    )?;
-    Ok(())
-}
-
-fn clear_transaction_change_context(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM _transaction_change_context", [])?;
-    Ok(())
-}
-
-pub fn get_last_sync(conn: &Connection) -> Result<Option<(i64, String)>> {
+pub fn get_last_change(conn: &Connection, reason: &str) -> Result<Option<(i64, String)>> {
     let mut stmt = conn.prepare(
-        "SELECT version, created_at FROM _sync_history ORDER BY version DESC LIMIT 1",
+        "SELECT version, created_at FROM _transaction_change_log WHERE reason = ?1 ORDER BY version DESC LIMIT 1",
     )?;
-    Ok(stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?))).ok())
+    Ok(stmt.query_row([reason], |row| Ok((row.get(0)?, row.get(1)?))).ok())
 }
 
-pub fn insert_sync(conn: &Connection, transactions_updated: i64) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO _sync_history (transactions_updated) VALUES (?1)",
-        [transactions_updated],
-    )?;
-    Ok(conn.last_insert_rowid())
-}
-
-pub fn with_transaction_change_context<F, T>(conn: &Connection, reason: &str, sync_version: Option<i64>, f: F) -> Result<T>
+pub fn with_transaction_change_log<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
 {
-    set_transaction_change_context(conn, reason, sync_version)?;
+    conn.execute(
+        "INSERT INTO _transaction_change_log (reason) VALUES (?1)",
+        [reason],
+    )?;
+    let version = conn.last_insert_rowid();
+
+    conn.execute("DELETE FROM _transaction_change_log_context", [])?;
+    conn.execute(
+        "INSERT INTO _transaction_change_log_context (_version) VALUES (?1)",
+        [version],
+    )?;
+
     let result = f(conn);
-    clear_transaction_change_context(conn)?;
+
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(DISTINCT _rowid) FROM _transactions_history WHERE _version = ?1",
+        [version],
+        |row| row.get(0),
+    )?;
+    conn.execute(
+        "UPDATE _transaction_change_log SET transactions_updated = ?1 WHERE version = ?2",
+        rusqlite::params![count, version],
+    )?;
+
+    conn.execute("DELETE FROM _transaction_change_log_context", [])?;
+
     result
 }
 
@@ -175,33 +176,53 @@ mod tests {
     use test_helpers::*;
 
     #[test]
-    fn test_get_last_sync_returns_none_when_empty() {
+    fn test_get_last_change_returns_none_when_empty() {
         let conn = test_db();
-        assert_eq!(get_last_sync(&conn).unwrap(), None);
+        assert_eq!(get_last_change(&conn, "pocketsmith").unwrap(), None);
     }
 
     #[test]
-    fn test_insert_sync_returns_version() {
+    fn test_with_transaction_change_log_creates_entry() {
         let conn = test_db();
-        let v = insert_sync(&conn, 42).unwrap();
-        assert_eq!(v, 1);
+        with_transaction_change_log(&conn, "pocketsmith", |_| Ok(())).unwrap();
+        let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
+        assert_eq!(version, 1);
     }
 
     #[test]
-    fn test_get_last_sync_returns_latest() {
+    fn test_get_last_change_filters_by_reason() {
         let conn = test_db();
-        insert_sync(&conn, 10).unwrap();
-        insert_sync(&conn, 5).unwrap();
-        let (version, _created_at) = get_last_sync(&conn).unwrap().unwrap();
+        with_transaction_change_log(&conn, "pocketsmith", |_| Ok(())).unwrap();
+        with_transaction_change_log(&conn, "rules", |_| Ok(())).unwrap();
+        let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
+        assert_eq!(version, 1);
+        let (version, _) = get_last_change(&conn, "rules").unwrap().unwrap();
         assert_eq!(version, 2);
     }
 
     #[test]
-    fn test_insert_sync_increments_version() {
+    fn test_with_transaction_change_log_increments_version() {
         let conn = test_db();
-        assert_eq!(insert_sync(&conn, 1).unwrap(), 1);
-        assert_eq!(insert_sync(&conn, 2).unwrap(), 2);
-        assert_eq!(insert_sync(&conn, 3).unwrap(), 3);
+        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
+        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
+        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
+        let (version, _) = get_last_change(&conn, "test").unwrap().unwrap();
+        assert_eq!(version, 3);
+    }
+
+    #[test]
+    fn test_with_transaction_change_log_counts_transactions() {
+        let conn = test_db();
+        with_transaction_change_log(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "A"))?;
+            upsert_transaction(conn, &make_transaction(2, "B"))?;
+            Ok(())
+        }).unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT transactions_updated FROM _transaction_change_log WHERE version = 1",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(count, 2);
     }
 
     #[test]

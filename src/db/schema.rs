@@ -1,13 +1,13 @@
 pub(crate) const SCHEMA: &str = "
-CREATE TABLE IF NOT EXISTS _sync_history (
+CREATE TABLE IF NOT EXISTS _transaction_change_log (
     version              INTEGER PRIMARY KEY,
+    reason               TEXT NOT NULL,
     created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    transactions_updated INTEGER NOT NULL
+    transactions_updated INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS _transaction_change_context (
-    reason        TEXT NOT NULL,
-    _sync_version INTEGER
+CREATE TABLE IF NOT EXISTS _transaction_change_log_context (
+    _version INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -95,18 +95,16 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE TABLE IF NOT EXISTS _transactions_history (
-    _rowid        INTEGER NOT NULL,
-    payee         TEXT,
-    category_id   INTEGER,
-    note          TEXT,
-    labels        TEXT,
-    is_transfer   INTEGER,
-    memo          TEXT,
-    reason        TEXT NOT NULL,
-    _sync_version INTEGER,
-    _version      INTEGER NOT NULL DEFAULT 1,
-    _updated      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    _mask         INTEGER NOT NULL DEFAULT 0
+    _rowid       INTEGER NOT NULL,
+    payee        TEXT,
+    category_id  INTEGER,
+    note         TEXT,
+    labels       TEXT,
+    is_transfer  INTEGER,
+    memo         TEXT,
+    _version     INTEGER NOT NULL REFERENCES _transaction_change_log(version),
+    _updated     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    _mask        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_history_rowid
@@ -116,10 +114,9 @@ CREATE TRIGGER IF NOT EXISTS _transactions_history_insert
 AFTER INSERT ON transactions
 WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE _rowid = NEW.id)
 BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, reason, _sync_version, _version, _mask)
+    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
     VALUES (NEW.id, NEW.payee, NEW.category_id, NEW.note, NEW.labels, NEW.is_transfer, NEW.memo,
-            (SELECT reason FROM _transaction_change_context),
-            (SELECT _sync_version FROM _transaction_change_context), 1, 63);
+            (SELECT _version FROM _transaction_change_log_context), 63);
 END;
 
 CREATE TRIGGER IF NOT EXISTS _transactions_history_update
@@ -131,7 +128,7 @@ WHEN (OLD.payee IS NOT NEW.payee
    OR OLD.is_transfer IS NOT NEW.is_transfer
    OR OLD.memo IS NOT NEW.memo)
 BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, reason, _sync_version, _version, _mask)
+    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
     VALUES (
         NEW.id,
         CASE WHEN OLD.payee IS NOT NEW.payee THEN NEW.payee ELSE NULL END,
@@ -140,9 +137,7 @@ BEGIN
         CASE WHEN OLD.labels IS NOT NEW.labels THEN NEW.labels ELSE NULL END,
         CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN NEW.is_transfer ELSE NULL END,
         CASE WHEN OLD.memo IS NOT NEW.memo THEN NEW.memo ELSE NULL END,
-        (SELECT reason FROM _transaction_change_context),
-        (SELECT _sync_version FROM _transaction_change_context),
-        (SELECT COALESCE(MAX(_version), 0) + 1 FROM _transactions_history WHERE _rowid = NEW.id),
+        (SELECT _version FROM _transaction_change_log_context),
         (CASE WHEN OLD.payee IS NOT NEW.payee THEN 1 ELSE 0 END)
         | (CASE WHEN OLD.category_id IS NOT NEW.category_id THEN 2 ELSE 0 END)
         | (CASE WHEN OLD.note IS NOT NEW.note THEN 4 ELSE 0 END)
@@ -155,11 +150,9 @@ END;
 CREATE TRIGGER IF NOT EXISTS _transactions_history_delete
 AFTER DELETE ON transactions
 BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, reason, _sync_version, _version, _mask)
+    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
     VALUES (OLD.id, NULL, NULL, NULL, NULL, NULL, NULL,
-            (SELECT reason FROM _transaction_change_context),
-            (SELECT _sync_version FROM _transaction_change_context),
-            (SELECT COALESCE(MAX(_version), 0) + 1 FROM _transactions_history WHERE _rowid = OLD.id),
+            (SELECT _version FROM _transaction_change_log_context),
             63);
 END;
 ";

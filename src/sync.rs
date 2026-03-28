@@ -23,7 +23,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
         db::upsert_category(conn, cat)?;
     }
 
-    let last_sync = db::get_last_sync(conn)?;
+    let last_sync = db::get_last_change(conn, "pocketsmith")?;
     let updated_since = last_sync.as_ref().map(|(_, ts)| ts.clone());
     let params = TransactionParams {
         updated_since,
@@ -35,9 +35,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     let transactions = client.get_all_transactions(user_id, &params)?;
     println!("{} transactions fetched", transactions.len());
 
-    let version = db::insert_sync(conn, transactions.len() as i64)?;
-
-    db::with_transaction_change_context(conn, "pocketsmith", Some(version), |conn| {
+    db::with_transaction_change_log(conn, "pocketsmith", |conn| {
         let tx = conn.unchecked_transaction()?;
         for txn in &transactions {
             db::upsert_transaction(&tx, txn)?;
@@ -45,8 +43,6 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
         tx.commit()?;
         Ok(())
     })?;
-
-    println!("Sync complete (version={})", version);
 
     Ok(())
 }
