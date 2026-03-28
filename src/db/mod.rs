@@ -46,15 +46,15 @@ fn clear_transaction_change_context(conn: &Connection) -> Result<()> {
 
 pub fn get_last_sync(conn: &Connection) -> Result<Option<(i64, String)>> {
     let mut stmt = conn.prepare(
-        "SELECT version, synced_at FROM _sync_history ORDER BY version DESC LIMIT 1",
+        "SELECT version, created_at FROM _sync_history ORDER BY version DESC LIMIT 1",
     )?;
     Ok(stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?))).ok())
 }
 
-pub fn insert_sync(conn: &Connection, synced_at: &str, transactions_updated: i64) -> Result<i64> {
+pub fn insert_sync(conn: &Connection, transactions_updated: i64) -> Result<i64> {
     conn.execute(
-        "INSERT INTO _sync_history (synced_at, transactions_updated) VALUES (?1, ?2)",
-        rusqlite::params![synced_at, transactions_updated],
+        "INSERT INTO _sync_history (transactions_updated) VALUES (?1)",
+        [transactions_updated],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -183,26 +183,25 @@ mod tests {
     #[test]
     fn test_insert_sync_returns_version() {
         let conn = test_db();
-        let v = insert_sync(&conn, "2024-06-15T10:00:00Z", 42).unwrap();
+        let v = insert_sync(&conn, 42).unwrap();
         assert_eq!(v, 1);
     }
 
     #[test]
     fn test_get_last_sync_returns_latest() {
         let conn = test_db();
-        insert_sync(&conn, "2024-01-01T00:00:00Z", 10).unwrap();
-        insert_sync(&conn, "2024-06-15T10:00:00Z", 5).unwrap();
-        let (version, synced_at) = get_last_sync(&conn).unwrap().unwrap();
+        insert_sync(&conn, 10).unwrap();
+        insert_sync(&conn, 5).unwrap();
+        let (version, _created_at) = get_last_sync(&conn).unwrap().unwrap();
         assert_eq!(version, 2);
-        assert_eq!(synced_at, "2024-06-15T10:00:00Z");
     }
 
     #[test]
     fn test_insert_sync_increments_version() {
         let conn = test_db();
-        assert_eq!(insert_sync(&conn, "t1", 1).unwrap(), 1);
-        assert_eq!(insert_sync(&conn, "t2", 2).unwrap(), 2);
-        assert_eq!(insert_sync(&conn, "t3", 3).unwrap(), 3);
+        assert_eq!(insert_sync(&conn, 1).unwrap(), 1);
+        assert_eq!(insert_sync(&conn, 2).unwrap(), 2);
+        assert_eq!(insert_sync(&conn, 3).unwrap(), 3);
     }
 
     #[test]
