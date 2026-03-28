@@ -30,17 +30,17 @@ pub fn initialize_in_memory() -> Result<Connection> {
     Ok(conn)
 }
 
-fn set_change_context(conn: &Connection, reason: &str, sync_version: Option<i64>) -> Result<()> {
-    conn.execute("DELETE FROM _change_context", [])?;
+fn set_transaction_change_context(conn: &Connection, reason: &str, sync_version: Option<i64>) -> Result<()> {
+    conn.execute("DELETE FROM _transaction_change_context", [])?;
     conn.execute(
-        "INSERT INTO _change_context (reason, _sync_version) VALUES (?1, ?2)",
+        "INSERT INTO _transaction_change_context (reason, _sync_version) VALUES (?1, ?2)",
         rusqlite::params![reason, sync_version],
     )?;
     Ok(())
 }
 
-fn clear_change_context(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM _change_context", [])?;
+fn clear_transaction_change_context(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM _transaction_change_context", [])?;
     Ok(())
 }
 
@@ -59,13 +59,13 @@ pub fn insert_sync(conn: &Connection, synced_at: &str, transactions_updated: i64
     Ok(conn.last_insert_rowid())
 }
 
-pub fn with_change_context<F, T>(conn: &Connection, reason: &str, sync_version: Option<i64>, f: F) -> Result<T>
+pub fn with_transaction_change_context<F, T>(conn: &Connection, reason: &str, sync_version: Option<i64>, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
 {
-    set_change_context(conn, reason, sync_version)?;
+    set_transaction_change_context(conn, reason, sync_version)?;
     let result = f(conn);
-    clear_change_context(conn)?;
+    clear_transaction_change_context(conn)?;
     result
 }
 
