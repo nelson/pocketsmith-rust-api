@@ -1,41 +1,48 @@
 use anyhow::{Context, Result};
-use reqwest::blocking::Client;
+use ureq::Agent;
 
 use crate::models::*;
 
 const BASE_URL: &str = "https://api.pocketsmith.com/v2";
 
 pub struct PocketSmithClient {
-    http: Client,
+    http: Agent,
     api_key: String,
 }
 
 impl PocketSmithClient {
     pub fn new(api_key: String) -> Self {
+        let config = ureq::config::Config::builder()
+            .http_status_as_error(false)
+            .build();
         Self {
-            http: Client::new(),
+            http: Agent::new_with_config(config),
             api_key,
         }
     }
 
     fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
         let url = format!("{}{}", BASE_URL, path);
-        let resp = self
+        let mut resp = self
             .http
             .get(&url)
             .header("X-Developer-Key", &self.api_key)
             .header("Accept", "application/json")
-            .send()
+            .call()
             .with_context(|| format!("GET {}", url))?;
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().unwrap_or_default();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
             anyhow::bail!("GET {} returned {}: {}", url, status, body);
         }
 
-        let resp_text = resp.text()?;
-        serde_json::from_str(&resp_text)
+        let body = resp
+            .body_mut()
+            .read_to_string()
+            .with_context(|| format!("Reading body from GET {}", url))?;
+
+        serde_json::from_str(&body)
             .with_context(|| format!("Failed to parse response from GET {}", url))
     }
 
@@ -45,38 +52,41 @@ impl PocketSmithClient {
         body: &B,
     ) -> Result<T> {
         let url = format!("{}{}", BASE_URL, path);
-        let resp = self
+        let mut resp = self
             .http
             .post(&url)
             .header("X-Developer-Key", &self.api_key)
             .header("Accept", "application/json")
-            .json(body)
-            .send()
+            .send_json(body)
             .with_context(|| format!("POST {}", url))?;
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().unwrap_or_default();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
             anyhow::bail!("POST {} returned {}: {}", url, status, body);
         }
 
-        let resp_text = resp.text()?;
-        serde_json::from_str(&resp_text)
+        let resp_body = resp
+            .body_mut()
+            .read_to_string()
+            .with_context(|| format!("Reading body from POST {}", url))?;
+
+        serde_json::from_str(&resp_body)
             .with_context(|| format!("Failed to parse response from POST {}", url))
     }
 
     fn delete_request(&self, path: &str) -> Result<()> {
         let url = format!("{}{}", BASE_URL, path);
-        let resp = self
+        let mut resp = self
             .http
             .delete(&url)
             .header("X-Developer-Key", &self.api_key)
-            .send()
+            .call()
             .with_context(|| format!("DELETE {}", url))?;
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().unwrap_or_default();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
             anyhow::bail!("DELETE {} returned {}: {}", url, status, body);
         }
 
@@ -137,18 +147,21 @@ impl PocketSmithClient {
         }
 
         let url = format!("{}/users/{}/transactions", BASE_URL, user_id);
-        let resp = self
+        let mut req = self
             .http
             .get(&url)
             .header("X-Developer-Key", &self.api_key)
-            .header("Accept", "application/json")
-            .query(&query)
-            .send()
+            .header("Accept", "application/json");
+        for (k, v) in &query {
+            req = req.query(k, v);
+        }
+        let mut resp = req
+            .call()
             .with_context(|| format!("GET {} page {}", url, page))?;
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().unwrap_or_default();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
             // 400 with "out of bounds" means we've gone past the last page
             if status.as_u16() == 400 && body.contains("out of bounds") {
                 return Ok(Vec::new());
@@ -156,8 +169,11 @@ impl PocketSmithClient {
             anyhow::bail!("GET {} page {} returned {}: {}", url, page, status, body);
         }
 
-        let resp_text = resp.text()?;
-        serde_json::from_str(&resp_text)
+        let body = resp
+            .body_mut()
+            .read_to_string()
+            .with_context(|| format!("Reading body from GET {} page {}", url, page))?;
+        serde_json::from_str(&body)
             .with_context(|| format!("Failed to parse transactions page {}", page))
     }
 
@@ -188,22 +204,25 @@ impl PocketSmithClient {
         update: &TransactionUpdate,
     ) -> Result<Transaction> {
         let url = format!("{}/transactions/{}", BASE_URL, id);
-        let resp = self
+        let mut resp = self
             .http
             .put(&url)
             .header("X-Developer-Key", &self.api_key)
             .header("Accept", "application/json")
-            .json(update)
-            .send()
+            .send_json(update)
             .with_context(|| format!("PUT {}", url))?;
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().unwrap_or_default();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
             anyhow::bail!("PUT {} returned {}: {}", url, status, body);
         }
 
-        resp.json().context("Failed to parse update response")
+        let body = resp
+            .body_mut()
+            .read_to_string()
+            .with_context(|| format!("Reading body from PUT {}", url))?;
+        serde_json::from_str(&body).context("Failed to parse update response")
     }
 
     pub fn create_transaction(
