@@ -69,7 +69,8 @@ fn apply_transfer(
     if resolved != entity {
         if payee_type == "transfer_out" {
             // Outgoing to employer = donation
-            let out_label = resolved.replace("(Salary)", "(Donation)");
+            let paren_re = crate::normalise::rules::Re::new(r"\(.*?\)").expect("static regex");
+            let out_label = paren_re.replace(&resolved, "(Donation)").to_string();
             metadata.insert("identity".into(), Value::String(out_label.clone()));
             return out_label;
         }
@@ -228,6 +229,17 @@ fn clean_capture(value: &str, rules: &CompiledIdentifyRules) -> String {
             break;
         }
         result = cleaned;
+    }
+    // Remove duplicate trailing location (e.g., "Fairy Meadow Fairy Meadow" → "Fairy Meadow")
+    let upper = result.to_uppercase();
+    for loc in &rules.known_locations {
+        if let Some(first) = upper.find(loc.as_str()) {
+            if let Some(second) = upper[first + loc.len()..].find(loc.as_str()) {
+                let cut = first + loc.len() + second;
+                result = result[..cut].trim().to_string();
+                break;
+            }
+        }
     }
     result
 }
