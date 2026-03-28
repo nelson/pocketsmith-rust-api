@@ -7,6 +7,10 @@ edition = "2021"
 name = "normalise"
 path = "src/bin/normalise.rs"
 
+[[bin]]
+name = "categorise"
+path = "src/bin/categorise.rs"
+
 [dependencies]
 ureq = { version = "3", features = ["json"] }
 serde = { version = "1", features = ["derive"] }

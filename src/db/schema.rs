@@ -147,6 +147,17 @@ BEGIN
     );
 END;
 
+CREATE TABLE IF NOT EXISTS places_cache (
+    query         TEXT NOT NULL,
+    provider      TEXT NOT NULL,
+    place_name    TEXT,
+    place_types   TEXT,
+    place_address TEXT,
+    raw_response  TEXT,
+    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (query, provider)
+);
+
 CREATE TRIGGER IF NOT EXISTS _transactions_history_delete
 AFTER DELETE ON transactions
 BEGIN
