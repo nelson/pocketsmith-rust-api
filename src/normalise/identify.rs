@@ -1,5 +1,5 @@
 use crate::normalise::{meta, Metadata};
-use crate::normalise::rules::CompiledIdentifyRules;
+use crate::normalise::rules::{CompiledEntityExtraction, CompiledIdentifyRules};
 use serde_json::Value;
 
 /// Stage 4: Identity-based normalisation.
@@ -55,7 +55,7 @@ fn apply_transfer(
     }
 
     // Extract entity
-    let entity = extract_transfer_entity(original_payee, rules)
+    let entity = extract_entity(original_payee, &rules.transfer_entity_extraction, true)
         .or_else(|| {
             metadata
                 .get(meta::EXTRACTED_ENTITY)
@@ -110,7 +110,7 @@ fn apply_banking(
     }
 
     // Extract banking entity
-    if let Some(entity) = extract_banking_entity(original_payee, rules) {
+    if let Some(entity) = extract_entity(original_payee, &rules.banking_entity_extraction, false) {
         let resolved = resolve_employer(&entity, rules);
         if resolved != entity {
             metadata.insert("identity".into(), Value::String(resolved.clone()));
@@ -159,7 +159,7 @@ fn apply_merchant(
     // Tag merchant group
     for grp in &rules.merchant_groups {
         if grp.re.is_match(&result) {
-            metadata.insert("merchant_group".into(), Value::String(grp.group.clone()));
+            metadata.insert("merchant_group".into(), Value::String(grp.canonical.clone()));
             break;
         }
     }
@@ -272,34 +272,20 @@ fn strip_suffixes(payee: &str, rules: &CompiledIdentifyRules) -> String {
     result.trim().to_string()
 }
 
-fn extract_transfer_entity(
-    original_payee: &str,
-    rules: &CompiledIdentifyRules,
+fn extract_entity(
+    text: &str,
+    extractions: &[CompiledEntityExtraction],
+    trim_punct: bool,
 ) -> Option<String> {
-    for t in &rules.transfer_entity_extraction {
-        if let Some(caps) = t.re.captures(original_payee) {
-            if let Some(m) = caps.get(t.group) {
-                let entity = m.as_str().trim().trim_end_matches(&[',', ';', '.'][..]);
-                let result = match &t.prefix {
-                    Some(prefix) => format!("{} {}", prefix, entity),
-                    None => entity.to_string(),
+    for e in extractions {
+        if let Some(caps) = e.re.captures(text) {
+            if let Some(m) = caps.get(e.group) {
+                let entity = if trim_punct {
+                    m.as_str().trim().trim_end_matches(&[',', ';', '.'][..])
+                } else {
+                    m.as_str().trim()
                 };
-                return Some(result);
-            }
-        }
-    }
-    None
-}
-
-fn extract_banking_entity(
-    original_payee: &str,
-    rules: &CompiledIdentifyRules,
-) -> Option<String> {
-    for b in &rules.banking_entity_extraction {
-        if let Some(caps) = b.re.captures(original_payee) {
-            if let Some(m) = caps.get(b.group) {
-                let entity = m.as_str().trim();
-                let result = match &b.prefix {
+                let result = match &e.prefix {
                     Some(prefix) => format!("{} {}", prefix, entity),
                     None => entity.to_string(),
                 };

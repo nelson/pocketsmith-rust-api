@@ -346,7 +346,7 @@ struct IdentifyRulesYaml {
     #[serde(default)]
     default_locations: std::collections::HashMap<String, String>,
     #[serde(default)]
-    strip_patterns: Vec<StripPatternYaml>,
+    strip_patterns: Vec<String>,
     #[serde(default)]
     internal_account_mappings: Vec<PatternCanonicalYaml>,
     #[serde(default)]
@@ -354,7 +354,7 @@ struct IdentifyRulesYaml {
     #[serde(default)]
     banking_entity_extraction: Vec<EntityExtractionYaml>,
     #[serde(default)]
-    merchant_groups: Vec<MerchantGroupYaml>,
+    merchant_groups: Vec<PatternCanonicalYaml>,
 }
 
 #[derive(Deserialize)]
@@ -370,23 +370,10 @@ struct PatternCanonicalYaml {
 }
 
 #[derive(Deserialize)]
-struct StripPatternYaml {
-    pattern: String,
-    #[allow(dead_code)]
-    name: String,
-}
-
-#[derive(Deserialize)]
 struct EntityExtractionYaml {
     pattern: String,
     group: Option<usize>,
     prefix: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct MerchantGroupYaml {
-    pattern: String,
-    group: String,
 }
 
 pub(super) struct CompiledPatternCanonical {
@@ -398,11 +385,6 @@ pub(super) struct CompiledEntityExtraction {
     pub(super) re: Re,
     pub(super) group: usize,
     pub(super) prefix: Option<String>,
-}
-
-pub(super) struct CompiledMerchantGroup {
-    pub(super) re: Re,
-    pub(super) group: String,
 }
 
 pub(super) struct Employer {
@@ -422,7 +404,7 @@ pub struct CompiledIdentifyRules {
     pub(super) internal_account_mappings: Vec<CompiledPatternCanonical>,
     pub(super) transfer_entity_extraction: Vec<CompiledEntityExtraction>,
     pub(super) banking_entity_extraction: Vec<CompiledEntityExtraction>,
-    pub(super) merchant_groups: Vec<CompiledMerchantGroup>,
+    pub(super) merchant_groups: Vec<CompiledPatternCanonical>,
     pub(super) capture_noise: Re,
     pub(super) title_re: Re,
     /// Known location names (uppercase) for deduplicating capture group output.
@@ -430,28 +412,28 @@ pub struct CompiledIdentifyRules {
     pub(super) known_locations: Vec<String>,
 }
 
+fn compile_pc(items: Vec<PatternCanonicalYaml>, ctx: &str) -> Result<Vec<CompiledPatternCanonical>> {
+    items.into_iter().map(|p| {
+        Ok(CompiledPatternCanonical {
+            re: compile_icase(&p.pattern, ctx)?,
+            canonical: p.canonical,
+        })
+    }).collect()
+}
+
+fn compile_ee(items: Vec<EntityExtractionYaml>, ctx: &str) -> Result<Vec<CompiledEntityExtraction>> {
+    items.into_iter().map(|e| {
+        Ok(CompiledEntityExtraction {
+            re: compile_icase(&e.pattern, ctx)?,
+            group: e.group.unwrap_or(1),
+            prefix: e.prefix,
+        })
+    }).collect()
+}
+
 impl CompiledIdentifyRules {
     pub fn load(rules_dir: &Path) -> Result<Self> {
         let yaml: IdentifyRulesYaml = load_yaml(rules_dir, "identify.yaml")?;
-
-        let compile_pc = |items: Vec<PatternCanonicalYaml>, ctx: &str| -> Result<Vec<CompiledPatternCanonical>> {
-            items.into_iter().map(|p| {
-                Ok(CompiledPatternCanonical {
-                    re: compile_icase(&p.pattern, ctx)?,
-                    canonical: p.canonical,
-                })
-            }).collect()
-        };
-
-        let compile_ee = |items: Vec<EntityExtractionYaml>, ctx: &str| -> Result<Vec<CompiledEntityExtraction>> {
-            items.into_iter().map(|e| {
-                Ok(CompiledEntityExtraction {
-                    re: compile_icase(&e.pattern, ctx)?,
-                    group: e.group.unwrap_or(1),
-                    prefix: e.prefix,
-                })
-            }).collect()
-        };
 
         // Build case-insensitive persons lookup
         let mut persons_upper = std::collections::HashMap::new();
@@ -494,17 +476,12 @@ impl CompiledIdentifyRules {
             merchant_mappings: compile_pc(yaml.merchant_mappings, "merchant mapping")?,
             default_locations,
             strip_patterns: yaml.strip_patterns.into_iter()
-                .map(|s| compile_icase(&s.pattern, "strip pattern"))
+                .map(|s| compile_icase(&s, "strip pattern"))
                 .collect::<Result<_>>()?,
             internal_account_mappings: compile_pc(yaml.internal_account_mappings, "internal account")?,
             transfer_entity_extraction: compile_ee(yaml.transfer_entity_extraction, "transfer entity")?,
             banking_entity_extraction: compile_ee(yaml.banking_entity_extraction, "banking entity")?,
-            merchant_groups: yaml.merchant_groups.into_iter().map(|g| {
-                Ok(CompiledMerchantGroup {
-                    re: compile_icase(&g.pattern, "merchant group")?,
-                    group: g.group,
-                })
-            }).collect::<Result<_>>()?,
+            merchant_groups: compile_pc(yaml.merchant_groups, "merchant group")?,
             capture_noise,
             title_re,
             known_locations: Vec::new(),
