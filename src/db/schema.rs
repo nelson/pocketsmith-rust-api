@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS _sync_history (
     transactions_updated INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS _change_context (
+CREATE TABLE IF NOT EXISTS _transaction_change_context (
     reason        TEXT NOT NULL,
     _sync_version INTEGER
 );
@@ -118,8 +118,8 @@ WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE _rowid = NEW.id)
 BEGIN
     INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, reason, _sync_version, _version, _mask)
     VALUES (NEW.id, NEW.payee, NEW.category_id, NEW.note, NEW.labels, NEW.is_transfer, NEW.memo,
-            (SELECT reason FROM _change_context),
-            (SELECT _sync_version FROM _change_context), 1, 63);
+            (SELECT reason FROM _transaction_change_context),
+            (SELECT _sync_version FROM _transaction_change_context), 1, 63);
 END;
 
 CREATE TRIGGER IF NOT EXISTS _transactions_history_update
@@ -140,8 +140,8 @@ BEGIN
         CASE WHEN OLD.labels IS NOT NEW.labels THEN NEW.labels ELSE NULL END,
         CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN NEW.is_transfer ELSE NULL END,
         CASE WHEN OLD.memo IS NOT NEW.memo THEN NEW.memo ELSE NULL END,
-        (SELECT reason FROM _change_context),
-        (SELECT _sync_version FROM _change_context),
+        (SELECT reason FROM _transaction_change_context),
+        (SELECT _sync_version FROM _transaction_change_context),
         (SELECT COALESCE(MAX(_version), 0) + 1 FROM _transactions_history WHERE _rowid = NEW.id),
         (CASE WHEN OLD.payee IS NOT NEW.payee THEN 1 ELSE 0 END)
         | (CASE WHEN OLD.category_id IS NOT NEW.category_id THEN 2 ELSE 0 END)
@@ -157,8 +157,8 @@ AFTER DELETE ON transactions
 BEGIN
     INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, reason, _sync_version, _version, _mask)
     VALUES (OLD.id, NULL, NULL, NULL, NULL, NULL, NULL,
-            (SELECT reason FROM _change_context),
-            (SELECT _sync_version FROM _change_context),
+            (SELECT reason FROM _transaction_change_context),
+            (SELECT _sync_version FROM _transaction_change_context),
             (SELECT COALESCE(MAX(_version), 0) + 1 FROM _transactions_history WHERE _rowid = OLD.id),
             63);
 END;
