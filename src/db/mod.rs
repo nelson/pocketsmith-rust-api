@@ -30,9 +30,12 @@ pub fn initialize_in_memory() -> Result<Connection> {
     Ok(conn)
 }
 
-fn set_change_reason(conn: &Connection, reason: &str) -> Result<()> {
+fn set_change_reason(conn: &Connection, reason: &str, sync_version: Option<i64>) -> Result<()> {
     conn.execute("DELETE FROM _transaction_history_reason", [])?;
-    conn.execute("INSERT INTO _transaction_history_reason (reason) VALUES (?1)", [reason])?;
+    conn.execute(
+        "INSERT INTO _transaction_history_reason (reason, _sync_version) VALUES (?1, ?2)",
+        rusqlite::params![reason, sync_version],
+    )?;
     Ok(())
 }
 
@@ -56,11 +59,11 @@ pub fn insert_sync(conn: &Connection, synced_at: &str, transactions_updated: i64
     Ok(conn.last_insert_rowid())
 }
 
-pub fn with_change_reason<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
+pub fn with_change_reason<F, T>(conn: &Connection, reason: &str, sync_version: Option<i64>, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
 {
-    set_change_reason(conn, reason)?;
+    set_change_reason(conn, reason, sync_version)?;
     let result = f(conn);
     clear_change_reason(conn)?;
     result

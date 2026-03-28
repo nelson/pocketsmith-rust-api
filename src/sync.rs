@@ -35,7 +35,10 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     let transactions = client.get_all_transactions(user_id, &params)?;
     println!("{} transactions fetched", transactions.len());
 
-    db::with_change_reason(conn, "pocketsmith", |conn| {
+    let now = chrono::Utc::now().to_rfc3339();
+    let version = db::insert_sync(conn, &now, transactions.len() as i64)?;
+
+    db::with_change_reason(conn, "pocketsmith", Some(version), |conn| {
         let tx = conn.unchecked_transaction()?;
         for txn in &transactions {
             db::upsert_transaction(&tx, txn)?;
@@ -44,9 +47,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
         Ok(())
     })?;
 
-    let now = chrono::Utc::now().to_rfc3339();
-    let version = db::insert_sync(conn, &now, transactions.len() as i64)?;
-    println!("Sync complete (version={}, last_sync={})", version, now);
+    println!("Sync complete (version={}, synced_at={})", version, now);
 
     Ok(())
 }
