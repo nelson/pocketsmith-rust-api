@@ -1,7 +1,7 @@
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS _sync_history (
     version              INTEGER PRIMARY KEY,
-    synced_at            TEXT NOT NULL,
+    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     transactions_updated INTEGER NOT NULL
 );
 

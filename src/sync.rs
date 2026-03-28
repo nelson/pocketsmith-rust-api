@@ -35,8 +35,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     let transactions = client.get_all_transactions(user_id, &params)?;
     println!("{} transactions fetched", transactions.len());
 
-    let now = chrono::Utc::now().to_rfc3339();
-    let version = db::insert_sync(conn, &now, transactions.len() as i64)?;
+    let version = db::insert_sync(conn, transactions.len() as i64)?;
 
     db::with_transaction_change_context(conn, "pocketsmith", Some(version), |conn| {
         let tx = conn.unchecked_transaction()?;
@@ -47,7 +46,7 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
         Ok(())
     })?;
 
-    println!("Sync complete (version={}, synced_at={})", version, now);
+    println!("Sync complete (version={})", version);
 
     Ok(())
 }
