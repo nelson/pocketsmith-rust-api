@@ -1,0 +1,44 @@
+\f category_by_method
+SELECT method, category, COUNT(*) payees, SUM(transaction_count) txns
+FROM categorisation_audit WHERE category IS NOT NULL
+GROUP BY method, category ORDER BY method, txns DESC;
+
+\f uncategorised
+SELECT normalised_payee, payee_type, method, reason, transaction_count
+FROM categorisation_audit WHERE category IS NULL
+ORDER BY transaction_count DESC;
+
+\f type_distribution
+SELECT payee_type, COUNT(*) payees, SUM(transaction_count) txns
+FROM payee_metadata GROUP BY payee_type ORDER BY txns DESC;
+
+\f non_merchant_places
+SELECT ca.normalised_payee, pm.payee_type, ca.place_name
+FROM categorisation_audit ca JOIN payee_metadata pm ON ca.normalised_payee = pm.normalised_payee
+WHERE pm.payee_type != 'merchant' AND ca.method = 'google_places';
+
+\f top_payees
+SELECT pm.normalised_payee, pm.payee_type, ca.category, ca.method, pm.transaction_count
+FROM payee_metadata pm LEFT JOIN categorisation_audit ca ON pm.normalised_payee = ca.normalised_payee
+ORDER BY pm.transaction_count DESC LIMIT 30;
+
+\f merchant_groups
+SELECT pm.merchant_group, ca.category, COUNT(*) payees, SUM(pm.transaction_count) txns
+FROM payee_metadata pm JOIN categorisation_audit ca ON pm.normalised_payee = ca.normalised_payee
+WHERE pm.merchant_group IS NOT NULL GROUP BY pm.merchant_group, ca.category ORDER BY txns DESC;
+
+\f spend_by_category
+SELECT c.title, SUM(ABS(t.amount)) total, COUNT(*) txns
+FROM transactions t
+JOIN categories c ON t.category_id = c.id
+GROUP BY c.title ORDER BY total DESC;
+
+\f recent_changes
+SELECT version, reason, created_at, transactions_updated
+FROM _transaction_change_log WHERE reason = 'categorise'
+ORDER BY version DESC LIMIT 10;
+
+\f transfers_and_persons
+SELECT normalised_payee, payee_type, identity, extracted_entity, transaction_count
+FROM payee_metadata WHERE payee_type IN ('transfer_in', 'transfer_out', 'salary')
+ORDER BY transaction_count DESC;
