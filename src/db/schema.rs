@@ -147,6 +147,21 @@ BEGIN
     );
 END;
 
+CREATE TABLE IF NOT EXISTS payee_metadata (
+    normalised_payee  TEXT PRIMARY KEY,
+    payee_type        TEXT NOT NULL,
+    extracted_entity  TEXT,
+    extract_kind      TEXT,
+    identity          TEXT,
+    merchant_group    TEXT,
+    detected_location TEXT,
+    extra             TEXT,
+    sample_original   TEXT,
+    transaction_count INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS places_cache (
     query         TEXT NOT NULL,
     provider      TEXT NOT NULL,
