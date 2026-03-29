@@ -2,6 +2,7 @@ use std::fmt;
 
 pub mod rules;
 pub mod cache;
+pub mod audit;
 pub mod places;
 pub mod llm;
 pub mod mapping;

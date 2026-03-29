@@ -173,6 +173,22 @@ CREATE TABLE IF NOT EXISTS places_cache (
     PRIMARY KEY (query, provider)
 );
 
+CREATE TABLE IF NOT EXISTS categorisation_audit (
+    normalised_payee  TEXT PRIMARY KEY,
+    payee_type        TEXT,
+    method            TEXT NOT NULL,
+    category          TEXT,
+    reason            TEXT,
+    transaction_count INTEGER NOT NULL DEFAULT 0,
+    place_name        TEXT,
+    place_types       TEXT,
+    place_address     TEXT,
+    raw_response      TEXT,
+    metadata          TEXT,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TRIGGER IF NOT EXISTS _transactions_history_delete
 AFTER DELETE ON transactions
 BEGIN
