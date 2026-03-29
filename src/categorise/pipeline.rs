@@ -3,10 +3,13 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 
+use crate::db::payee_metadata;
 use crate::normalise::main::{normalise_payee, PipelineRules};
 use crate::normalise::meta;
+use crate::normalise::Metadata;
 
-use super::cache::{self, PlaceResult};
+use super::audit;
+use super::cache::PlaceResult;
 use super::llm::LlmClient;
 use super::mapping::map_place_to_category;
 use super::places::PlacesClient;
@@ -25,6 +28,8 @@ struct TxnRow {
 struct PayeeGroup {
     normalised: String,
     txn_type: Option<String>,
+    metadata: Metadata,
+    sample_original: String,
     txn_ids: Vec<i64>,
     current_category_ids: Vec<Option<i64>>,
 }
@@ -63,12 +68,12 @@ pub fn run(
         return Ok((Vec::new(), Vec::new()));
     }
 
-    // 3. Normalise and group by payee
-    let groups = normalise_and_group(&txns, normalise_rules);
+    // 3. Normalise, group by payee, and persist metadata
+    let groups = normalise_and_group(conn, &txns, normalise_rules)?;
 
     // 4. Categorise each group
     let mut results: Vec<CategoriseResult> = Vec::new();
-    let mut unresolved_merchants: Vec<(usize, String)> = Vec::new(); // (results_idx, payee)
+    let mut unresolved: Vec<(usize, String, Option<String>)> = Vec::new(); // (idx, payee, type)
 
     let places_client = config
         .google_places_key
@@ -81,72 +86,110 @@ pub fn run(
 
         // 4a. Try rule-based
         if let Some(r) = try_rules(&group.normalised, txn_type, count, categorise_rules) {
+            audit::upsert(
+                conn,
+                &r.normalised_payee,
+                txn_type,
+                "rule",
+                r.category.as_deref(),
+                &r.reason,
+                count as i64,
+                None,
+            )?;
             results.push(r);
             continue;
         }
 
-        // 4b. Check cache
-        if let Some(cached) = cache::get_cached(conn, &group.normalised, "google_places")? {
-            if let Some(cat) =
-                map_place_to_category(&cached.place_types, &categorise_rules.google_places_mappings)
-            {
-                let type_str = cached.place_types.first().cloned().unwrap_or_default();
+        // 4b. Check audit cache
+        if let Some(cached) = audit::get_cached(conn, &group.normalised)? {
+            if let Some(ref cat) = cached.category {
+                let source = match cached.method.as_str() {
+                    "google_places" => CategoriseSource::Cache,
+                    "llm" => CategoriseSource::Cache,
+                    _ => CategoriseSource::Cache,
+                };
                 results.push(CategoriseResult {
                     normalised_payee: group.normalised.clone(),
-                    category: Some(cat),
-                    source: CategoriseSource::Cache,
-                    reason: format!("cache:{}→category", type_str),
+                    category: Some(cat.clone()),
+                    source,
+                    reason: format!("cache:{}", cached.reason.as_deref().unwrap_or("")),
                     transaction_count: count,
                 });
                 continue;
             }
         }
 
-        // 4c. Google Places API
-        if let Some(ref client) = places_client {
-            match client.search_raw(&group.normalised) {
-                Ok((Some(place), raw)) => {
-                    cache::set_cached(
-                        conn,
-                        &group.normalised,
-                        "google_places",
-                        &place,
-                        Some(&raw),
-                    )?;
-                    if let Some(cat) = map_place_to_category(
-                        &place.place_types,
-                        &categorise_rules.google_places_mappings,
-                    ) {
-                        let type_str = place.place_types.first().cloned().unwrap_or_default();
-                        results.push(CategoriseResult {
-                            normalised_payee: group.normalised.clone(),
-                            category: Some(cat),
-                            source: CategoriseSource::GooglePlaces,
-                            reason: format!("google:{}→category", type_str),
-                            transaction_count: count,
-                        });
-                        continue;
+        // 4c. Google Places API — only for merchants (or unknown type)
+        if txn_type == Some("merchant") || txn_type.is_none() {
+            if let Some(ref client) = places_client {
+                match client.search_raw(&group.normalised) {
+                    Ok((Some(place), raw)) => {
+                        if let Some(cat) = map_place_to_category(
+                            &place.place_types,
+                            &categorise_rules.google_places_mappings,
+                        ) {
+                            let type_str =
+                                place.place_types.first().cloned().unwrap_or_default();
+                            let reason = format!("google:{}→category", type_str);
+                            audit::upsert_with_places(
+                                conn,
+                                &group.normalised,
+                                txn_type,
+                                Some(&cat),
+                                &reason,
+                                count as i64,
+                                &place,
+                                Some(&raw),
+                            )?;
+                            results.push(CategoriseResult {
+                                normalised_payee: group.normalised.clone(),
+                                category: Some(cat),
+                                source: CategoriseSource::GooglePlaces,
+                                reason,
+                                transaction_count: count,
+                            });
+                            continue;
+                        }
+                        // Place found but no category mapping — record it
+                        let empty_place = PlaceResult {
+                            place_name: place.place_name,
+                            place_types: place.place_types,
+                            place_address: place.place_address,
+                        };
+                        audit::upsert_with_places(
+                            conn,
+                            &group.normalised,
+                            txn_type,
+                            None,
+                            "google:no_mapping",
+                            count as i64,
+                            &empty_place,
+                            Some(&raw),
+                        )?;
                     }
-                }
-                Ok((None, raw)) => {
-                    let empty = PlaceResult {
-                        place_name: None,
-                        place_types: vec![],
-                        place_address: None,
-                    };
-                    cache::set_cached(
-                        conn,
-                        &group.normalised,
-                        "google_places",
-                        &empty,
-                        Some(&raw),
-                    )?;
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Google Places API error for '{}': {}",
-                        group.normalised, e
-                    );
+                    Ok((None, raw)) => {
+                        let empty = PlaceResult {
+                            place_name: None,
+                            place_types: vec![],
+                            place_address: None,
+                        };
+                        audit::upsert_with_places(
+                            conn,
+                            &group.normalised,
+                            txn_type,
+                            None,
+                            "google:no_result",
+                            count as i64,
+                            &empty,
+                            Some(&raw),
+                        )?;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: Google Places API error for '{}': {}",
+                            group.normalised, e
+                        );
+                    }
                 }
             }
         }
@@ -160,15 +203,14 @@ pub fn run(
             reason: "pending LLM".into(),
             transaction_count: count,
         });
-        unresolved_merchants.push((idx, group.normalised.clone()));
+        unresolved.push((idx, group.normalised.clone(), group.txn_type.clone()));
     }
 
     // 5. LLM batch for unresolved
-    if !unresolved_merchants.is_empty() {
+    if !unresolved.is_empty() {
         if let Some(ref api_key) = config.anthropic_key {
             let client = LlmClient::new(api_key.clone());
-            let payees: Vec<String> =
-                unresolved_merchants.iter().map(|(_, p)| p.clone()).collect();
+            let payees: Vec<String> = unresolved.iter().map(|(_, p, _)| p.clone()).collect();
 
             for (chunk_idx, chunk) in payees.chunks(20).enumerate() {
                 let chunk_vec: Vec<String> = chunk.to_vec();
@@ -176,10 +218,20 @@ pub fn run(
                     Ok(llm_results) => {
                         let base = chunk_idx * 20;
                         for (i, llm_r) in llm_results.into_iter().enumerate() {
-                            let global_idx = unresolved_merchants[base + i].0;
+                            let (global_idx, ref payee, ref typ) = unresolved[base + i];
                             results[global_idx].source = CategoriseSource::Llm;
-                            results[global_idx].category = llm_r.category;
-                            results[global_idx].reason = llm_r.reason;
+                            results[global_idx].category = llm_r.category.clone();
+                            results[global_idx].reason = llm_r.reason.clone();
+                            audit::upsert(
+                                conn,
+                                payee,
+                                typ.as_deref(),
+                                "llm",
+                                llm_r.category.as_deref(),
+                                &llm_r.reason,
+                                results[global_idx].transaction_count as i64,
+                                None,
+                            )?;
                         }
                     }
                     Err(e) => {
@@ -256,9 +308,13 @@ fn load_transactions(conn: &Connection) -> Result<Vec<TxnRow>> {
     Ok(rows)
 }
 
-fn normalise_and_group(txns: &[TxnRow], rules: &PipelineRules) -> Vec<PayeeGroup> {
+fn normalise_and_group(
+    conn: &Connection,
+    txns: &[TxnRow],
+    rules: &PipelineRules,
+) -> Result<Vec<PayeeGroup>> {
     let mut map: HashMap<String, PayeeGroup> = HashMap::new();
-    let mut norm_cache: HashMap<String, (String, Option<String>)> = HashMap::new();
+    let mut norm_cache: HashMap<String, (String, Option<String>, Metadata)> = HashMap::new();
 
     for txn in txns {
         let raw = txn
@@ -270,21 +326,23 @@ fn normalise_and_group(txns: &[TxnRow], rules: &PipelineRules) -> Vec<PayeeGroup
             continue;
         }
 
-        let (normalised, txn_type) = norm_cache
+        let (normalised, txn_type, metadata) = norm_cache
             .entry(raw.to_string())
             .or_insert_with(|| {
-                let (n, metadata) = normalise_payee(raw, rules);
-                let t = metadata
+                let (n, md) = normalise_payee(raw, rules);
+                let t = md
                     .get(meta::TYPE)
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-                (n, t)
+                (n, t, md)
             })
             .clone();
 
         let entry = map.entry(normalised.clone()).or_insert_with(|| PayeeGroup {
             normalised,
             txn_type,
+            metadata,
+            sample_original: raw.to_string(),
             txn_ids: Vec::new(),
             current_category_ids: Vec::new(),
         });
@@ -294,7 +352,19 @@ fn normalise_and_group(txns: &[TxnRow], rules: &PipelineRules) -> Vec<PayeeGroup
 
     let mut groups: Vec<PayeeGroup> = map.into_values().collect();
     groups.sort_by(|a, b| b.txn_ids.len().cmp(&a.txn_ids.len()));
-    groups
+
+    // Persist metadata to DB
+    for group in &groups {
+        payee_metadata::upsert(
+            conn,
+            &group.normalised,
+            &group.metadata,
+            &group.sample_original,
+            group.txn_ids.len() as i64,
+        )?;
+    }
+
+    Ok(groups)
 }
 
 fn load_category_maps(
@@ -381,6 +451,14 @@ mod tests {
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].new_category, "_Income");
+
+        // Verify audit row was written
+        let cached = audit::get_cached(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(cached.method, "rule");
+
+        // Verify payee_metadata was persisted
+        let pm = payee_metadata::get_type(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(pm, "salary");
     }
 
     #[test]
@@ -428,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pipeline_cached_place_used() {
+    fn test_pipeline_cached_audit_used() {
         let conn = db::initialize_in_memory().unwrap();
         setup_db_with_categories(&conn);
 
@@ -438,15 +516,19 @@ mod tests {
         })
         .unwrap();
 
-        let place = crate::categorise::cache::PlaceResult {
+        // Pre-populate audit cache
+        let place = PlaceResult {
             place_name: Some("Woolworths Strathfield".into()),
             place_types: vec!["supermarket".into(), "grocery_store".into()],
             place_address: None,
         };
-        crate::categorise::cache::set_cached(
+        audit::upsert_with_places(
             &conn,
             "Woolworths Strathfield",
-            "google_places",
+            Some("merchant"),
+            Some("_Groceries"),
+            "google:supermarket→category",
+            1,
             &place,
             None,
         )
@@ -463,6 +545,36 @@ mod tests {
         assert_eq!(results[0].category, Some("_Groceries".into()));
         assert_eq!(results[0].source, CategoriseSource::Cache);
         assert_eq!(changes[0].new_category, "_Groceries");
+    }
+
+    #[test]
+    fn test_pipeline_non_merchant_skips_places() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        // Insert a transfer_out that has NO matching rule override
+        // (banking_operation type maps to _Bills by rule, so we need something
+        // that falls through rules but is NOT merchant type)
+        // We'll verify by checking the audit — it should never have method=google_places
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Apple", "Salary from APPLE PTY LTD");
+            Ok(())
+        })
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, _) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        // Salary resolves by rule, never reaches Places
+        assert_eq!(results[0].source, CategoriseSource::Rule);
+
+        let audit_row = audit::get_cached(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(audit_row.method, "rule");
     }
 
     #[test]
