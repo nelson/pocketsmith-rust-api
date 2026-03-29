@@ -11,7 +11,7 @@ use super::llm::LlmClient;
 use super::mapping::map_place_to_category;
 use super::places::PlacesClient;
 use super::rules::{try_rules, CategoriseRules};
-use super::{confidence, CategoriseResult, CategoriseSource};
+use super::{CategoriseResult, CategoriseSource};
 
 /// A transaction row with the fields we need.
 struct TxnRow {
@@ -87,7 +87,7 @@ pub fn run(
 
         // 4b. Check cache
         if let Some(cached) = cache::get_cached(conn, &group.normalised, "google_places")? {
-            if let Some((cat, conf)) =
+            if let Some(cat) =
                 map_place_to_category(&cached.place_types, &categorise_rules.google_places_mappings)
             {
                 let type_str = cached.place_types.first().cloned().unwrap_or_default();
@@ -96,7 +96,6 @@ pub fn run(
                     category: Some(cat),
                     source: CategoriseSource::Cache,
                     reason: format!("cache:{}→category", type_str),
-                    confidence: conf,
                     transaction_count: count,
                 });
                 continue;
@@ -114,7 +113,7 @@ pub fn run(
                         &place,
                         Some(&raw),
                     )?;
-                    if let Some((cat, conf)) = map_place_to_category(
+                    if let Some(cat) = map_place_to_category(
                         &place.place_types,
                         &categorise_rules.google_places_mappings,
                     ) {
@@ -124,7 +123,6 @@ pub fn run(
                             category: Some(cat),
                             source: CategoriseSource::GooglePlaces,
                             reason: format!("google:{}→category", type_str),
-                            confidence: conf,
                             transaction_count: count,
                         });
                         continue;
@@ -160,7 +158,6 @@ pub fn run(
             category: None,
             source: CategoriseSource::Unknown,
             reason: "pending LLM".into(),
-            confidence: 0.0,
             transaction_count: count,
         });
         unresolved_merchants.push((idx, group.normalised.clone()));
@@ -181,7 +178,6 @@ pub fn run(
                         for (i, llm_r) in llm_results.into_iter().enumerate() {
                             let global_idx = unresolved_merchants[base + i].0;
                             results[global_idx].source = CategoriseSource::Llm;
-                            results[global_idx].confidence = confidence::LLM;
                             results[global_idx].category = llm_r.category;
                             results[global_idx].reason = llm_r.reason;
                         }

@@ -36,7 +36,6 @@ pub struct CategoriseResult {
     pub category: Option<String>,
     pub source: CategoriseSource,
     pub reason: String,
-    pub confidence: f64,
     pub transaction_count: usize,
 }
 
@@ -45,13 +44,3 @@ pub const TARGET_CATEGORIES: &[&str] = &[
     "_Holidays", "_Household", "_Income", "_Mortgage", "_Shopping",
     "_Transfer", "_Transport",
 ];
-
-pub mod confidence {
-    pub const TYPE_HIGH: f64 = 0.99;
-    pub const PAYEE_OVERRIDE: f64 = 0.95;
-    pub const PLACES_SPECIFIC: f64 = 0.90;
-    pub const TYPE_BANKING: f64 = 0.80;
-    pub const TYPE_DEFAULT: f64 = 0.70;
-    pub const PLACES_GENERIC: f64 = 0.70;
-    pub const LLM: f64 = 0.70;
-}

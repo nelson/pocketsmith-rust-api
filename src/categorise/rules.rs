@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::normalise::rules::{compile_icase, load_yaml, Re};
 
-use super::{confidence, CategoriseResult, CategoriseSource};
+use super::{CategoriseResult, CategoriseSource};
 
 #[derive(Deserialize)]
 struct CategoriseRulesYaml {
@@ -72,7 +72,6 @@ pub fn try_rules(
                 category: Some(ovr.category.clone()),
                 source: CategoriseSource::Rule,
                 reason: format!("payee_override:{}", ovr.re.as_str()),
-                confidence: confidence::PAYEE_OVERRIDE,
                 transaction_count,
             });
         }
@@ -81,17 +80,11 @@ pub fn try_rules(
     // 2. Check type rules
     if let Some(typ) = txn_type {
         if let Some(cat) = rules.type_rules.get(typ) {
-            let conf = match typ {
-                "salary" | "transfer_in" | "transfer_out" => confidence::TYPE_HIGH,
-                "banking_operation" => confidence::TYPE_BANKING,
-                _ => confidence::TYPE_DEFAULT,
-            };
             return Some(CategoriseResult {
                 normalised_payee: normalised_payee.to_string(),
                 category: Some(cat.clone()),
                 source: CategoriseSource::Rule,
                 reason: format!("type:{}→{}", typ, cat),
-                confidence: conf,
                 transaction_count,
             });
         }
@@ -116,7 +109,6 @@ mod tests {
         let result = try_rules("Apple (Salary)", Some("salary"), 10, &r).unwrap();
         assert_eq!(result.category, Some("_Income".into()));
         assert_eq!(result.source, CategoriseSource::Rule);
-        assert!(result.confidence >= 0.99);
     }
 
     #[test]
@@ -138,7 +130,6 @@ mod tests {
         let r = rules();
         let result = try_rules("Some Bank Operation", Some("banking_operation"), 2, &r).unwrap();
         assert_eq!(result.category, Some("_Bills".into()));
-        assert!(result.confidence <= 0.80);
     }
 
     #[test]

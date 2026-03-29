@@ -1,24 +1,15 @@
 use std::collections::HashMap;
 
-use super::confidence;
-
 /// Map Google Places types to a PocketSmith category.
 /// Iterates the place's types in order (most specific first from Google's API).
-/// Returns (category, confidence) or None if no type matches.
+/// Returns the category name or None if no type matches.
 pub fn map_place_to_category(
     types: &[String],
     mappings: &HashMap<String, String>,
-) -> Option<(String, f64)> {
-    const GENERIC_TYPES: &[&str] = &["store", "point_of_interest", "establishment", "food"];
-
+) -> Option<String> {
     for t in types {
         if let Some(cat) = mappings.get(t.as_str()) {
-            let conf = if GENERIC_TYPES.contains(&t.as_str()) {
-                confidence::PLACES_GENERIC
-            } else {
-                confidence::PLACES_SPECIFIC
-            };
-            return Some((cat.clone(), conf));
+            return Some(cat.clone());
         }
     }
     None
@@ -40,27 +31,24 @@ mod tests {
     fn test_supermarket_maps_to_groceries() {
         let m = mappings();
         let types = vec!["supermarket".into(), "grocery_store".into(), "store".into()];
-        let (cat, conf) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Groceries");
-        assert!(conf > 0.80);
     }
 
     #[test]
     fn test_restaurant_maps_to_dining() {
         let m = mappings();
         let types = vec!["restaurant".into(), "food".into(), "point_of_interest".into()];
-        let (cat, conf) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Dining");
-        assert!(conf > 0.80);
     }
 
     #[test]
-    fn test_generic_store_lower_confidence() {
+    fn test_generic_store_maps_to_shopping() {
         let m = mappings();
         let types = vec!["store".into(), "point_of_interest".into()];
-        let (cat, conf) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Shopping");
-        assert!(conf <= 0.70);
     }
 
     #[test]
@@ -74,9 +62,8 @@ mod tests {
     #[test]
     fn test_first_matching_type_wins() {
         let m = mappings();
-        // cafe before store -> should be _Dining not _Shopping
         let types = vec!["cafe".into(), "store".into()];
-        let (cat, _) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Dining");
     }
 
@@ -91,7 +78,7 @@ mod tests {
     fn test_gas_station_maps_to_transport() {
         let m = mappings();
         let types = vec!["gas_station".into()];
-        let (cat, _) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Transport");
     }
 
@@ -99,7 +86,7 @@ mod tests {
     fn test_pharmacy_maps_to_bills() {
         let m = mappings();
         let types = vec!["pharmacy".into(), "store".into()];
-        let (cat, _) = map_place_to_category(&types, &m).unwrap();
+        let cat = map_place_to_category(&types, &m).unwrap();
         assert_eq!(cat, "_Bills");
     }
 }
