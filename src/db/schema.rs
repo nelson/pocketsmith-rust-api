@@ -110,6 +110,17 @@ CREATE TABLE IF NOT EXISTS _transactions_history (
 CREATE INDEX IF NOT EXISTS idx_transactions_history_rowid
     ON _transactions_history(_rowid);
 
+CREATE TABLE IF NOT EXISTS transfer_pairs (
+    txn_id_a    INTEGER NOT NULL REFERENCES transactions(id),
+    txn_id_b    INTEGER NOT NULL REFERENCES transactions(id),
+    amount_cents INTEGER NOT NULL,
+    confidence  TEXT NOT NULL CHECK(confidence IN ('high', 'medium', 'low')),
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'confirmed', 'rejected')),
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(txn_id_a),
+    UNIQUE(txn_id_b)
+);
+
 CREATE TRIGGER IF NOT EXISTS _transactions_history_insert
 AFTER INSERT ON transactions
 WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE _rowid = NEW.id)

@@ -241,4 +241,17 @@ mod tests {
         assert!(tables.contains(&"categories".to_string()));
         assert!(tables.contains(&"transactions".to_string()));
     }
+
+    #[test]
+    fn test_initialize_creates_transfer_pairs_table() {
+        let conn = test_db();
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='transfer_pairs'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(exists);
+    }
 }
