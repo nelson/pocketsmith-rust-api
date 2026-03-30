@@ -3,6 +3,7 @@ mod schema;
 pub mod categories;
 pub mod transaction_accounts;
 pub mod transactions;
+pub mod transfer_pairs;
 pub mod users;
 
 pub use categories::upsert_category;
