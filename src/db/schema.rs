@@ -162,17 +162,6 @@ CREATE TABLE IF NOT EXISTS payee_metadata (
     updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
-CREATE TABLE IF NOT EXISTS places_cache (
-    query         TEXT NOT NULL,
-    provider      TEXT NOT NULL,
-    place_name    TEXT,
-    place_types   TEXT,
-    place_address TEXT,
-    raw_response  TEXT,
-    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    PRIMARY KEY (query, provider)
-);
-
 CREATE TABLE IF NOT EXISTS categorisation_audit (
     normalised_payee  TEXT PRIMARY KEY,
     payee_type        TEXT,

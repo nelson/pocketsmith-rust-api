@@ -2,7 +2,12 @@ use anyhow::Result;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use super::cache::PlaceResult;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaceResult {
+    pub place_name: Option<String>,
+    pub place_types: Vec<String>,
+    pub place_address: Option<String>,
+}
 
 /// A cached categorisation decision.
 #[derive(Debug, Clone)]
@@ -124,19 +129,6 @@ pub struct CachedAudit {
     pub place_types: Vec<String>,
 }
 
-/// Migrate existing places_cache rows into categorisation_audit.
-/// Only copies rows that don't already exist in categorisation_audit.
-pub fn migrate_places_cache(conn: &Connection) -> Result<usize> {
-    let count = conn.execute(
-        "INSERT OR IGNORE INTO categorisation_audit
-            (normalised_payee, method, place_name, place_types, place_address, raw_response)
-         SELECT query, 'google_places', place_name, place_types, place_address, raw_response
-         FROM places_cache",
-        [],
-    )?;
-    Ok(count)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,27 +213,4 @@ mod tests {
         assert_eq!(cached.category, Some("_Dining".into()));
     }
 
-    #[test]
-    fn test_migrate_places_cache() {
-        let conn = db::initialize_in_memory().unwrap();
-
-        // Insert into old places_cache
-        let place = PlaceResult {
-            place_name: Some("Coles".into()),
-            place_types: vec!["supermarket".into()],
-            place_address: None,
-        };
-        crate::categorise::cache::set_cached(&conn, "Coles", "google_places", &place, None)
-            .unwrap();
-
-        let migrated = migrate_places_cache(&conn).unwrap();
-        assert_eq!(migrated, 1);
-
-        let cached = get_cached(&conn, "Coles").unwrap().unwrap();
-        assert_eq!(cached.method, "google_places");
-
-        // Running again should not duplicate
-        let migrated2 = migrate_places_cache(&conn).unwrap();
-        assert_eq!(migrated2, 0);
-    }
 }

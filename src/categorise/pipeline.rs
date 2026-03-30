@@ -9,7 +9,7 @@ use crate::normalise::meta;
 use crate::normalise::Metadata;
 
 use super::audit;
-use super::cache::PlaceResult;
+use super::audit::PlaceResult;
 use super::llm::LlmClient;
 use super::mapping::map_place_to_category;
 use super::places::PlacesClient;
@@ -64,12 +64,14 @@ pub fn run(
 
     // 2. Load all transactions
     let txns = load_transactions(conn)?;
+    eprintln!("Loaded {} transactions", txns.len());
     if txns.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
 
     // 3. Normalise, group by payee, and persist metadata
     let groups = normalise_and_group(conn, &txns, normalise_rules)?;
+    eprintln!("Grouped into {} unique payees", groups.len());
 
     // 4. Categorise each group
     let mut results: Vec<CategoriseResult> = Vec::new();
@@ -119,9 +121,10 @@ pub fn run(
             }
         }
 
-        // 4c. Google Places API — only for merchants (or unknown type)
-        if txn_type == Some("merchant") || txn_type.is_none() {
+        // 4c. Google Places API — only for merchants
+        if txn_type == Some("merchant") {
             if let Some(ref client) = places_client {
+                eprintln!("  [Google Places] {}", group.normalised);
                 match client.search_raw(&group.normalised) {
                     Ok((Some(place), raw)) => {
                         if let Some(cat) = map_place_to_category(
@@ -211,8 +214,11 @@ pub fn run(
         if let Some(ref api_key) = config.anthropic_key {
             let client = LlmClient::new(api_key.clone());
             let payees: Vec<String> = unresolved.iter().map(|(_, p, _)| p.clone()).collect();
+            let total_chunks = (payees.len() + 19) / 20;
+            eprintln!("Sending {} unresolved payees to LLM ({} batches)...", payees.len(), total_chunks);
 
             for (chunk_idx, chunk) in payees.chunks(20).enumerate() {
+                eprintln!("  [LLM] batch {}/{}: {} payees", chunk_idx + 1, total_chunks, chunk.len());
                 let chunk_vec: Vec<String> = chunk.to_vec();
                 match client.categorise_batch(&chunk_vec) {
                     Ok(llm_results) => {
@@ -241,6 +247,8 @@ pub fn run(
             }
         }
     }
+
+    eprintln!("Categorisation complete. Building change list...");
 
     // 6. Build changes list
     let mut changes: Vec<CategoryChange> = Vec::new();

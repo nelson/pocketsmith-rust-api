@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::cache::PlaceResult;
+use super::audit::PlaceResult;
 
 pub struct PlacesClient {
     api_key: String,

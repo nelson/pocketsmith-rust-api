@@ -3,7 +3,6 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use pocketsmith_sync::categorise::audit;
 use pocketsmith_sync::categorise::eval;
 use pocketsmith_sync::categorise::pipeline::{self, PipelineConfig};
 use pocketsmith_sync::categorise::rules::CategoriseRules;
@@ -16,11 +15,6 @@ fn main() -> Result<()> {
 
     let conn = pocketsmith_sync::db::initialize("pocketsmith.db")?;
 
-    // Migrate any existing places_cache rows into categorisation_audit
-    let migrated = audit::migrate_places_cache(&conn)?;
-    if migrated > 0 {
-        println!("Migrated {} places_cache entries to categorisation_audit.", migrated);
-    }
     let normalise_rules = PipelineRules::load(Path::new("rules"))?;
     let categorise_rules = CategoriseRules::load(Path::new("rules"))?;
 
