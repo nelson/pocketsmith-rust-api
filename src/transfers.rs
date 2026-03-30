@@ -1,4 +1,7 @@
 use std::fmt;
+use std::sync::OnceLock;
+
+use regex::RegexSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Confidence {
@@ -73,6 +76,27 @@ pub struct TransferPair {
     pub status: Status,
 }
 
+fn transfer_patterns() -> &'static RegexSet {
+    static PATTERNS: OnceLock<RegexSet> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        RegexSet::new([
+            r"(?i)^Transfer (to|from)",
+            r"(?i)Fast Transfer (From|To)",
+            r"(?i)^(PAYMENT TO|PAYMENT FROM|ONLINE PAYMENT)",
+            r"(?i)Funds [Tt]ransfer",
+            r"(?i)^(to|from) account",
+            r"(?i)^(Mortgage|Amex) - Transfer",
+            r"(?i)^LOAN PAYMENT$",
+            r"(?i)^Repayment/Payment$",
+        ])
+        .expect("invalid regex patterns")
+    })
+}
+
+pub fn is_transfer_like(payee: &str) -> bool {
+    transfer_patterns().is_match(payee)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,5 +137,45 @@ mod tests {
     fn test_display() {
         assert_eq!(format!("{}", Confidence::High), "high");
         assert_eq!(format!("{}", Status::Confirmed), "confirmed");
+    }
+
+    #[test]
+    fn test_is_transfer_like_positive() {
+        let positives = [
+            "Transfer to xx8005 CommBank app",
+            "Transfer from xx8820 CommBank app",
+            "transfer to savings",
+            "Fast Transfer From JOHN SMITH",
+            "Fast Transfer To JANE DOE",
+            "PAYMENT TO AMEX",
+            "PAYMENT FROM SAVINGS",
+            "ONLINE PAYMENT",
+            "Funds Transfer",
+            "Funds transfer",
+            "to account 1234",
+            "from account 5678",
+            "Mortgage - Transfer",
+            "Amex - Transfer",
+            "LOAN PAYMENT",
+            "Repayment/Payment",
+        ];
+        for payee in positives {
+            assert!(is_transfer_like(payee), "should match: {payee}");
+        }
+    }
+
+    #[test]
+    fn test_is_transfer_like_negative() {
+        let negatives = [
+            "Woolworths",
+            "Netflix",
+            "SALARY",
+            "Amazon.com.au",
+            "Transfer Station Fees",
+            "Payment received",
+        ];
+        for payee in negatives {
+            assert!(!is_transfer_like(payee), "should NOT match: {payee}");
+        }
     }
 }
