@@ -1,5 +1,6 @@
 use std::env;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Read, Write};
+use std::os::fd::AsRawFd;
 
 use anyhow::{bail, Result};
 
@@ -67,19 +68,20 @@ fn review_mode(args: &[String]) -> Result<()> {
     let mut rejected = 0usize;
     let mut skipped = 0usize;
 
-    let stdin = io::stdin();
-    let mut lines = stdin.lock().lines();
+    let _raw_guard = RawModeGuard::enter()?;
 
     for (i, pair) in pairs.iter().enumerate() {
         print_review_prompt(i + 1, total, pair);
 
-        let response = match lines.next() {
-            Some(Ok(line)) => line.trim().to_lowercase(),
-            _ => break,
+        let key = match read_key() {
+            Some(k) => k,
+            None => break,
         };
+        // Echo the key and move to next line
+        println!("{key}");
 
-        match response.as_str() {
-            "y" | "yes" => {
+        match key {
+            'y' => {
                 transfer_pairs::update_status(
                     &conn,
                     pair.txn_id_a,
@@ -88,7 +90,7 @@ fn review_mode(args: &[String]) -> Result<()> {
                 )?;
                 confirmed += 1;
             }
-            "n" | "no" => {
+            'n' => {
                 transfer_pairs::update_status(
                     &conn,
                     pair.txn_id_a,
@@ -97,13 +99,14 @@ fn review_mode(args: &[String]) -> Result<()> {
                 )?;
                 rejected += 1;
             }
-            "q" | "quit" => break,
+            'q' => break,
             _ => {
                 skipped += 1;
             }
         }
     }
 
+    drop(_raw_guard);
     println!("\nReview session: {confirmed} confirmed, {rejected} rejected, {skipped} skipped");
     print_status_summary(&conn)?;
     Ok(())
@@ -207,6 +210,48 @@ fn print_status_summary(conn: &rusqlite::Connection) -> Result<()> {
         println!("  {status}: {n}");
     }
     Ok(())
+}
+
+/// RAII guard that puts stdin into raw mode and restores on drop.
+struct RawModeGuard {
+    original: libc::termios,
+    fd: i32,
+}
+
+impl RawModeGuard {
+    fn enter() -> Result<Self> {
+        let fd = io::stdin().as_raw_fd();
+        let mut original: libc::termios = unsafe { std::mem::zeroed() };
+        if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
+            bail!("failed to get terminal attributes");
+        }
+        let mut raw = original;
+        // Disable canonical mode (line buffering) and echo
+        raw.c_lflag &= !(libc::ICANON | libc::ECHO);
+        // Read one byte at a time
+        raw.c_cc[libc::VMIN] = 1;
+        raw.c_cc[libc::VTIME] = 0;
+        if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &raw) } != 0 {
+            bail!("failed to set raw mode");
+        }
+        Ok(Self { original, fd })
+    }
+}
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        unsafe {
+            libc::tcsetattr(self.fd, libc::TCSANOW, &self.original);
+        }
+    }
+}
+
+fn read_key() -> Option<char> {
+    let mut buf = [0u8; 1];
+    match io::stdin().read_exact(&mut buf) {
+        Ok(()) => Some(buf[0] as char),
+        Err(_) => None,
+    }
 }
 
 #[cfg(test)]

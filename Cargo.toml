@@ -11,6 +11,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 anyhow = "1"
 dotenvy = "0.15"
 regex = "1"
+libc = "0.2"
 
 [[bin]]
 name = "transfers"
