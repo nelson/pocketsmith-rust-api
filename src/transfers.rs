@@ -32,7 +32,7 @@ impl fmt::Display for Confidence {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Status {
     Pending,
     Confirmed,
