@@ -11,3 +11,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 anyhow = "1"
 dotenvy = "0.15"
 regex = "1"
+
+[[bin]]
+name = "transfers"
+path = "src/bin/transfers.rs"
