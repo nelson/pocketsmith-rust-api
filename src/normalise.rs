@@ -336,6 +336,42 @@ pub fn expand_truncations(s: &str) -> String {
     result
 }
 
+/// Title-case a string (capitalize first letter of each word).
+pub fn title_case(s: &str) -> String {
+    s.split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => {
+                    let upper: String = c.to_uppercase().collect();
+                    let lower: String = chars.as_str().to_lowercase();
+                    format!("{upper}{lower}")
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Run the full normalisation pipeline on a payee string.
+/// Currently a skeleton: strip -> expand -> title-case fallback.
+pub fn normalise(original: &str) -> NormalisationResult {
+    let (stripped, gateway) = strip_metadata(original);
+    let expanded = expand_truncations(&stripped);
+    let normalised = title_case(&expanded);
+
+    NormalisationResult {
+        original: original.to_string(),
+        normalised,
+        features: Features {
+            payment_gateway: gateway,
+            ..Default::default()
+        },
+        class: PayeeClass::Unclassified,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +541,40 @@ mod tests {
     #[test]
     fn test_expand_north_strathfield() {
         assert_eq!(expand_truncations("SHOP NORTH STRATHF"), "SHOP NORTH STRATHFIELD");
+    }
+
+    // --- Title case tests ---
+
+    #[test]
+    fn test_title_case_basic() {
+        assert_eq!(title_case("WOOLWORTHS STRATHFIELD"), "Woolworths Strathfield");
+    }
+
+    #[test]
+    fn test_title_case_empty() {
+        assert_eq!(title_case(""), "");
+    }
+
+    // --- Skeleton normalise tests ---
+
+    #[test]
+    fn test_normalise_chains_strip_expand_titlecase() {
+        let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        assert_eq!(result.normalised, "Woolworths 1624 Strathfield");
+        assert_eq!(result.class, PayeeClass::Unclassified);
+    }
+
+    #[test]
+    fn test_normalise_with_gateway() {
+        let result = normalise("SQ *CAFE BLUE SYDNEY AU");
+        assert_eq!(result.features.payment_gateway.as_deref(), Some("Square"));
+        assert!(result.normalised.contains("Cafe Blue"));
+    }
+
+    #[test]
+    fn test_normalise_preserves_original() {
+        let original = "SMP*TEST MERCHANT PTY LTD";
+        let result = normalise(original);
+        assert_eq!(result.original, original);
     }
 }
