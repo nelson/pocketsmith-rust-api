@@ -4,6 +4,8 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
+use crate::known_entities::KNOWN_EMPLOYERS;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
     Transfer,
@@ -372,6 +374,102 @@ pub fn normalise(original: &str) -> NormalisationResult {
     }
 }
 
+// --- Feature Extraction ---
+
+struct DirectionPattern {
+    regex: Regex,
+    direction: Direction,
+}
+
+fn direction_patterns() -> &'static Vec<DirectionPattern> {
+    static PATTERNS: OnceLock<Vec<DirectionPattern>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        let raw: Vec<(&str, Direction)> = vec![
+            (r"(?i)^Salary\b", Direction::Salary),
+            (r"(?i)^PAY/SALARY FROM\b", Direction::Salary),
+            (r"(?i)^Employer Contribution From\b", Direction::Salary),
+            (r"(?i)^Salary - Salary Deposit", Direction::Salary),
+            (r"(?i)^Fast Transfer From\b", Direction::TransferIn),
+            (r"(?i)^Transfer From\b", Direction::TransferIn),
+            (r"(?i)^From\b", Direction::TransferIn),
+            (r"(?i)^Transfer [Tt]o\b", Direction::TransferOut),
+            (r"(?i)^Fast Transfer To\b", Direction::TransferOut),
+            (r"(?i)^To\b", Direction::TransferOut),
+            (r"(?i)^Mortgage\s*-?\s*Transfer", Direction::TransferOut),
+            (r"(?i)^Amex - Transfer", Direction::TransferOut),
+            (r"- Osko Payment - Receipt", Direction::TransferIn),
+            (r"- Osko Payment to", Direction::TransferOut),
+            (r"(?i)^Direct Debit\b", Direction::DirectDebit),
+            (r"(?i)^Direct Credit\b", Direction::DirectCredit),
+            (r"(?i)^BPAY PAYMENT", Direction::BankingOperation),
+            (r"(?i)^Loan Repayment", Direction::BankingOperation),
+            (r"(?i)^Interest Charge", Direction::BankingOperation),
+            (r"(?i)^Interest Adjustment", Direction::BankingOperation),
+            (r"(?i)^Credit Card$", Direction::BankingOperation),
+            (r"(?i)^Funds [Tt]ransfer$", Direction::BankingOperation),
+            (r"(?i)^ACCOUNT SERVICING FEE$", Direction::BankingOperation),
+            (r"(?i)^ONLINE PAYMENT", Direction::BankingOperation),
+            (r"(?i)^PAYMENT FROM\b", Direction::BankingOperation),
+            (r"(?i)^PAYMENT TO\b", Direction::BankingOperation),
+            (r"(?i)^from account", Direction::BankingOperation),
+            (r"(?i)^to account", Direction::BankingOperation),
+            (r"(?i)^Wdl ATM", Direction::BankingOperation),
+            (r"(?i)^CASH DEPOSIT", Direction::BankingOperation),
+            (r"(?i)^Repayment/Payment", Direction::BankingOperation),
+            (r"(?i)^Internal Transfer", Direction::BankingOperation),
+        ];
+        raw.into_iter()
+            .map(|(p, d)| DirectionPattern {
+                regex: Regex::new(p).expect("invalid direction pattern"),
+                direction: d,
+            })
+            .collect()
+    })
+}
+
+fn extract_direction(original: &str) -> Option<Direction> {
+    for pat in direction_patterns() {
+        if pat.regex.is_match(original) {
+            return Some(pat.direction.clone());
+        }
+    }
+    None
+}
+
+fn extract_employer(original: &str) -> Option<String> {
+    static SALARY_PATTERNS: OnceLock<Vec<(Regex, usize)>> = OnceLock::new();
+    let patterns = SALARY_PATTERNS.get_or_init(|| {
+        vec![
+            (Regex::new(r"(?i)^Salary [Ff]rom (.+?)(?:\s*-\s*.+)?$").unwrap(), 1),
+            (Regex::new(r"(?i)^PAY/SALARY FROM (.+?)(?:\s+SALARY)?$").unwrap(), 1),
+            (Regex::new(r"(?i)^Employer Contribution From (.+)$").unwrap(), 1),
+            (Regex::new(r"^Salary (AFES)").unwrap(), 1),
+        ]
+    });
+
+    for (regex, group) in patterns {
+        if let Some(caps) = regex.captures(original) {
+            if let Some(m) = caps.get(*group) {
+                let employer_raw = m.as_str().trim();
+                let upper = employer_raw.to_uppercase();
+                for emp in KNOWN_EMPLOYERS {
+                    if upper.contains(emp.pattern) {
+                        return Some(emp.canonical.to_string());
+                    }
+                }
+                return Some(title_case(employer_raw));
+            }
+        }
+    }
+    None
+}
+
+fn extract_account_ref(s: &str) -> Option<String> {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\bxx(\d{4})\b").unwrap());
+    re.captures(s).map(|c| format!("xx{}", &c[1]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -576,5 +674,41 @@ mod tests {
         let original = "SMP*TEST MERCHANT PTY LTD";
         let result = normalise(original);
         assert_eq!(result.original, original);
+    }
+
+    // --- Direction/employer/account_ref extraction tests ---
+
+    #[test]
+    fn test_extract_direction_salary() {
+        assert_eq!(extract_direction("Salary from Apple Pty Ltd"), Some(Direction::Salary));
+        assert_eq!(extract_direction("PAY/SALARY FROM APPLE"), Some(Direction::Salary));
+    }
+
+    #[test]
+    fn test_extract_direction_transfer() {
+        assert_eq!(extract_direction("Transfer to xx8005 CommBank app"), Some(Direction::TransferOut));
+        assert_eq!(extract_direction("Fast Transfer From John Smith"), Some(Direction::TransferIn));
+    }
+
+    #[test]
+    fn test_extract_direction_banking() {
+        assert_eq!(extract_direction("Interest Charge"), Some(Direction::BankingOperation));
+        assert_eq!(extract_direction("BPAY PAYMENT 12345"), Some(Direction::BankingOperation));
+    }
+
+    #[test]
+    fn test_extract_direction_none() {
+        assert_eq!(extract_direction("Woolworths Strathfield"), None);
+    }
+
+    #[test]
+    fn test_extract_employer_apple() {
+        assert_eq!(extract_employer("Salary from Apple Pty Ltd"), Some("Apple".into()));
+    }
+
+    #[test]
+    fn test_extract_account_ref() {
+        assert_eq!(extract_account_ref("Transfer to xx8005 CommBank app"), Some("xx8005".into()));
+        assert_eq!(extract_account_ref("Woolworths"), None);
     }
 }
