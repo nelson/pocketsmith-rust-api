@@ -1,5 +1,5 @@
 use std::env;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::os::fd::AsRawFd;
 
 use anyhow::{bail, Result};
@@ -68,17 +68,39 @@ fn review_mode(args: &[String]) -> Result<()> {
     let mut rejected = 0usize;
     let mut skipped = 0usize;
 
-    let _raw_guard = RawModeGuard::enter()?;
+    let is_tty = unsafe { libc::isatty(io::stdin().as_raw_fd()) } != 0;
+    let _raw_guard = if is_tty {
+        Some(RawModeGuard::enter()?)
+    } else {
+        None
+    };
+    let mut lines = if !is_tty {
+        Some(io::stdin().lock().lines())
+    } else {
+        None
+    };
 
     for (i, pair) in pairs.iter().enumerate() {
         print_review_prompt(i + 1, total, pair);
 
-        let key = match read_key() {
-            Some(k) => k,
-            None => break,
+        let key = if is_tty {
+            match read_key() {
+                Some(k) => {
+                    println!("{k}");
+                    k
+                }
+                None => break,
+            }
+        } else {
+            match lines.as_mut().unwrap().next() {
+                Some(Ok(line)) => {
+                    let ch = line.chars().next().unwrap_or('y');
+                    println!("{ch}");
+                    ch
+                }
+                _ => break,
+            }
         };
-        // Echo the key and move to next line
-        println!("{key}");
 
         match key {
             'y' | '\n' | '\r' => {

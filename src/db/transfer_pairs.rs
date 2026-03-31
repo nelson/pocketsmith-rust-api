@@ -68,7 +68,8 @@ pub fn get_pending_pairs(conn: &Connection, limit: usize) -> Result<Vec<Transfer
     let query = format!(
         "{} WHERE tp.status = 'pending' ORDER BY
             CASE tp.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-            tp.amount_cents DESC
+            tp.amount_cents DESC,
+            tp.txn_id_a
          LIMIT ?1",
         PAIR_ROW_QUERY
     );
