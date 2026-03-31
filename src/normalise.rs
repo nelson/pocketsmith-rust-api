@@ -197,6 +197,145 @@ pub fn strip_metadata(payee: &str) -> (String, Option<String>, Option<String>) {
     (s, gateway, date)
 }
 
+struct Expansion {
+    from: &'static str,
+    to: &'static str,
+}
+
+fn truncation_expansions() -> &'static Vec<Expansion> {
+    static EXPANSIONS: OnceLock<Vec<Expansion>> = OnceLock::new();
+    EXPANSIONS.get_or_init(|| {
+        vec![
+            // Multi-word suburbs (longest first)
+            Expansion { from: "NORTH STRATHFIE", to: "NORTH STRATHFIELD" },
+            Expansion { from: "NORTH STRATHFAU", to: "NORTH STRATHFIELD" },
+            Expansion { from: "NORTH STRATHF", to: "NORTH STRATHFIELD" },
+            Expansion { from: "NORTH STRATH", to: "NORTH STRATHFIELD" },
+            Expansion { from: "STRATHFIEL", to: "STRATHFIELD" },
+            Expansion { from: "STRATHFIE", to: "STRATHFIELD" },
+            Expansion { from: "STRATHFI", to: "STRATHFIELD" },
+            Expansion { from: "STRATHFAU", to: "STRATHFIELD" },
+            Expansion { from: "STRATHF", to: "STRATHFIELD" },
+            Expansion { from: "STRATH", to: "STRATHFIELD" },
+            Expansion { from: "STRAT", to: "STRATHFIELD" },
+            Expansion { from: "NORTH RY", to: "NORTH RYDE" },
+            Expansion { from: "WEST RY", to: "WEST RYDE" },
+            Expansion { from: "BURWOO", to: "BURWOOD" },
+            Expansion { from: "BURWO", to: "BURWOOD" },
+            Expansion { from: "BURW", to: "BURWOOD" },
+            Expansion { from: "MACQUARIE PAR", to: "MACQUARIE PARK" },
+            Expansion { from: "MACQUARIE PA", to: "MACQUARIE PARK" },
+            Expansion { from: "MACQUARIE CEN", to: "MACQUARIE CENTRE" },
+            Expansion { from: "MACQUARI", to: "MACQUARIE" },
+            Expansion { from: "MACQUAR", to: "MACQUARIE" },
+            Expansion { from: "HABERFIEL", to: "HABERFIELD" },
+            Expansion { from: "HEBERFIELD", to: "HABERFIELD" },
+            Expansion { from: "HOMEBUSH WES", to: "HOMEBUSH WEST" },
+            Expansion { from: "HOMEBUSH WEA", to: "HOMEBUSH WEST" },
+            Expansion { from: "SOUTH GRANVIL", to: "SOUTH GRANVILLE" },
+            Expansion { from: "DARLINGHURS", to: "DARLINGHURST" },
+            Expansion { from: "WOOLLOOMOOL", to: "WOOLLOOMOOLOO" },
+            Expansion { from: "BALGOWNI", to: "BALGOWNIE" },
+            Expansion { from: "COOLANGATT", to: "COOLANGATTA" },
+            Expansion { from: "PARRAMATT", to: "PARRAMATTA" },
+            Expansion { from: "BARANGARO", to: "BARANGAROO" },
+            Expansion { from: "PETERSHA", to: "PETERSHAM" },
+            Expansion { from: "STANMOR", to: "STANMORE" },
+            Expansion { from: "SURFERS PARADIS", to: "SURFERS PARADISE" },
+            Expansion { from: "MELBOURNE AIRPO", to: "MELBOURNE AIRPORT" },
+            Expansion { from: "MARSFIEL", to: "MARSFIELD" },
+            Expansion { from: "MARSFIE", to: "MARSFIELD" },
+            Expansion { from: "NEWINGT", to: "NEWINGTON" },
+            Expansion { from: "CHULLOR", to: "CHULLORA" },
+            Expansion { from: "CONCOR", to: "CONCORD" },
+            Expansion { from: "CROYD", to: "CROYDON" },
+            Expansion { from: "PALM BEAC", to: "PALM BEACH" },
+            Expansion { from: "MONA VAL", to: "MONA VALE" },
+            Expansion { from: "SUMMER HIL", to: "SUMMER HILL" },
+            Expansion { from: "BROADWA", to: "BROADWAY" },
+            Expansion { from: "BROADW", to: "BROADWAY" },
+            Expansion { from: "GATEWA", to: "GATEWAY" },
+            Expansion { from: "CHARLESTOW", to: "CHARLESTOWN" },
+            Expansion { from: "HEATHCO", to: "HEATHCOTE" },
+            Expansion { from: "KIRRIBILL", to: "KIRRIBILLI" },
+            Expansion { from: "SHELL COV", to: "SHELL COVE" },
+            Expansion { from: "SHELL C", to: "SHELL COVE" },
+            Expansion { from: "BOMADERR", to: "BOMADERRY" },
+            Expansion { from: "WOLLONGON", to: "WOLLONGONG" },
+            Expansion { from: "HURSTV", to: "HURSTVILLE" },
+            Expansion { from: "FIVE DOC", to: "FIVE DOCK" },
+            Expansion { from: "ASHFIEL", to: "ASHFIELD" },
+            Expansion { from: "BELFIEL", to: "BELFIELD" },
+            Expansion { from: "CROWS NES", to: "CROWS NEST" },
+            Expansion { from: "DICKSO", to: "DICKSON" },
+            Expansion { from: "FORTITUD", to: "FORTITUDE VALLEY" },
+            // Word truncations
+            Expansion { from: "PHARMCY", to: "PHARMACY" },
+            Expansion { from: "MKTPL", to: "MARKETPLACE" },
+            Expansion { from: "MKTPLC", to: "MARKETPLACE" },
+            Expansion { from: "RETA", to: "RETAIL" },
+            Expansion { from: "AUSTRA", to: "AUSTRALIA" },
+            Expansion { from: "SUPERMARKE", to: "SUPERMARKET" },
+            Expansion { from: "SUPERMAR", to: "SUPERMARKET" },
+            Expansion { from: "RESTAURAN", to: "RESTAURANT" },
+            Expansion { from: "INTERNATIO", to: "INTERNATIONAL" },
+            Expansion { from: "INTERNATIONA", to: "INTERNATIONAL" },
+            Expansion { from: "ENTERPRI", to: "ENTERPRISES" },
+            Expansion { from: "ENTERPRIS", to: "ENTERPRISES" },
+            Expansion { from: "ENTERPRISE", to: "ENTERPRISES" },
+            Expansion { from: "CHOCOLA", to: "CHOCOLATES" },
+            Expansion { from: "ACUPUNCT", to: "ACUPUNCTURE" },
+            Expansion { from: "CHEMIS", to: "CHEMIST" },
+            Expansion { from: "CHEMI", to: "CHEMIST" },
+            Expansion { from: "KITCHE", to: "KITCHEN" },
+            Expansion { from: "KITCH", to: "KITCHEN" },
+            Expansion { from: "GELAT", to: "GELATO" },
+            Expansion { from: "ENTERTAIN", to: "ENTERTAINMENT" },
+            Expansion { from: "ENTERTAINMEN", to: "ENTERTAINMENT" },
+            Expansion { from: "BOULEVAR", to: "BOULEVARD" },
+            Expansion { from: "TOWE", to: "TOWER" },
+            Expansion { from: "COF", to: "COFFEE" },
+            Expansion { from: "COFF", to: "COFFEE" },
+            Expansion { from: "COSME", to: "COSMETICS" },
+            Expansion { from: "STARBUC", to: "STARBUCKS" },
+            Expansion { from: "BREADTO", to: "BREADTOP" },
+        ]
+    })
+}
+
+/// Expand truncated words in a payee string using word-boundary matching.
+pub fn expand_truncations(s: &str) -> String {
+    let mut result = s.to_string();
+    let mut changed = true;
+
+    while changed {
+        changed = false;
+        let upper = result.to_uppercase();
+
+        for exp in truncation_expansions() {
+            if exp.from == exp.to {
+                continue;
+            }
+
+            if let Some(pos) = upper.find(exp.from) {
+                let at_word_start =
+                    pos == 0 || !upper.as_bytes()[pos - 1].is_ascii_alphanumeric();
+                let end = pos + exp.from.len();
+                let at_word_end =
+                    end == upper.len() || !upper.as_bytes()[end].is_ascii_alphanumeric();
+
+                if at_word_start && at_word_end {
+                    result = format!("{}{}{}", &result[..pos], exp.to, &result[end..]);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +473,37 @@ mod tests {
     fn test_strip_email_suffix() {
         let (stripped, _, _) = strip_metadata("PAYPAL - paypal-aud@airbnb.com");
         assert_eq!(stripped, "PAYPAL");
+    }
+
+    // --- Expand truncations tests ---
+
+    #[test]
+    fn test_expand_strathfield() {
+        assert_eq!(expand_truncations("WOOLWORTHS 1624 STRATHF"), "WOOLWORTHS 1624 STRATHFIELD");
+    }
+
+    #[test]
+    fn test_expand_burwood() {
+        assert_eq!(expand_truncations("COLES BURWOO"), "COLES BURWOOD");
+    }
+
+    #[test]
+    fn test_expand_pharmacy() {
+        assert_eq!(expand_truncations("DISCOUNT PHARMCY"), "DISCOUNT PHARMACY");
+    }
+
+    #[test]
+    fn test_expand_no_partial_match() {
+        assert_eq!(expand_truncations("STRATEGIC PLAN"), "STRATEGIC PLAN");
+    }
+
+    #[test]
+    fn test_expand_multiple() {
+        assert_eq!(expand_truncations("PHARMCY BURWOO"), "PHARMACY BURWOOD");
+    }
+
+    #[test]
+    fn test_expand_north_strathfield() {
+        assert_eq!(expand_truncations("SHOP NORTH STRATHF"), "SHOP NORTH STRATHFIELD");
     }
 }
