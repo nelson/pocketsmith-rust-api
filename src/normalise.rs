@@ -4,7 +4,10 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use crate::known_entities::{KNOWN_EMPLOYERS, KNOWN_PERSONS, PERSONS_STRIP_MEMO};
+use crate::known_entities::{
+    KNOWN_BANKING_OPS, KNOWN_EMPLOYERS, KNOWN_LOCATIONS, KNOWN_MERCHANT_PATTERNS, KNOWN_PERSONS,
+    PERSONS_STRIP_MEMO,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
@@ -543,6 +546,83 @@ fn extract_person(stripped: &str, original: &str) -> Option<String> {
     None
 }
 
+fn compiled_merchant_patterns() -> &'static Vec<(Regex, &'static str)> {
+    static PATTERNS: OnceLock<Vec<(Regex, &'static str)>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        KNOWN_MERCHANT_PATTERNS
+            .iter()
+            .map(|mp| {
+                let re = Regex::new(mp.pattern)
+                    .unwrap_or_else(|e| panic!("invalid merchant pattern '{}': {}", mp.pattern, e));
+                (re, mp.canonical)
+            })
+            .collect()
+    })
+}
+
+fn extract_merchant(stripped: &str, original: &str) -> Option<String> {
+    let upper_stripped = stripped.to_uppercase();
+    let upper_original = original.to_uppercase();
+
+    for (re, canonical) in compiled_merchant_patterns() {
+        if re.is_match(&upper_original) || re.is_match(&upper_stripped) {
+            return Some(canonical.to_string());
+        }
+    }
+    None
+}
+
+fn extract_location(s: &str) -> Option<String> {
+    let upper = s.to_uppercase();
+    for &loc in KNOWN_LOCATIONS {
+        if let Some(pos) = upper.find(loc) {
+            let at_word_start = pos == 0 || !upper.as_bytes()[pos - 1].is_ascii_alphanumeric();
+            let end = pos + loc.len();
+            let at_word_end = end == upper.len() || !upper.as_bytes()[end].is_ascii_alphanumeric();
+            if at_word_start && at_word_end {
+                return Some(title_case(loc));
+            }
+        }
+    }
+    None
+}
+
+fn extract_banking_op(original: &str) -> Option<String> {
+    let upper = original.to_uppercase();
+    for op in KNOWN_BANKING_OPS {
+        if upper.contains(op.pattern) {
+            return Some(op.canonical.to_string());
+        }
+    }
+    None
+}
+
+pub fn extract_features(stripped: &str, original: &str, gateway: Option<String>) -> Features {
+    let mut f = Features {
+        payment_gateway: gateway,
+        ..Default::default()
+    };
+
+    f.direction = extract_direction(original);
+    f.account_ref = extract_account_ref(original);
+
+    if matches!(f.direction, Some(Direction::Salary)) {
+        f.employer_name = extract_employer(original);
+    }
+
+    f.person_name = extract_person(stripped, original);
+    f.merchant_name = extract_merchant(stripped, original);
+    f.location = extract_location(stripped);
+
+    if f.merchant_name.is_none() && f.person_name.is_none() {
+        if let Some(op) = extract_banking_op(original) {
+            f.bank_name = Some(op);
+        }
+    }
+
+    f
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -806,5 +886,35 @@ mod tests {
     #[test]
     fn test_extract_person_none() {
         assert_eq!(extract_person("WOOLWORTHS", "WOOLWORTHS"), None);
+    }
+
+    // --- Merchant/location/banking extraction tests ---
+
+    #[test]
+    fn test_extract_merchant_woolworths() {
+        assert_eq!(extract_merchant("WOOLWORTHS 1624 STRATHFIELD", "WOOLWORTHS 1624 STRATHFIELD"), Some("Woolworths".into()));
+    }
+
+    #[test]
+    fn test_extract_merchant_banking_identity() {
+        assert_eq!(
+            extract_merchant("Direct Debit 123 AUSTRALIAN FELLO", "Direct Debit 123 AUSTRALIAN FELLO"),
+            Some("AFES (Donation)".into())
+        );
+    }
+
+    #[test]
+    fn test_extract_location() {
+        assert_eq!(extract_location("WOOLWORTHS 1624 STRATHFIELD"), Some("Strathfield".into()));
+        assert_eq!(extract_location("COLES BURWOOD"), Some("Burwood".into()));
+        assert_eq!(extract_location("SOME RANDOM TEXT"), None);
+    }
+
+    #[test]
+    fn test_extract_features_wires_all() {
+        let f = extract_features("WOOLWORTHS 1624 STRATHFIELD", "WOOLWORTHS 1624 STRATHFIELD", None);
+        assert_eq!(f.merchant_name.as_deref(), Some("Woolworths"));
+        assert_eq!(f.location.as_deref(), Some("Strathfield"));
+        assert!(f.person_name.is_none());
     }
 }
