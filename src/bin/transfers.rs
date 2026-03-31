@@ -81,7 +81,7 @@ fn review_mode(args: &[String]) -> Result<()> {
         println!("{key}");
 
         match key {
-            'y' => {
+            'y' | '\n' | '\r' => {
                 transfer_pairs::update_status(
                     &conn,
                     pair.txn_id_a,
