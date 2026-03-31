@@ -623,6 +623,76 @@ pub fn extract_features(stripped: &str, original: &str, gateway: Option<String>)
     f
 }
 
+// --- Classification ---
+
+pub fn classify(features: &Features) -> PayeeClass {
+    if features.employer_name.is_some() {
+        return PayeeClass::Employer;
+    }
+    if features.person_name.is_some() && features.merchant_name.is_none() {
+        return PayeeClass::Person;
+    }
+    if features.merchant_name.is_some() {
+        return PayeeClass::Merchant;
+    }
+    if features.direction.is_some()
+        || features.reason.is_some()
+        || features.bank_name.is_some()
+        || features.account_ref.is_some()
+    {
+        return PayeeClass::Other;
+    }
+    PayeeClass::Unclassified
+}
+
+// --- Normalised Payee Generation ---
+
+pub fn generate_normalised_payee(class: &PayeeClass, features: &Features, stripped: &str) -> String {
+    match class {
+        PayeeClass::Merchant => {
+            let name = features.merchant_name.as_deref().unwrap_or("Unknown");
+            match &features.location {
+                Some(loc) if !name.to_uppercase().contains(&loc.to_uppercase()) => {
+                    format!("{name} {loc}")
+                }
+                _ => name.to_string(),
+            }
+        }
+        PayeeClass::Person => {
+            let name = features.person_name.as_deref().unwrap_or("Unknown");
+            match &features.reason {
+                Some(reason) => format!("{name} ({reason})"),
+                None => name.to_string(),
+            }
+        }
+        PayeeClass::Employer => {
+            let name = features.employer_name.as_deref().unwrap_or("Unknown");
+            format!("{name} (Salary)")
+        }
+        PayeeClass::Other => {
+            if let Some(bank_op) = &features.bank_name {
+                return bank_op.clone();
+            }
+            if let Some(ref dir) = features.direction {
+                let dir_str = match dir {
+                    Direction::TransferIn => "Transfer from",
+                    Direction::TransferOut => "Transfer to",
+                    Direction::DirectDebit => "Direct Debit",
+                    Direction::DirectCredit => "Direct Credit",
+                    Direction::Salary => "Salary",
+                    Direction::BankingOperation => "Banking Operation",
+                };
+                if let Some(ref acct) = features.account_ref {
+                    return format!("{dir_str} {acct}");
+                }
+                return dir_str.to_string();
+            }
+            title_case(stripped)
+        }
+        PayeeClass::Unclassified => title_case(stripped),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -916,5 +986,67 @@ mod tests {
         assert_eq!(f.merchant_name.as_deref(), Some("Woolworths"));
         assert_eq!(f.location.as_deref(), Some("Strathfield"));
         assert!(f.person_name.is_none());
+    }
+
+    // --- Classification tests ---
+
+    #[test]
+    fn test_classify_employer() {
+        let f = Features { employer_name: Some("Apple".into()), ..Default::default() };
+        assert_eq!(classify(&f), PayeeClass::Employer);
+    }
+
+    #[test]
+    fn test_classify_person() {
+        let f = Features { person_name: Some("Johnny Tam".into()), ..Default::default() };
+        assert_eq!(classify(&f), PayeeClass::Person);
+    }
+
+    #[test]
+    fn test_classify_merchant() {
+        let f = Features { merchant_name: Some("Woolworths".into()), ..Default::default() };
+        assert_eq!(classify(&f), PayeeClass::Merchant);
+    }
+
+    #[test]
+    fn test_classify_other() {
+        let f = Features { direction: Some(Direction::TransferOut), account_ref: Some("xx8005".into()), ..Default::default() };
+        assert_eq!(classify(&f), PayeeClass::Other);
+    }
+
+    #[test]
+    fn test_classify_unclassified() {
+        assert_eq!(classify(&Features::default()), PayeeClass::Unclassified);
+    }
+
+    // --- Generation tests ---
+
+    #[test]
+    fn test_generate_merchant_with_location() {
+        let f = Features { merchant_name: Some("Woolworths".into()), location: Some("Strathfield".into()), ..Default::default() };
+        assert_eq!(generate_normalised_payee(&PayeeClass::Merchant, &f, ""), "Woolworths Strathfield");
+    }
+
+    #[test]
+    fn test_generate_person() {
+        let f = Features { person_name: Some("Johnny Tam".into()), ..Default::default() };
+        assert_eq!(generate_normalised_payee(&PayeeClass::Person, &f, ""), "Johnny Tam");
+    }
+
+    #[test]
+    fn test_generate_employer() {
+        let f = Features { employer_name: Some("Apple".into()), ..Default::default() };
+        assert_eq!(generate_normalised_payee(&PayeeClass::Employer, &f, ""), "Apple (Salary)");
+    }
+
+    #[test]
+    fn test_generate_other_transfer() {
+        let f = Features { direction: Some(Direction::TransferOut), account_ref: Some("xx8005".into()), ..Default::default() };
+        assert_eq!(generate_normalised_payee(&PayeeClass::Other, &f, ""), "Transfer to xx8005");
+    }
+
+    #[test]
+    fn test_generate_unclassified() {
+        assert_eq!(generate_normalised_payee(&PayeeClass::Unclassified, &Features::default(), "SOME TEXT"), "Some Text");
     }
 }
