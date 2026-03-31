@@ -310,6 +310,95 @@ pub const PERSONS_STRIP_MEMO: &[&str] = &[
     "STEPHANIE WONG", "ZACHARY MATTHEW FISHE", "MARTIN HIGHLAND",
 ];
 
+// --- Known Locations ---
+pub const KNOWN_LOCATIONS: &[&str] = &[
+    "NORTH STRATHFIELD", "STRATHFIELD SOUTH", "NORTH PARRAMATTA",
+    "SOUTH GRANVILLE", "MACQUARIE CENTRE", "SURFERS PARADISE",
+    "MELBOURNE AIRPORT", "FORTITUDE VALLEY", "SYDNEY AIRPORT",
+    "MACQUARIE PARK", "HOMEBUSH WEST", "WEST MELBOURNE",
+    "CROYDON PARK", "SUMMER HILL", "BAULKHAM HILLS",
+    "EASTERN CREEK", "PENNANT HILLS", "MARTIN PLACE",
+    "FAIRY MEADOW", "THE ENTRANCE", "NORTH RYDE", "WEST RYDE",
+    "SHELL COVE", "MONA VALE", "PALM BEACH", "SURRY HILLS",
+    "CROWS NEST", "FIVE DOCK", "STRATHFIELD", "BURWOOD",
+    "BROADWAY", "SYDNEY", "MELBOURNE", "CHIPPENDALE", "ULTIMO",
+    "BOWRAL", "TEMPE", "CROYDON", "ENFIELD", "NEWINGTON",
+    "CONCORD", "RHODES", "HEATHCOTE", "BOMADERRY", "WOLLONGONG",
+    "HURSTVILLE", "KINGSFORD", "MARSFIELD", "ASHFIELD", "BELFIELD",
+    "DICKSON", "MASCOT", "AUBURN", "PADDINGTON", "DARLINGHURST",
+    "KIRRIBILLI", "STANMORE", "PETERSHAM", "HABERFIELD", "CHULLORA",
+    "SILVERWATER", "PARRAMATTA", "BARANGAROO", "WYNYARD",
+    "SUNNYVALE", "SAN FRANCISCO", "CHARLESTOWN", "THE ROCKS",
+    "HAYMARKET", "GATEWAY", "MACQUARIE", "COOLANGATTA",
+    "WOOLLOOMOOLOO", "BALGOWNIE", "CHATSWOOD", "BLACKTOWN",
+    "LIDCOMBE", "GREENACRE", "ENGADINE", "BLAXLAND", "GOULBURN",
+    "KATOOMBA", "EPPING", "RYDE", "HOMEBUSH", "DURAL", "OURIMBAH",
+    "BALMAIN", "BANKSTOWN", "MOOREBANK", "PYRMONT", "WESTMEAD",
+    "NORTHMEAD", "LYNEHAM", "CAMPSIE",
+];
+
+// --- Known Banking Operations ---
+pub const KNOWN_BANKING_OPS: &[KnownEntity] = &[
+    KnownEntity { pattern: "INTEREST CHARGE", canonical: "Interest Charged" },
+    KnownEntity { pattern: "INTEREST ADJUSTMENT", canonical: "Interest Adjustment" },
+    KnownEntity { pattern: "INTEREST CORRECTION", canonical: "Interest Correction" },
+    KnownEntity { pattern: "CREDIT CARD", canonical: "Credit Card" },
+    KnownEntity { pattern: "FUNDS TRANSFER", canonical: "Funds Transfer" },
+    KnownEntity { pattern: "ACCOUNT SERVICING FEE", canonical: "Account Servicing Fee" },
+    KnownEntity { pattern: "GOVERNMENT SEARCH FEE", canonical: "Government Search Fee" },
+    KnownEntity { pattern: "LOAN REPAYMENT", canonical: "Loan Repayment" },
+    KnownEntity { pattern: "CASH DEPOSIT", canonical: "Cash Deposit" },
+    KnownEntity { pattern: "WDL ATM", canonical: "ATM Withdrawal" },
+];
+
+// --- Employer patterns ---
+pub struct EmployerPattern {
+    pub pattern: &'static str,
+    pub canonical: &'static str,
+}
+
+pub const KNOWN_EMPLOYERS: &[EmployerPattern] = &[
+    EmployerPattern { pattern: "APPLE PTY LTD", canonical: "Apple" },
+    EmployerPattern { pattern: "APPLE COMPUTERS", canonical: "Apple" },
+    EmployerPattern { pattern: "APPLE COMPUTER AUSTRALIA PTY LTD", canonical: "Apple" },
+    EmployerPattern { pattern: "AFES", canonical: "AFES" },
+    EmployerPattern { pattern: "AUSTRALIAN FELLO", canonical: "AFES" },
+];
+
+// --- Cleanup constants ---
+pub const UPPERCASE_EXCEPTIONS: &[&str] = &[
+    "ATM", "NSW", "AUS", "AU", "UTS", "KFC", "CBD", "QVB", "BWS", "BHP",
+    "ANZ", "CBA", "NAB", "NDIS", "HCF", "BUPA", "AFES", "AMEB", "ALDI",
+    "IKEA", "MYER", "ZARA", "ASOS", "LEGO", "UFC", "ATO", "ABN", "ACN",
+    "PTY", "LTD", "USA", "UK", "NZ", "JP", "ID", "SG", "PS", "TFNSW",
+    "UBER", "PEXA", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT",
+    "JFC", "GNT", "CS", "BP", "OMF", "FMC", "ING", "GYG",
+];
+
+pub const LOWERCASE_EXCEPTIONS: &[&str] = &[
+    "the", "and", "of", "in", "at", "for", "to", "by", "on", "or", "a", "an",
+    "pty", "ltd",
+];
+
+pub struct CleanupPattern {
+    pub pattern: &'static str,
+}
+
+pub const TRAILING_NOISE_PATTERNS: &[CleanupPattern] = &[
+    CleanupPattern { pattern: r"\s+NS$" },
+    CleanupPattern { pattern: r"\s+AU$" },
+    CleanupPattern { pattern: r"\s+AUS$" },
+    CleanupPattern { pattern: r"\s+NSWAU$" },
+    CleanupPattern { pattern: r"\s+XX\d+$" },
+    CleanupPattern { pattern: r"\s+X\d+$" },
+    CleanupPattern { pattern: r"\s+\d{6}$" },
+    CleanupPattern { pattern: r"\s+\d{7,}$" },
+    CleanupPattern { pattern: r"\s+VISA$" },
+    CleanupPattern { pattern: r"\s+BANK$" },
+    CleanupPattern { pattern: r"\s+DEBIT$" },
+    CleanupPattern { pattern: r"\s+CREDIT$" },
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +424,28 @@ mod tests {
     #[test]
     fn test_persons_strip_memo_not_empty() {
         assert!(!PERSONS_STRIP_MEMO.is_empty());
+    }
+
+    #[test]
+    fn test_known_locations_not_empty() {
+        assert!(!KNOWN_LOCATIONS.is_empty());
+    }
+
+    #[test]
+    fn test_known_banking_ops_not_empty() {
+        assert!(!KNOWN_BANKING_OPS.is_empty());
+    }
+
+    #[test]
+    fn test_known_employers_not_empty() {
+        assert!(!KNOWN_EMPLOYERS.is_empty());
+    }
+
+    #[test]
+    fn test_trailing_noise_patterns_are_valid_regex() {
+        for p in TRAILING_NOISE_PATTERNS {
+            regex::Regex::new(p.pattern)
+                .unwrap_or_else(|e| panic!("invalid trailing noise pattern '{}': {}", p.pattern, e));
+        }
     }
 }
