@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use crate::known_entities::KNOWN_EMPLOYERS;
+use crate::known_entities::{KNOWN_EMPLOYERS, KNOWN_PERSONS, PERSONS_STRIP_MEMO};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
@@ -470,6 +470,79 @@ fn extract_account_ref(s: &str) -> Option<String> {
     re.captures(s).map(|c| format!("xx{}", &c[1]))
 }
 
+fn extract_person(stripped: &str, original: &str) -> Option<String> {
+    let upper_stripped = stripped.to_uppercase();
+
+    // Check persons_strip_memo: if stripped text starts with a known person, strip memo
+    for memo_name in PERSONS_STRIP_MEMO {
+        if upper_stripped.starts_with(memo_name) {
+            let upper_name = &upper_stripped[..memo_name.len()];
+            for person in KNOWN_PERSONS {
+                if upper_name == person.pattern {
+                    return Some(person.canonical.to_string());
+                }
+            }
+        }
+    }
+
+    // Transfer entity extraction patterns on the original
+    static TRANSFER_ENTITY_PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+    let transfer_patterns = TRANSFER_ENTITY_PATTERNS.get_or_init(|| {
+        vec![
+            Regex::new(r"(?i)^Fast Transfer From (.+?),\s*to PayID.*$").unwrap(),
+            Regex::new(r"(?i)^Fast Transfer From (.+?),\s*(.+)$").unwrap(),
+            Regex::new(r"(?i)^Transfer To (.+?)\s+CommBank App.*$").unwrap(),
+            Regex::new(r"(?i)^Transfer To (.+?),\s*CommBank App.*$").unwrap(),
+            Regex::new(r"(?i)^Transfer To (.+?),\s*PayID.*$").unwrap(),
+            Regex::new(r"(?i)^To (.+?)\s*-\s*.*$").unwrap(),
+            Regex::new(r"(?i)^Transfer to (.+?)\s*-\s*Receipt.*$").unwrap(),
+            Regex::new(r"(?i)^TRANSFER FROM (.+?)\s+/REF/.*$").unwrap(),
+            Regex::new(r"(?i)^Transfer From (.+?)\s+(.+)$").unwrap(),
+            Regex::new(r"(?i)^From (.+?)\s*-\s*.*$").unwrap(),
+            Regex::new(r"^ANZ MOBILE BANKING PAYMENT \d+ TO (.+)$").unwrap(),
+            Regex::new(r"^(.+?)\s*-\s*Osko Payment to\s.*$").unwrap(),
+            Regex::new(r"^(.+?)\s+-\s*Osko Payment\s*-\s*Receipt.*$").unwrap(),
+        ]
+    });
+
+    for re in transfer_patterns {
+        if let Some(caps) = re.captures(original) {
+            if let Some(m) = caps.get(1) {
+                let extracted = m.as_str().trim();
+                let upper_extracted = extracted.to_uppercase();
+                for person in KNOWN_PERSONS {
+                    if upper_extracted == person.pattern
+                        || upper_extracted.starts_with(&format!("{} ", person.pattern))
+                    {
+                        return Some(person.canonical.to_string());
+                    }
+                }
+                return Some(title_case(extracted));
+            }
+        }
+    }
+
+    // Direct match on stripped text
+    for person in KNOWN_PERSONS {
+        if upper_stripped == person.pattern {
+            return Some(person.canonical.to_string());
+        }
+    }
+
+    // Prefix match
+    for person in KNOWN_PERSONS {
+        if person.pattern.len() >= 4 && upper_stripped.starts_with(person.pattern) {
+            let after = upper_stripped.len() == person.pattern.len()
+                || upper_stripped.as_bytes().get(person.pattern.len()) == Some(&b' ');
+            if after {
+                return Some(person.canonical.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,5 +783,28 @@ mod tests {
     fn test_extract_account_ref() {
         assert_eq!(extract_account_ref("Transfer to xx8005 CommBank app"), Some("xx8005".into()));
         assert_eq!(extract_account_ref("Woolworths"), None);
+    }
+
+    // --- Person extraction tests ---
+
+    #[test]
+    fn test_extract_person_known() {
+        assert_eq!(
+            extract_person("JOHNNY TAM", "Fast Transfer From Johnny Tam, to PayID Phone"),
+            Some("Johnny Tam".into())
+        );
+    }
+
+    #[test]
+    fn test_extract_person_transfer_entity() {
+        assert_eq!(
+            extract_person("", "Transfer To Nelson Tam CommBank App something"),
+            Some("Nelson Tam".into())
+        );
+    }
+
+    #[test]
+    fn test_extract_person_none() {
+        assert_eq!(extract_person("WOOLWORTHS", "WOOLWORTHS"), None);
     }
 }
