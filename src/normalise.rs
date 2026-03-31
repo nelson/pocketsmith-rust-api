@@ -364,16 +364,16 @@ pub fn title_case(s: &str) -> String {
 pub fn normalise(original: &str) -> NormalisationResult {
     let (stripped, gateway) = strip_metadata(original);
     let expanded = expand_truncations(&stripped);
-    let normalised = title_case(&expanded);
+    let features = extract_features(&expanded, original, gateway);
+    let class = classify(&features);
+    let raw_normalised = generate_normalised_payee(&class, &features, &expanded);
+    let normalised = cleanup(&raw_normalised);
 
     NormalisationResult {
         original: original.to_string(),
         normalised,
-        features: Features {
-            payment_gateway: gateway,
-            ..Default::default()
-        },
-        class: PayeeClass::Unclassified,
+        features,
+        class,
     }
 }
 
@@ -937,8 +937,8 @@ mod tests {
     #[test]
     fn test_normalise_chains_strip_expand_titlecase() {
         let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
-        assert_eq!(result.normalised, "Woolworths 1624 Strathfield");
-        assert_eq!(result.class, PayeeClass::Unclassified);
+        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.normalised, "Woolworths Strathfield");
     }
 
     #[test]
@@ -1128,5 +1128,42 @@ mod tests {
     #[test]
     fn test_cleanup_dedup() {
         assert_eq!(cleanup("Burwood Burwood"), "Burwood");
+    }
+
+    // --- Full pipeline integration tests ---
+
+    #[test]
+    fn test_normalise_woolworths_full() {
+        let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.normalised, "Woolworths Strathfield");
+    }
+
+    #[test]
+    fn test_normalise_salary() {
+        let result = normalise("Salary from Apple Pty Ltd");
+        assert_eq!(result.class, PayeeClass::Employer);
+        assert_eq!(result.normalised, "Apple (Salary)");
+    }
+
+    #[test]
+    fn test_normalise_transfer_to_account() {
+        let result = normalise("Transfer to xx8005 CommBank app");
+        assert_eq!(result.features.direction, Some(Direction::TransferOut));
+        assert_eq!(result.features.account_ref.as_deref(), Some("xx8005"));
+    }
+
+    #[test]
+    fn test_normalise_direct_debit_afes() {
+        let result = normalise("Direct Debit 123 AUSTRALIAN FELLO");
+        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.normalised, "AFES (Donation)");
+    }
+
+    #[test]
+    fn test_normalise_coles_burwood() {
+        let result = normalise("COLES BURWOO NSW 2134");
+        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.normalised, "Coles Burwood");
     }
 }
