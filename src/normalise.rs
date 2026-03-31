@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 use regex::Regex;
 
 use crate::known_entities::{
-    KNOWN_BANKING_OPS, KNOWN_EMPLOYERS, KNOWN_LOCATIONS, KNOWN_MERCHANT_PATTERNS, KNOWN_PERSONS,
-    PERSONS_STRIP_MEMO,
+    self, KNOWN_BANKING_OPS, KNOWN_EMPLOYERS, KNOWN_LOCATIONS, KNOWN_MERCHANT_PATTERNS,
+    KNOWN_PERSONS, PERSONS_STRIP_MEMO,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -693,6 +693,62 @@ pub fn generate_normalised_payee(class: &PayeeClass, features: &Features, stripp
     }
 }
 
+// --- Cleanup ---
+
+fn trailing_noise_regexes() -> &'static Vec<Regex> {
+    static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        known_entities::TRAILING_NOISE_PATTERNS
+            .iter()
+            .map(|p| Regex::new(p.pattern).expect("invalid trailing noise pattern"))
+            .collect()
+    })
+}
+
+pub fn cleanup(s: &str) -> String {
+    let mut result = s.to_string();
+
+    for re in trailing_noise_regexes() {
+        result = re.replace(&result, "").to_string();
+    }
+
+    while result.contains("  ") {
+        result = result.replace("  ", " ");
+    }
+    result = result.trim().to_string();
+
+    let words: Vec<String> = result
+        .split_whitespace()
+        .enumerate()
+        .map(|(i, word)| {
+            let upper = word.to_uppercase();
+            if known_entities::UPPERCASE_EXCEPTIONS.iter().any(|&e| e == upper) {
+                return upper;
+            }
+            if i > 0 {
+                let lower = word.to_lowercase();
+                if known_entities::LOWERCASE_EXCEPTIONS.iter().any(|&e| e == lower) {
+                    return lower;
+                }
+            }
+            word.to_string()
+        })
+        .collect();
+
+    result = words.join(" ");
+
+    // Deduplicate consecutive identical words
+    let final_words: Vec<&str> = result.split_whitespace().collect();
+    let mut deduped = Vec::new();
+    for (i, word) in final_words.iter().enumerate() {
+        if i == 0 || final_words[i - 1].to_uppercase() != word.to_uppercase() {
+            deduped.push(*word);
+        }
+    }
+
+    deduped.join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1048,5 +1104,29 @@ mod tests {
     #[test]
     fn test_generate_unclassified() {
         assert_eq!(generate_normalised_payee(&PayeeClass::Unclassified, &Features::default(), "SOME TEXT"), "Some Text");
+    }
+
+    // --- Cleanup tests ---
+
+    #[test]
+    fn test_cleanup_trailing_noise() {
+        assert_eq!(cleanup("Merchant AU"), "Merchant");
+        assert_eq!(cleanup("Merchant VISA"), "Merchant");
+    }
+
+    #[test]
+    fn test_cleanup_uppercase_exceptions() {
+        assert_eq!(cleanup("Kfc Strathfield"), "KFC Strathfield");
+        assert_eq!(cleanup("Aldi Burwood"), "ALDI Burwood");
+    }
+
+    #[test]
+    fn test_cleanup_lowercase_exceptions() {
+        assert_eq!(cleanup("Cup of Tea"), "Cup of Tea");
+    }
+
+    #[test]
+    fn test_cleanup_dedup() {
+        assert_eq!(cleanup("Burwood Burwood"), "Burwood");
     }
 }
