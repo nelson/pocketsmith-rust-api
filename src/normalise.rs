@@ -105,7 +105,60 @@ fn prefix_patterns() -> &'static Vec<StripPattern> {
     })
 }
 
-/// Strip metadata prefixes from a payee string.
+fn suffix_patterns() -> &'static Vec<StripPattern> {
+    static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        let patterns: Vec<(&str, &'static str)> = vec![
+            (r",?\s*Card xx\d{4}.*$", "Card value date"),
+            (r"\s+Card xx\d{4}.*$", "Card value date (space)"),
+            (r"\s+Tap and Pay xx\d{4}.*$", "Tap and Pay"),
+            (r"\s*-?\s*Visa Purchase\s*-\s*Receipt\s+\w+\s*In\s+.*$", "Visa Purchase receipt"),
+            (r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", "Visa Refund receipt"),
+            (r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", "Osko Payment receipt"),
+            (r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", "Deposit receipt"),
+            (r"\s*-\s*Alipay$", "Alipay suffix"),
+            (r"\s+Card\s+\d{6}x{6}\d{4}$", "Full card number"),
+            (r"\s+Value [Dd]ate:?\s+\d{2}/\d{2}/\d{4}$", "Standalone value date"),
+            (r"\s+NSWAU$", "NSWAU suffix"),
+            (r"\s+NS AUS$", "NS AUS suffix"),
+            (r"\s+AU AUS$", "AU AUS suffix"),
+            (r"\s+AUS$", "AUS suffix"),
+            (r"\s+AU$", "AU suffix"),
+            (r"\s+NLD$", "NLD suffix"),
+            (r"\s+SGP$", "SGP suffix"),
+            (r"\s+USA$", "USA suffix"),
+            (r"\s+IDN$", "IDN suffix"),
+            (r"\s+GBR$", "GBR suffix"),
+            (r"\s+[A-Z]{3}\s+\d+\.\d{2}$", "Foreign currency amount"),
+            (r"\s*,\s*\d{4}$", "Trailing code"),
+            (r"\s*-\s*negative\s+\$[\d.]+.*$", "Negative amount"),
+            (r"\s*-?\s*Eftpos (?:Purchase|Cash Out)\s*-\s*Receipt\s+.*$", "EFTPOS receipt"),
+            (r"\s+Eftpos Purchase\s*-\s*Receipt\s+.*$", "EFTPOS Purchase receipt"),
+            (r"\s*-\s*Eftpos Purchase\s*-\s*Receipt\s+\d+Date.*$", "EFTPOS receipt (no space)"),
+            (r"\s*,\s*\d{4}\s+Last 4 Card Digits\s+\d{4}$", "Last 4 Card Digits"),
+            (r"\s*Foreign Currency Amount:?\s+\d+In\s+.*$", "Foreign currency receipt"),
+            (r"\s*,?\s*\d{4}\s+Last\s+4\s+Card\s+Digits\s+\d{4}$", "Last 4 card digits"),
+            (r"\s*-\s*Internal Transfer\s*-\s*Receipt\s+\d+.*$", "Internal Transfer receipt"),
+            (r"\s+Card\s+\d[A-Z]\d{4}[A-Za-z]{6}\d{4}$", "Masked card number"),
+            (r"\s*-\s*[\w.+-]+@[\w.-]+$", "Email suffix"),
+            (r"\s+PTY\.?\s*LTD?\.?\s*$", "PTY LTD suffix"),
+            (r"\s+P/L\s*$", "P/L suffix"),
+            (r"\s+\d{7,}$", "Long reference number"),
+            (r"\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4,6}$", "State + postcode"),
+            (r"\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)$", "State suffix"),
+        ];
+        patterns
+            .into_iter()
+            .map(|(p, n)| StripPattern {
+                regex: Regex::new(p).expect("invalid suffix pattern"),
+                name: n,
+                is_gateway: false,
+            })
+            .collect()
+    })
+}
+
+/// Strip metadata prefixes and suffixes from a payee string.
 /// Returns (stripped_string, detected_payment_gateway, extracted_date).
 /// Strips multiple prefixes — typically one or more non-gateway prefixes
 /// and at most one gateway prefix.
@@ -131,6 +184,12 @@ pub fn strip_metadata(payee: &str) -> (String, Option<String>, Option<String>) {
         }
         if !matched {
             break;
+        }
+    }
+
+    for pat in suffix_patterns() {
+        if let Some(m) = pat.regex.find(&s) {
+            s = s[..m.start()].to_string();
         }
     }
 
@@ -224,5 +283,56 @@ mod tests {
         assert_eq!(stripped, "COFFEE SHOP");
         assert_eq!(gw.as_deref(), Some("Square"));
         assert_eq!(date.as_deref(), Some("28/01/26"));
+    }
+
+    // --- Strip metadata suffix tests ---
+
+    #[test]
+    fn test_strip_suffix_card() {
+        let (stripped, _, _) = strip_metadata("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        assert_eq!(stripped, "WOOLWORTHS 1624 STRATHF");
+    }
+
+    #[test]
+    fn test_strip_suffix_country_code() {
+        let (stripped, _, _) = strip_metadata("SOME MERCHANT NSWAU");
+        assert_eq!(stripped, "SOME MERCHANT");
+    }
+
+    #[test]
+    fn test_strip_suffix_state_postcode() {
+        let (stripped, _, _) = strip_metadata("MERCHANT NSW 2140");
+        assert_eq!(stripped, "MERCHANT");
+    }
+
+    #[test]
+    fn test_strip_suffix_pty_ltd() {
+        let (stripped, _, _) = strip_metadata("COMPANY NAME PTY LTD");
+        assert_eq!(stripped, "COMPANY NAME");
+    }
+
+    #[test]
+    fn test_strip_suffix_long_reference() {
+        let (stripped, _, _) = strip_metadata("MERCHANT 12345678");
+        assert_eq!(stripped, "MERCHANT");
+    }
+
+    #[test]
+    fn test_strip_both_prefix_and_suffix() {
+        let (stripped, gw, _) = strip_metadata("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
+        assert_eq!(stripped, "CAFE NAME");
+        assert_eq!(gw.as_deref(), Some("Square Marketplace"));
+    }
+
+    #[test]
+    fn test_strip_eftpos_receipt() {
+        let (stripped, _, _) = strip_metadata("MERCHANT - Eftpos Purchase - Receipt 123Date01/01");
+        assert_eq!(stripped, "MERCHANT");
+    }
+
+    #[test]
+    fn test_strip_email_suffix() {
+        let (stripped, _, _) = strip_metadata("PAYPAL - paypal-aud@airbnb.com");
+        assert_eq!(stripped, "PAYPAL");
     }
 }
