@@ -122,28 +122,15 @@ pub fn expand_truncations(result: &mut NormalisationResult) {
 
     while changed {
         changed = false;
-        let upper = result.normalised.to_uppercase();
 
         for exp in truncation_expansions() {
-            if exp.from == exp.to {
-                continue;
-            }
-
-            if let Some(pos) = upper.find(exp.from) {
-                let at_word_start =
-                    pos == 0 || !upper.as_bytes()[pos - 1].is_ascii_alphanumeric();
-                let end = pos + exp.from.len();
-                let at_word_end =
-                    end == upper.len() || !upper.as_bytes()[end].is_ascii_alphanumeric();
-
-                if at_word_start && at_word_end {
-                    result.normalised = format!("{}{}{}", &result.normalised[..pos], exp.to, &result.normalised[end..]);
-                    if exp.is_location {
-                        result.features.location = Some(exp.to.to_string());
-                    }
-                    changed = true;
-                    break;
+            if let Some(m) = exp.regex.find(&result.normalised) {
+                result.normalised = format!("{}{}{}", &result.normalised[..m.start()], exp.to, &result.normalised[m.end()..]);
+                if exp.is_location {
+                    result.features.location = Some(exp.to.to_string());
                 }
+                changed = true;
+                break;
             }
         }
     }
