@@ -58,6 +58,30 @@ pub struct StripResult {
     pub features: Features,
 }
 
+/// Extract named capture groups from a regex match into features.
+fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
+    if pat.is_gateway {
+        features.payment_gateway = Some(pat.name.to_string());
+    }
+    if let Some(date) = caps.name("date") {
+        features.date = Some(date.as_str().to_string());
+    }
+    if let Some(account_ref) = caps.name("account_ref") {
+        features.account_ref = Some(account_ref.as_str().to_string());
+    }
+    if let Some(location) = caps.name("location") {
+        features.location = Some(location.as_str().to_string());
+    } else if let Some(raw) = caps.name("location_raw") {
+        features.location = Some(map_location_raw(raw.as_str()).to_string());
+    }
+    if let Some(currency) = caps.name("foreign_currency") {
+        features.foreign_currency = Some(currency.as_str().to_string());
+    }
+    if let Some(amount) = caps.name("foreign_amount") {
+        features.foreign_amount = parse_amount_cents(amount.as_str());
+    }
+}
+
 /// Strip metadata prefixes and suffixes from a payee string.
 pub fn strip_metadata(payee: &str) -> StripResult {
     let mut s = payee.to_string();
@@ -69,15 +93,7 @@ pub fn strip_metadata(payee: &str) -> StripResult {
         let mut matched = false;
         for pat in prefix_patterns() {
             if let Some(caps) = pat.regex.captures(&s) {
-                if pat.is_gateway {
-                    features.payment_gateway = Some(pat.name.to_string());
-                }
-                if let Some(date) = caps.name("date") {
-                    features.date = Some(date.as_str().to_string());
-                }
-                if let Some(account_ref) = caps.name("account_ref") {
-                    features.account_ref = Some(account_ref.as_str().to_string());
-                }
+                extract_captures(&caps, &mut features, pat);
                 s = s[caps.get(0).unwrap().end()..].to_string();
                 matched = true;
                 break; // restart from beginning of pattern list
@@ -90,26 +106,7 @@ pub fn strip_metadata(payee: &str) -> StripResult {
 
     for pat in suffix_patterns() {
         if let Some(caps) = pat.regex.captures(&s) {
-            if pat.is_gateway {
-                features.payment_gateway = Some(pat.name.to_string());
-            }
-            if let Some(date) = caps.name("date") {
-                features.date = Some(date.as_str().to_string());
-            }
-            if let Some(account_ref) = caps.name("account_ref") {
-                features.account_ref = Some(account_ref.as_str().to_string());
-            }
-            if let Some(location) = caps.name("location") {
-                features.location = Some(location.as_str().to_string());
-            } else if let Some(raw) = caps.name("location_raw") {
-                features.location = Some(map_location_raw(raw.as_str()).to_string());
-            }
-            if let Some(currency) = caps.name("foreign_currency") {
-                features.foreign_currency = Some(currency.as_str().to_string());
-            }
-            if let Some(amount) = caps.name("foreign_amount") {
-                features.foreign_amount = parse_amount_cents(amount.as_str());
-            }
+            extract_captures(&caps, &mut features, pat);
             s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
