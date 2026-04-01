@@ -65,8 +65,56 @@ impl NormalisationResult {
     }
 }
 
-/// Extract named capture groups from a regex match into features.
-fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
+/// Strip metadata prefixes and suffixes from a payee string.
+///
+/// Uses a unified single loop: each iteration tries all prefix patterns
+/// then all suffix patterns, strips the first match, and restarts.
+pub fn strip_metadata(result: &mut NormalisationResult) {
+    loop {
+        let mut matched = false;
+
+        for pat in prefix_patterns() {
+            if let Some(caps) = pat.regex.captures(&result.normalised) {
+                extract_features(&caps, &mut result.features, pat);
+                result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
+                matched = true;
+                break;
+            }
+        }
+        if matched {
+            continue;
+        }
+
+        for pat in suffix_patterns() {
+            if let Some(caps) = pat.regex.captures(&result.normalised) {
+                extract_features(&caps, &mut result.features, pat);
+                result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
+                matched = true;
+                break;
+            }
+        }
+
+        if !matched {
+            break;
+        }
+    }
+
+    result.normalised = result.normalised.trim().to_string();
+}
+
+/// Suffix-only variant (used by normalise_check binary).
+pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
+    for pat in suffix_patterns() {
+        if let Some(caps) = pat.regex.captures(&result.normalised) {
+            extract_features(&caps, &mut result.features, pat);
+            result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
+        }
+    }
+
+    result.normalised = result.normalised.trim().to_string();
+}
+
+fn extract_features(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
     if pat.is_gateway {
         features.payment_gateway = Some(pat.name.to_string());
     }
@@ -87,55 +135,6 @@ fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &Strip
     if let Some(amount) = caps.name("foreign_amount") {
         features.foreign_amount = parse_amount_cents(amount.as_str());
     }
-}
-
-/// Strip metadata prefixes and suffixes from a payee string.
-///
-/// Uses a unified single loop: each iteration tries all prefix patterns
-/// then all suffix patterns, strips the first match, and restarts.
-pub fn strip_metadata(result: &mut NormalisationResult) {
-    loop {
-        let mut matched = false;
-
-        for pat in prefix_patterns() {
-            if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_captures(&caps, &mut result.features, pat);
-                result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
-                matched = true;
-                break;
-            }
-        }
-        if matched {
-            continue;
-        }
-
-        for pat in suffix_patterns() {
-            if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_captures(&caps, &mut result.features, pat);
-                result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
-                matched = true;
-                break;
-            }
-        }
-
-        if !matched {
-            break;
-        }
-    }
-
-    result.normalised = result.normalised.trim().to_string();
-}
-
-/// Suffix-only variant (used by normalise_check binary).
-pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
-    for pat in suffix_patterns() {
-        if let Some(caps) = pat.regex.captures(&result.normalised) {
-            extract_captures(&caps, &mut result.features, pat);
-            result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
-        }
-    }
-
-    result.normalised = result.normalised.trim().to_string();
 }
 
 fn map_location_raw(raw: &str) -> &'static str {
