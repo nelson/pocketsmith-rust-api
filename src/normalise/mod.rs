@@ -83,58 +83,10 @@ fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &Strip
 }
 
 /// Strip metadata prefixes and suffixes from a payee string.
+///
+/// Uses a unified single loop: each iteration tries all prefix patterns
+/// then all suffix patterns, strips the first match, and restarts.
 pub fn strip_metadata(payee: &str) -> StripResult {
-    let mut s = payee.to_string();
-    let mut features = Features::default();
-
-    // Strips multiple prefixes — typically one or more non-gateway prefixes
-    // and at most one gateway prefix.
-    loop {
-        let mut matched = false;
-        for pat in prefix_patterns() {
-            if let Some(caps) = pat.regex.captures(&s) {
-                extract_captures(&caps, &mut features, pat);
-                s = s[caps.get(0).unwrap().end()..].to_string();
-                matched = true;
-                break; // restart from beginning of pattern list
-            }
-        }
-        if !matched {
-            break;
-        }
-    }
-
-    for pat in suffix_patterns() {
-        if let Some(caps) = pat.regex.captures(&s) {
-            extract_captures(&caps, &mut features, pat);
-            s = s[..caps.get(0).unwrap().start()].to_string();
-        }
-    }
-
-    s = s.trim().to_string();
-    StripResult { stripped: s, features }
-}
-
-/// Suffix-only variant: skip prefix stripping entirely.
-pub fn strip_metadata_suffix_only(payee: &str) -> StripResult {
-    let mut s = payee.to_string();
-    let mut features = Features::default();
-
-    for pat in suffix_patterns() {
-        if let Some(caps) = pat.regex.captures(&s) {
-            extract_captures(&caps, &mut features, pat);
-            s = s[..caps.get(0).unwrap().start()].to_string();
-        }
-    }
-
-    s = s.trim().to_string();
-    StripResult { stripped: s, features }
-}
-
-/// Unified single-loop variant: all patterns (prefix then suffix) in one
-/// iterative loop. Each iteration tries every pattern; strips the match
-/// (prefix from start, suffix from end) and restarts until nothing matches.
-pub fn strip_metadata_unified(payee: &str) -> StripResult {
     let mut s = payee.to_string();
     let mut features = Features::default();
 
@@ -164,6 +116,22 @@ pub fn strip_metadata_unified(payee: &str) -> StripResult {
 
         if !matched {
             break;
+        }
+    }
+
+    s = s.trim().to_string();
+    StripResult { stripped: s, features }
+}
+
+/// Suffix-only variant (used by normalise_check binary).
+pub fn strip_metadata_suffix_only(payee: &str) -> StripResult {
+    let mut s = payee.to_string();
+    let mut features = Features::default();
+
+    for pat in suffix_patterns() {
+        if let Some(caps) = pat.regex.captures(&s) {
+            extract_captures(&caps, &mut features, pat);
+            s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
 
