@@ -47,15 +47,13 @@ pub struct NormalisationResult {
 
 pub struct StripResult {
     pub stripped: String,
-    pub gateway: Option<String>,
-    pub date: Option<String>,
+    pub features: Features,
 }
 
 /// Strip metadata prefixes and suffixes from a payee string.
 pub fn strip_metadata(payee: &str) -> StripResult {
     let mut s = payee.to_string();
-    let mut gateway = None;
-    let mut date = None;
+    let mut features = Features::default();
 
     // Strips multiple prefixes — typically one or more non-gateway prefixes
     // and at most one gateway prefix.
@@ -64,10 +62,10 @@ pub fn strip_metadata(payee: &str) -> StripResult {
         for pat in prefix_patterns() {
             if let Some(m) = pat.regex.find(&s) {
                 if pat.is_gateway {
-                    gateway = Some(pat.name.to_string());
+                    features.payment_gateway = Some(pat.name.to_string());
                 }
                 if pat.name == "Date prefix" {
-                    date = Some(m.as_str().trim_end_matches(|c: char| c == ',' || c.is_whitespace()).to_string());
+                    features.date = Some(m.as_str().trim_end_matches(|c: char| c == ',' || c.is_whitespace()).to_string());
                 }
                 s = s[m.end()..].to_string();
                 matched = true;
@@ -86,7 +84,7 @@ pub fn strip_metadata(payee: &str) -> StripResult {
     }
 
     s = s.trim().to_string();
-    StripResult { stripped: s, gateway, date }
+    StripResult { stripped: s, features }
 }
 
 struct Expansion {
@@ -273,14 +271,14 @@ mod tests {
     fn test_strip_prefix_square() {
         let r = strip_metadata("SQ *SOME MERCHANT SYDNEY");
         assert_eq!(r.stripped, "SOME MERCHANT SYDNEY");
-        assert_eq!(r.gateway.as_deref(), Some("Square"));
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
     }
 
     #[test]
     fn test_strip_prefix_doordash() {
         let r = strip_metadata("DOORDASH*THAI PLACE");
         assert_eq!(r.stripped, "THAI PLACE");
-        assert_eq!(r.gateway.as_deref(), Some("DoorDash"));
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("DoorDash"));
     }
 
     #[test]
@@ -293,29 +291,29 @@ mod tests {
     fn test_strip_prefix_date() {
         let r = strip_metadata("28/01/26, Direct Debit 123 ENTITY");
         assert_eq!(r.stripped, "Direct Debit 123 ENTITY");
-        assert_eq!(r.date.as_deref(), Some("28/01/26"));
+        assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
     }
 
     #[test]
     fn test_strip_prefix_none() {
         let r = strip_metadata("Woolworths Strathfield");
         assert_eq!(r.stripped, "Woolworths Strathfield");
-        assert!(r.gateway.is_none());
+        assert!(r.features.payment_gateway.is_none());
     }
 
     #[test]
     fn test_strip_prefix_paypal() {
         let r = strip_metadata("PAYPAL *SOME STORE");
         assert_eq!(r.stripped, "SOME STORE");
-        assert_eq!(r.gateway.as_deref(), Some("PayPal"));
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("PayPal"));
     }
 
     #[test]
     fn test_strip_multiple_prefixes() {
         let r = strip_metadata("28/01/26, SQ *COFFEE SHOP");
         assert_eq!(r.stripped, "COFFEE SHOP");
-        assert_eq!(r.gateway.as_deref(), Some("Square"));
-        assert_eq!(r.date.as_deref(), Some("28/01/26"));
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
+        assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
     }
 
     // --- Strip metadata suffix tests ---
@@ -354,7 +352,7 @@ mod tests {
     fn test_strip_both_prefix_and_suffix() {
         let r = strip_metadata("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
         assert_eq!(r.stripped, "CAFE NAME");
-        assert_eq!(r.gateway.as_deref(), Some("Square Marketplace"));
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square Marketplace"));
     }
 
     #[test]
