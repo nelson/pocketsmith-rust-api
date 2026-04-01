@@ -68,14 +68,17 @@ pub fn strip_metadata(payee: &str) -> StripResult {
     loop {
         let mut matched = false;
         for pat in prefix_patterns() {
-            if let Some(m) = pat.regex.find(&s) {
+            if let Some(caps) = pat.regex.captures(&s) {
                 if pat.is_gateway {
                     features.payment_gateway = Some(pat.name.to_string());
                 }
-                if pat.name == "Date prefix" {
-                    features.date = Some(m.as_str().trim_end_matches(|c: char| c == ',' || c.is_whitespace()).to_string());
+                if let Some(date) = caps.name("date") {
+                    features.date = Some(date.as_str().to_string());
                 }
-                s = s[m.end()..].to_string();
+                if let Some(account_ref) = caps.name("account_ref") {
+                    features.account_ref = Some(account_ref.as_str().to_string());
+                }
+                s = s[caps.get(0).unwrap().end()..].to_string();
                 matched = true;
                 break; // restart from beginning of pattern list
             }

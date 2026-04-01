@@ -11,7 +11,7 @@ pub(crate) fn prefix_patterns() -> &'static [StripPattern] {
         let patterns: Vec<(&str, &'static str, bool)> = vec![
             // --- Non-gateway prefixes ---
             // (r"^Cafes - ", "CBA auto-pay", false),
-            (r"^\d{2}/\d{2}/\d{2,4},?\s+", "Date prefix", false),
+            (r"^(?P<date>\d{2}/\d{2}/\d{2,4}),?\s+", "Date prefix", false),
             (r"^-([A-Z]+-)*", "dashed prefix", false),
             (r"^EFTPOS\s+", "EFTPOS", false),
             (r"^\*\s+", "Leading asterisk", false),
@@ -19,7 +19,7 @@ pub(crate) fn prefix_patterns() -> &'static [StripPattern] {
             (r"^% ", "percent prefix", false),
             (r"^Return\s+", "return", false),
             (r"^SP ", "SP prefix", false),
-            (r"^Visa Debit Purchase Card \d{4}\s+", "Visa Debit Purchase", false),
+            (r"^Visa Debit Purchase Card (?P<account_ref>\d{4})\s+", "Visa Debit Purchase", false),
             // --- Gateway prefixes ---
             (r"^ALI\*", "AliExpress", true),
             (r"^Alipay ", "Alipay", true),
