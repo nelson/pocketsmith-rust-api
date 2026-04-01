@@ -54,6 +54,17 @@ pub struct NormalisationResult {
     pub features: Features,
 }
 
+impl NormalisationResult {
+    pub fn new(payee: &str) -> Self {
+        Self {
+            original: payee.to_string(),
+            normalised: payee.to_string(),
+            class: PayeeClass::Unclassified,
+            features: Features::default(),
+        }
+    }
+}
+
 pub struct StripResult {
     pub stripped: String,
     pub features: Features,
@@ -194,6 +205,16 @@ mod tests {
         };
         assert_eq!(result.original, "TEST");
         assert_eq!(result.class, PayeeClass::Unclassified);
+    }
+
+    #[test]
+    fn test_normalisation_result_new() {
+        let result = NormalisationResult::new("TEST");
+        assert_eq!(result.original, "TEST");
+        assert_eq!(result.normalised, "TEST");
+        assert_eq!(result.class, PayeeClass::Unclassified);
+        assert!(result.features.entity_name.is_none());
+        assert!(result.features.location.is_none());
     }
 
     // --- Strip metadata prefix tests ---
