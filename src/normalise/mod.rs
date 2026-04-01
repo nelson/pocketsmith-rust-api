@@ -377,4 +377,18 @@ mod tests {
     fn test_expand_north_strathfield() {
         assert_eq!(expand_truncations("SHOP NORTH STRATHF"), "SHOP NORTH STRATHFIELD");
     }
+
+    #[test]
+    fn test_expand_location_suburb() {
+        let r = expand_truncations("SHOP STRATHF");
+        assert_eq!(r.expanded, "SHOP STRATHFIELD");
+        assert_eq!(r.location.as_deref(), Some("STRATHFIELD"));
+    }
+
+    #[test]
+    fn test_expand_location_word() {
+        let r = expand_truncations("DISCOUNT PHARMCY");
+        assert_eq!(r.expanded, "DISCOUNT PHARMACY");
+        assert!(r.location.is_none());
+    }
 }
