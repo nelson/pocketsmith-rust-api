@@ -1,5 +1,5 @@
 mod expand;
-pub use expand::{expand_truncations, ExpansionResult};
+pub use expand::expand_truncations;
 mod prefix;
 use prefix::prefix_patterns;
 mod suffix;
@@ -379,45 +379,59 @@ mod tests {
 
     #[test]
     fn test_expand_strathfield() {
-        assert_eq!(expand_truncations("WOOLWORTHS 1624 STRATHF").expanded, "WOOLWORTHS 1624 STRATHFIELD");
+        let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHF");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "WOOLWORTHS 1624 STRATHFIELD");
     }
 
     #[test]
     fn test_expand_burwood() {
-        assert_eq!(expand_truncations("COLES BURWOO").expanded, "COLES BURWOOD");
+        let mut r = NormalisationResult::new("COLES BURWOO");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "COLES BURWOOD");
     }
 
     #[test]
     fn test_expand_pharmacy() {
-        assert_eq!(expand_truncations("DISCOUNT PHARMCY").expanded, "DISCOUNT PHARMACY");
+        let mut r = NormalisationResult::new("DISCOUNT PHARMCY");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "DISCOUNT PHARMACY");
     }
 
     #[test]
     fn test_expand_no_partial_match() {
-        assert_eq!(expand_truncations("STRATEGIC PLAN").expanded, "STRATEGIC PLAN");
+        let mut r = NormalisationResult::new("STRATEGIC PLAN");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "STRATEGIC PLAN");
     }
 
     #[test]
     fn test_expand_multiple() {
-        assert_eq!(expand_truncations("PHARMCY BURWOO").expanded, "PHARMACY BURWOOD");
+        let mut r = NormalisationResult::new("PHARMCY BURWOO");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "PHARMACY BURWOOD");
     }
 
     #[test]
     fn test_expand_north_strathfield() {
-        assert_eq!(expand_truncations("SHOP NORTH STRATHF").expanded, "SHOP NORTH STRATHFIELD");
+        let mut r = NormalisationResult::new("SHOP NORTH STRATHF");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "SHOP NORTH STRATHFIELD");
     }
 
     #[test]
     fn test_expand_location_suburb() {
-        let r = expand_truncations("SHOP STRATHF");
-        assert_eq!(r.expanded, "SHOP STRATHFIELD");
-        assert_eq!(r.location.as_deref(), Some("STRATHFIELD"));
+        let mut r = NormalisationResult::new("SHOP STRATHF");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "SHOP STRATHFIELD");
+        assert_eq!(r.features.location.as_deref(), Some("STRATHFIELD"));
     }
 
     #[test]
     fn test_expand_location_word() {
-        let r = expand_truncations("DISCOUNT PHARMCY");
-        assert_eq!(r.expanded, "DISCOUNT PHARMACY");
-        assert!(r.location.is_none());
+        let mut r = NormalisationResult::new("DISCOUNT PHARMCY");
+        expand_truncations(&mut r);
+        assert_eq!(r.normalised, "DISCOUNT PHARMACY");
+        assert!(r.features.location.is_none());
     }
 }

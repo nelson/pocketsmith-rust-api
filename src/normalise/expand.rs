@@ -1,5 +1,7 @@
 use std::sync::OnceLock;
 
+use super::NormalisationResult;
+
 struct Expansion {
     from: &'static str,
     to: &'static str,
@@ -107,20 +109,13 @@ fn truncation_expansions() -> &'static Vec<Expansion> {
     })
 }
 
-pub struct ExpansionResult {
-    pub expanded: String,
-    pub location: Option<String>,
-}
-
 /// Expand truncated words in a payee string using word-boundary matching.
-pub fn expand_truncations(s: &str) -> ExpansionResult {
-    let mut result = s.to_string();
-    let mut location: Option<String> = None;
+pub fn expand_truncations(result: &mut NormalisationResult) {
     let mut changed = true;
 
     while changed {
         changed = false;
-        let upper = result.to_uppercase();
+        let upper = result.normalised.to_uppercase();
 
         for exp in truncation_expansions() {
             if exp.from == exp.to {
@@ -135,9 +130,9 @@ pub fn expand_truncations(s: &str) -> ExpansionResult {
                     end == upper.len() || !upper.as_bytes()[end].is_ascii_alphanumeric();
 
                 if at_word_start && at_word_end {
-                    result = format!("{}{}{}", &result[..pos], exp.to, &result[end..]);
+                    result.normalised = format!("{}{}{}", &result.normalised[..pos], exp.to, &result.normalised[end..]);
                     if exp.is_location {
-                        location = Some(exp.to.to_string());
+                        result.features.location = Some(exp.to.to_string());
                     }
                     changed = true;
                     break;
@@ -145,6 +140,4 @@ pub fn expand_truncations(s: &str) -> ExpansionResult {
             }
         }
     }
-
-    ExpansionResult { expanded: result, location }
 }
