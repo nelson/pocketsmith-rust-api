@@ -90,7 +90,7 @@ pub(crate) fn suffix_patterns() -> &'static [StripPattern] {
             (r"\s+(?P<location_raw>USA)$", "USA suffix", false),
             (r"\s+(?P<location_raw>IDN)$", "IDN suffix", false),
             (r"\s+(?P<location_raw>GBR)$", "GBR suffix", false),
-            (r"\s+[A-Z]{3}\s+\d+\.\d{2}$", "Foreign currency amount", false),
+            (r"\s+(?P<foreign_currency>[A-Z]{3})\s+(?P<foreign_amount>\d+\.\d{2})$", "Foreign currency amount", false),
             (r"\s*,\s*\d{4}$", "Trailing code", false),
             (r"\s*-\s*negative\s+\$[\d.]+.*$", "Negative amount", false),
             (r"\s*-?\s*Eftpos (?:Purchase|Cash Out)\s*-\s*Receipt\s+.*$", "EFTPOS receipt", false),
