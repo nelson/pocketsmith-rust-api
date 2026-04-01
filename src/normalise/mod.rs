@@ -1,6 +1,8 @@
+mod prefix;
+use prefix::prefix_patterns;
 #[path = "01_strip.rs"]
 mod _01_strip;
-use _01_strip::{prefix_patterns, suffix_patterns};
+use _01_strip::suffix_patterns;
 
 use regex::Regex;
 use std::sync::OnceLock;
