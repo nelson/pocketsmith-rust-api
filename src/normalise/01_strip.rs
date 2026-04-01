@@ -4,11 +4,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-pub(crate) struct StripPattern {
-    pub(crate) regex: Regex,
-    pub(crate) name: &'static str,
-    pub(crate) is_gateway: bool,
-}
+use super::StripPattern;
 
 pub(crate) fn prefix_patterns() -> &'static [StripPattern] {
     static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
