@@ -107,9 +107,15 @@ fn truncation_expansions() -> &'static Vec<Expansion> {
     })
 }
 
+pub struct ExpansionResult {
+    pub expanded: String,
+    pub location: Option<String>,
+}
+
 /// Expand truncated words in a payee string using word-boundary matching.
-pub fn expand_truncations(s: &str) -> String {
+pub fn expand_truncations(s: &str) -> ExpansionResult {
     let mut result = s.to_string();
+    let mut location: Option<String> = None;
     let mut changed = true;
 
     while changed {
@@ -130,6 +136,9 @@ pub fn expand_truncations(s: &str) -> String {
 
                 if at_word_start && at_word_end {
                     result = format!("{}{}{}", &result[..pos], exp.to, &result[end..]);
+                    if exp.is_location {
+                        location = Some(exp.to.to_string());
+                    }
                     changed = true;
                     break;
                 }
@@ -137,5 +146,5 @@ pub fn expand_truncations(s: &str) -> String {
         }
     }
 
-    result
+    ExpansionResult { expanded: result, location }
 }

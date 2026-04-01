@@ -1,5 +1,5 @@
 mod expand;
-pub use expand::expand_truncations;
+pub use expand::{expand_truncations, ExpansionResult};
 mod prefix;
 use prefix::prefix_patterns;
 mod suffix;
@@ -350,32 +350,32 @@ mod tests {
 
     #[test]
     fn test_expand_strathfield() {
-        assert_eq!(expand_truncations("WOOLWORTHS 1624 STRATHF"), "WOOLWORTHS 1624 STRATHFIELD");
+        assert_eq!(expand_truncations("WOOLWORTHS 1624 STRATHF").expanded, "WOOLWORTHS 1624 STRATHFIELD");
     }
 
     #[test]
     fn test_expand_burwood() {
-        assert_eq!(expand_truncations("COLES BURWOO"), "COLES BURWOOD");
+        assert_eq!(expand_truncations("COLES BURWOO").expanded, "COLES BURWOOD");
     }
 
     #[test]
     fn test_expand_pharmacy() {
-        assert_eq!(expand_truncations("DISCOUNT PHARMCY"), "DISCOUNT PHARMACY");
+        assert_eq!(expand_truncations("DISCOUNT PHARMCY").expanded, "DISCOUNT PHARMACY");
     }
 
     #[test]
     fn test_expand_no_partial_match() {
-        assert_eq!(expand_truncations("STRATEGIC PLAN"), "STRATEGIC PLAN");
+        assert_eq!(expand_truncations("STRATEGIC PLAN").expanded, "STRATEGIC PLAN");
     }
 
     #[test]
     fn test_expand_multiple() {
-        assert_eq!(expand_truncations("PHARMCY BURWOO"), "PHARMACY BURWOOD");
+        assert_eq!(expand_truncations("PHARMCY BURWOO").expanded, "PHARMACY BURWOOD");
     }
 
     #[test]
     fn test_expand_north_strathfield() {
-        assert_eq!(expand_truncations("SHOP NORTH STRATHF"), "SHOP NORTH STRATHFIELD");
+        assert_eq!(expand_truncations("SHOP NORTH STRATHF").expanded, "SHOP NORTH STRATHFIELD");
     }
 
     #[test]
