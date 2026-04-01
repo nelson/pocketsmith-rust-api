@@ -82,6 +82,9 @@ pub fn strip_metadata(payee: &str) -> StripResult {
             if let Some(date) = caps.name("date") {
                 features.date = Some(date.as_str().to_string());
             }
+            if let Some(account_ref) = caps.name("account_ref") {
+                features.account_ref = Some(account_ref.as_str().to_string());
+            }
             s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
@@ -326,6 +329,14 @@ mod tests {
         let r = strip_metadata("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
         assert_eq!(r.stripped, "WOOLWORTHS 1624 STRATHF");
         assert_eq!(r.features.date.as_deref(), Some("01/01/2026"));
+        assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
+    }
+
+    #[test]
+    fn test_strip_suffix_full_card_number() {
+        let r = strip_metadata("MERCHANT Card 123456xxxxxx7890");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.account_ref.as_deref(), Some("7890"));
     }
 
     #[test]

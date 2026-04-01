@@ -70,15 +70,15 @@ pub(crate) fn suffix_patterns() -> &'static [StripPattern] {
     static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
         let patterns: Vec<(&str, &'static str)> = vec![
-            (r",?\s*Card xx\d{4}.*?(?P<date>\d{2}/\d{2}/\d{4}).*$", "Card value date"),
-            (r"\s+Card xx\d{4}.*?(?P<date>\d{2}/\d{2}/\d{4}).*$", "Card value date (space)"),
-            (r"\s+Tap and Pay xx\d{4}.*$", "Tap and Pay"),
+            (r",?\s*Card xx(?P<account_ref>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", "Card value date"),
+            (r"\s+Card xx(?P<account_ref>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", "Card value date (space)"),
+            (r"\s+Tap and Pay xx(?P<account_ref>\d{4}).*$", "Tap and Pay"),
             (r"\s*-?\s*Visa Purchase\s*-\s*Receipt\s+\w+\s*In\s+.*$", "Visa Purchase receipt"),
             (r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", "Visa Refund receipt"),
             (r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", "Osko Payment receipt"),
             (r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", "Deposit receipt"),
             (r"\s*-\s*Alipay$", "Alipay suffix"),
-            (r"\s+Card\s+\d{6}x{6}\d{4}$", "Full card number"),
+            (r"\s+Card\s+\d{6}x{6}(?P<account_ref>\d{4})$", "Full card number"),
             (r"\s+Value [Dd]ate:?\s+(?P<date>\d{2}/\d{2}/\d{4})$", "Standalone value date"),
             (r"\s+NSWAU$", "NSWAU suffix"),
             (r"\s+NS AUS$", "NS AUS suffix"),
