@@ -93,6 +93,12 @@ pub fn strip_metadata(payee: &str) -> StripResult {
             } else if let Some(raw) = caps.name("location_raw") {
                 features.location = Some(map_location_raw(raw.as_str()).to_string());
             }
+            if let Some(currency) = caps.name("foreign_currency") {
+                features.foreign_currency = Some(currency.as_str().to_string());
+            }
+            if let Some(amount) = caps.name("foreign_amount") {
+                features.foreign_amount = parse_amount_cents(amount.as_str());
+            }
             s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
@@ -112,6 +118,10 @@ fn map_location_raw(raw: &str) -> &'static str {
         "GBR" => "GB",
         other => panic!("unmapped location_raw: {other}"),
     }
+}
+
+fn parse_amount_cents(s: &str) -> Option<u32> {
+    s.replace('.', "").parse().ok()
 }
 
 struct Expansion {
@@ -425,6 +435,14 @@ mod tests {
     fn test_strip_eftpos_receipt() {
         let r = strip_metadata("MERCHANT - Eftpos Purchase - Receipt 123Date01/01");
         assert_eq!(r.stripped, "MERCHANT");
+    }
+
+    #[test]
+    fn test_strip_suffix_foreign_currency() {
+        let r = strip_metadata("MERCHANT SGD 12.50");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.foreign_currency.as_deref(), Some("SGD"));
+        assert_eq!(r.features.foreign_amount, Some(1250));
     }
 
     #[test]
