@@ -5,14 +5,13 @@ use super::NormalisationResult;
 
 struct Expansion {
     regex: Regex,
-    from: &'static str,
     to: &'static str,
     is_location: bool,
 }
 
-fn exp(from: &'static str, to: &'static str, is_location: bool) -> Expansion {
+fn exp(from: &str, to: &'static str, is_location: bool) -> Expansion {
     let regex = Regex::new(&format!("(?i)\\b{}\\b", regex::escape(from))).unwrap();
-    Expansion { regex, from, to, is_location }
+    Expansion { regex, to, is_location }
 }
 
 fn truncation_expansions() -> &'static Vec<Expansion> {
