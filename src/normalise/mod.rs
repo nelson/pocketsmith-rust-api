@@ -79,6 +79,9 @@ pub fn strip_metadata(payee: &str) -> StripResult {
 
     for pat in suffix_patterns() {
         if let Some(caps) = pat.regex.captures(&s) {
+            if pat.is_gateway {
+                features.payment_gateway = Some(pat.name.to_string());
+            }
             if let Some(date) = caps.name("date") {
                 features.date = Some(date.as_str().to_string());
             }
@@ -396,6 +399,13 @@ mod tests {
     fn test_strip_suffix_pty_ltd() {
         let r = strip_metadata("COMPANY NAME PTY LTD");
         assert_eq!(r.stripped, "COMPANY NAME");
+    }
+
+    #[test]
+    fn test_strip_suffix_alipay_gateway() {
+        let r = strip_metadata("MERCHANT - Alipay");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.payment_gateway.as_deref(), Some("Alipay"));
     }
 
     #[test]
