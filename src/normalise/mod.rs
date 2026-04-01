@@ -78,8 +78,11 @@ pub fn strip_metadata(payee: &str) -> StripResult {
     }
 
     for pat in suffix_patterns() {
-        if let Some(m) = pat.regex.find(&s) {
-            s = s[..m.start()].to_string();
+        if let Some(caps) = pat.regex.captures(&s) {
+            if let Some(date) = caps.name("date") {
+                features.date = Some(date.as_str().to_string());
+            }
+            s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
 
@@ -322,6 +325,14 @@ mod tests {
     fn test_strip_suffix_card() {
         let r = strip_metadata("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
         assert_eq!(r.stripped, "WOOLWORTHS 1624 STRATHF");
+        assert_eq!(r.features.date.as_deref(), Some("01/01/2026"));
+    }
+
+    #[test]
+    fn test_strip_suffix_standalone_value_date() {
+        let r = strip_metadata("MERCHANT Value Date: 15/03/2026");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.date.as_deref(), Some("15/03/2026"));
     }
 
     #[test]
