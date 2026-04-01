@@ -98,17 +98,14 @@ fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &Strip
 ///
 /// Uses a unified single loop: each iteration tries all prefix patterns
 /// then all suffix patterns, strips the first match, and restarts.
-pub fn strip_metadata(payee: &str) -> StripResult {
-    let mut s = payee.to_string();
-    let mut features = Features::default();
-
+pub fn strip_metadata(result: &mut NormalisationResult) {
     loop {
         let mut matched = false;
 
         for pat in prefix_patterns() {
-            if let Some(caps) = pat.regex.captures(&s) {
-                extract_captures(&caps, &mut features, pat);
-                s = s[caps.get(0).unwrap().end()..].to_string();
+            if let Some(caps) = pat.regex.captures(&result.normalised) {
+                extract_captures(&caps, &mut result.features, pat);
+                result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
                 matched = true;
                 break;
             }
@@ -118,9 +115,9 @@ pub fn strip_metadata(payee: &str) -> StripResult {
         }
 
         for pat in suffix_patterns() {
-            if let Some(caps) = pat.regex.captures(&s) {
-                extract_captures(&caps, &mut features, pat);
-                s = s[..caps.get(0).unwrap().start()].to_string();
+            if let Some(caps) = pat.regex.captures(&result.normalised) {
+                extract_captures(&caps, &mut result.features, pat);
+                result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
                 matched = true;
                 break;
             }
@@ -131,8 +128,7 @@ pub fn strip_metadata(payee: &str) -> StripResult {
         }
     }
 
-    s = s.trim().to_string();
-    StripResult { stripped: s, features }
+    result.normalised = result.normalised.trim().to_string();
 }
 
 /// Suffix-only variant (used by normalise_check binary).
@@ -221,50 +217,57 @@ mod tests {
 
     #[test]
     fn test_strip_prefix_square() {
-        let r = strip_metadata("SQ *SOME MERCHANT SYDNEY");
-        assert_eq!(r.stripped, "SOME MERCHANT SYDNEY");
+        let mut r = NormalisationResult::new("SQ *SOME MERCHANT SYDNEY");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "SOME MERCHANT SYDNEY");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
     }
 
     #[test]
     fn test_strip_prefix_doordash() {
-        let r = strip_metadata("DOORDASH*THAI PLACE");
-        assert_eq!(r.stripped, "THAI PLACE");
+        let mut r = NormalisationResult::new("DOORDASH*THAI PLACE");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "THAI PLACE");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("DoorDash"));
     }
 
     #[test]
     fn test_strip_prefix_visa_debit() {
-        let r = strip_metadata("Visa Debit Purchase Card 9172 MERCHANT NAME");
-        assert_eq!(r.stripped, "MERCHANT NAME");
+        let mut r = NormalisationResult::new("Visa Debit Purchase Card 9172 MERCHANT NAME");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT NAME");
         assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
     }
 
     #[test]
     fn test_strip_prefix_date() {
-        let r = strip_metadata("28/01/26, Direct Debit 123 ENTITY");
-        assert_eq!(r.stripped, "Direct Debit 123 ENTITY");
+        let mut r = NormalisationResult::new("28/01/26, Direct Debit 123 ENTITY");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "Direct Debit 123 ENTITY");
         assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
     }
 
     #[test]
     fn test_strip_prefix_none() {
-        let r = strip_metadata("Woolworths Strathfield");
-        assert_eq!(r.stripped, "Woolworths Strathfield");
+        let mut r = NormalisationResult::new("Woolworths Strathfield");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "Woolworths Strathfield");
         assert!(r.features.payment_gateway.is_none());
     }
 
     #[test]
     fn test_strip_prefix_paypal() {
-        let r = strip_metadata("PAYPAL *SOME STORE");
-        assert_eq!(r.stripped, "SOME STORE");
+        let mut r = NormalisationResult::new("PAYPAL *SOME STORE");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "SOME STORE");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("PayPal"));
     }
 
     #[test]
     fn test_strip_multiple_prefixes() {
-        let r = strip_metadata("28/01/26, SQ *COFFEE SHOP");
-        assert_eq!(r.stripped, "COFFEE SHOP");
+        let mut r = NormalisationResult::new("28/01/26, SQ *COFFEE SHOP");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "COFFEE SHOP");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
         assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
     }
@@ -273,98 +276,112 @@ mod tests {
 
     #[test]
     fn test_strip_suffix_card() {
-        let r = strip_metadata("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
-        assert_eq!(r.stripped, "WOOLWORTHS 1624 STRATHF");
+        let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "WOOLWORTHS 1624 STRATHF");
         assert_eq!(r.features.date.as_deref(), Some("01/01/2026"));
         assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
     }
 
     #[test]
     fn test_strip_suffix_full_card_number() {
-        let r = strip_metadata("MERCHANT Card 123456xxxxxx7890");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT Card 123456xxxxxx7890");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.account_ref.as_deref(), Some("7890"));
     }
 
     #[test]
     fn test_strip_suffix_standalone_value_date() {
-        let r = strip_metadata("MERCHANT Value Date: 15/03/2026");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT Value Date: 15/03/2026");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.date.as_deref(), Some("15/03/2026"));
     }
 
     #[test]
     fn test_strip_suffix_country_code() {
-        let r = strip_metadata("SOME MERCHANT NSWAU");
-        assert_eq!(r.stripped, "SOME MERCHANT");
+        let mut r = NormalisationResult::new("SOME MERCHANT NSWAU");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "SOME MERCHANT");
         assert_eq!(r.features.location.as_deref(), Some("NSW"));
     }
 
     #[test]
     fn test_strip_suffix_state_postcode() {
-        let r = strip_metadata("MERCHANT NSW 2140");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT NSW 2140");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.location.as_deref(), Some("NSW 2140"));
     }
 
     #[test]
     fn test_strip_suffix_au_aus() {
-        let r = strip_metadata("MERCHANT AU AUS");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT AU AUS");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.location.as_deref(), Some("AU"));
     }
 
     #[test]
     fn test_strip_suffix_state_only() {
-        let r = strip_metadata("MERCHANT VIC");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT VIC");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.location.as_deref(), Some("VIC"));
     }
 
     #[test]
     fn test_strip_suffix_pty_ltd() {
-        let r = strip_metadata("COMPANY NAME PTY LTD");
-        assert_eq!(r.stripped, "COMPANY NAME");
+        let mut r = NormalisationResult::new("COMPANY NAME PTY LTD");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "COMPANY NAME");
     }
 
     #[test]
     fn test_strip_suffix_alipay_gateway() {
-        let r = strip_metadata("MERCHANT - Alipay");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT - Alipay");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("Alipay"));
     }
 
     #[test]
     fn test_strip_suffix_long_reference() {
-        let r = strip_metadata("MERCHANT 12345678");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT 12345678");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
     }
 
     #[test]
     fn test_strip_both_prefix_and_suffix() {
-        let r = strip_metadata("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
-        assert_eq!(r.stripped, "CAFE NAME");
+        let mut r = NormalisationResult::new("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "CAFE NAME");
         assert_eq!(r.features.payment_gateway.as_deref(), Some("Square Marketplace"));
     }
 
     #[test]
     fn test_strip_eftpos_receipt() {
-        let r = strip_metadata("MERCHANT - Eftpos Purchase - Receipt 123Date01/01");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT - Eftpos Purchase - Receipt 123Date01/01");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
     }
 
     #[test]
     fn test_strip_suffix_foreign_currency() {
-        let r = strip_metadata("MERCHANT SGD 12.50");
-        assert_eq!(r.stripped, "MERCHANT");
+        let mut r = NormalisationResult::new("MERCHANT SGD 12.50");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
         assert_eq!(r.features.foreign_currency.as_deref(), Some("SGD"));
         assert_eq!(r.features.foreign_amount, Some(1250));
     }
 
     #[test]
     fn test_strip_email_suffix() {
-        let r = strip_metadata("PAYPAL - paypal-aud@airbnb.com");
-        assert_eq!(r.stripped, "PAYPAL");
+        let mut r = NormalisationResult::new("PAYPAL - paypal-aud@airbnb.com");
+        strip_metadata(&mut r);
+        assert_eq!(r.normalised, "PAYPAL");
     }
 
     // --- Expand truncations tests ---
