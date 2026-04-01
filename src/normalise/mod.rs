@@ -2,7 +2,14 @@
 mod _01_strip;
 use _01_strip::{prefix_patterns, suffix_patterns};
 
+use regex::Regex;
 use std::sync::OnceLock;
+
+pub(crate) struct StripPattern {
+    pub(crate) regex: Regex,
+    pub(crate) name: &'static str,
+    pub(crate) is_gateway: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
