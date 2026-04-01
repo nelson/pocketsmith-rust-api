@@ -330,6 +330,7 @@ mod tests {
     fn test_strip_prefix_visa_debit() {
         let r = strip_metadata("Visa Debit Purchase Card 9172 MERCHANT NAME");
         assert_eq!(r.stripped, "MERCHANT NAME");
+        assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
     }
 
     #[test]
