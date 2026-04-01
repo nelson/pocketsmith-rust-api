@@ -25,10 +25,11 @@ fn main() -> Result<()> {
     for payee in &payees {
         let mut a = NormalisationResult::new(payee);
         strip_metadata(&mut a);
-        let b = strip_metadata_suffix_only(payee);
+        let mut b = NormalisationResult::new(payee);
+        strip_metadata_suffix_only(&mut b);
 
-        if a.normalised != b.stripped {
-            diffs.push((payee.clone(), a.normalised.clone(), b.stripped.clone()));
+        if a.normalised != b.normalised {
+            diffs.push((payee.clone(), a.normalised.clone(), b.normalised.clone()));
         }
         if features_differ(&a.features, &b.features) {
             feature_diffs += 1;
