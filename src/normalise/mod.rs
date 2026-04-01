@@ -65,11 +65,6 @@ impl NormalisationResult {
     }
 }
 
-pub struct StripResult {
-    pub stripped: String,
-    pub features: Features,
-}
-
 /// Extract named capture groups from a regex match into features.
 fn extract_captures(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
     if pat.is_gateway {
@@ -132,19 +127,15 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
 }
 
 /// Suffix-only variant (used by normalise_check binary).
-pub fn strip_metadata_suffix_only(payee: &str) -> StripResult {
-    let mut s = payee.to_string();
-    let mut features = Features::default();
-
+pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     for pat in suffix_patterns() {
-        if let Some(caps) = pat.regex.captures(&s) {
-            extract_captures(&caps, &mut features, pat);
-            s = s[..caps.get(0).unwrap().start()].to_string();
+        if let Some(caps) = pat.regex.captures(&result.normalised) {
+            extract_captures(&caps, &mut result.features, pat);
+            result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
         }
     }
 
-    s = s.trim().to_string();
-    StripResult { stripped: s, features }
+    result.normalised = result.normalised.trim().to_string();
 }
 
 fn map_location_raw(raw: &str) -> &'static str {
