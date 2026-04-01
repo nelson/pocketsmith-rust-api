@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use pocketsmith_sync::db;
 use pocketsmith_sync::normalise::{
-    strip_metadata, strip_metadata_suffix_only, Features,
+    strip_metadata, strip_metadata_suffix_only, Features, NormalisationResult,
 };
 
 fn main() -> Result<()> {
@@ -23,11 +23,12 @@ fn main() -> Result<()> {
     let mut feature_diffs = 0usize;
 
     for payee in &payees {
-        let a = strip_metadata(payee);
+        let mut a = NormalisationResult::new(payee);
+        strip_metadata(&mut a);
         let b = strip_metadata_suffix_only(payee);
 
-        if a.stripped != b.stripped {
-            diffs.push((payee.clone(), a.stripped.clone(), b.stripped.clone()));
+        if a.normalised != b.stripped {
+            diffs.push((payee.clone(), a.normalised.clone(), b.stripped.clone()));
         }
         if features_differ(&a.features, &b.features) {
             feature_diffs += 1;
