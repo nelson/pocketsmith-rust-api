@@ -85,12 +85,30 @@ pub fn strip_metadata(payee: &str) -> StripResult {
             if let Some(account_ref) = caps.name("account_ref") {
                 features.account_ref = Some(account_ref.as_str().to_string());
             }
+            if let Some(location) = caps.name("location") {
+                features.location = Some(location.as_str().to_string());
+            } else if let Some(raw) = caps.name("location_raw") {
+                features.location = Some(map_location_raw(raw.as_str()).to_string());
+            }
             s = s[..caps.get(0).unwrap().start()].to_string();
         }
     }
 
     s = s.trim().to_string();
     StripResult { stripped: s, features }
+}
+
+fn map_location_raw(raw: &str) -> &'static str {
+    match raw {
+        "NSWAU" | "NS" => "NSW",
+        "AU" | "AUS" => "AU",
+        "NLD" => "NL",
+        "SGP" => "SG",
+        "USA" => "US",
+        "IDN" => "ID",
+        "GBR" => "GB",
+        other => panic!("unmapped location_raw: {other}"),
+    }
 }
 
 struct Expansion {
@@ -350,12 +368,28 @@ mod tests {
     fn test_strip_suffix_country_code() {
         let r = strip_metadata("SOME MERCHANT NSWAU");
         assert_eq!(r.stripped, "SOME MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("NSW"));
     }
 
     #[test]
     fn test_strip_suffix_state_postcode() {
         let r = strip_metadata("MERCHANT NSW 2140");
         assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("NSW 2140"));
+    }
+
+    #[test]
+    fn test_strip_suffix_au_aus() {
+        let r = strip_metadata("MERCHANT AU AUS");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("AU"));
+    }
+
+    #[test]
+    fn test_strip_suffix_state_only() {
+        let r = strip_metadata("MERCHANT VIC");
+        assert_eq!(r.stripped, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("VIC"));
     }
 
     #[test]
