@@ -9,8 +9,7 @@ use regex::Regex;
 
 pub(crate) struct StripPattern {
     pub(crate) regex: Regex,
-    pub(crate) name: &'static str,
-    pub(crate) is_gateway: bool,
+    pub(crate) gateway_name: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +75,9 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
         for pat in prefix_patterns() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features, pat);
+                if let Some(gw) = pat.gateway_name {
+                    result.features.payment_gateway = Some(gw.to_string());
+                }
                 result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
                 matched = true;
                 break;
@@ -88,6 +90,9 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
         for pat in suffix_patterns() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features, pat);
+                if let Some(gw) = pat.gateway_name {
+                    result.features.payment_gateway = Some(gw.to_string());
+                }
                 result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
                 matched = true;
                 break;
@@ -107,6 +112,9 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     for pat in suffix_patterns() {
         if let Some(caps) = pat.regex.captures(&result.normalised) {
             extract_features(&caps, &mut result.features, pat);
+            if let Some(gw) = pat.gateway_name {
+                result.features.payment_gateway = Some(gw.to_string());
+            }
             result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
         }
     }
@@ -117,8 +125,6 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
 fn extract_features(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
     if let Some(gateway) = caps.name("payment_gateway") {
         features.payment_gateway = Some(gateway.as_str().to_string());
-    } else if pat.is_gateway {
-        features.payment_gateway = Some(pat.name.to_string());
     }
     if let Some(date) = caps.name("date") {
         features.date = Some(date.as_str().to_string());
