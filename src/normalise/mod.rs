@@ -115,7 +115,9 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
 }
 
 fn extract_features(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
-    if pat.is_gateway {
+    if let Some(gateway) = caps.name("payment_gateway") {
+        features.payment_gateway = Some(gateway.as_str().to_string());
+    } else if pat.is_gateway {
         features.payment_gateway = Some(pat.name.to_string());
     }
     if let Some(date) = caps.name("date") {
