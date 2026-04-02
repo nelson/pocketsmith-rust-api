@@ -74,7 +74,7 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
 
         for pat in prefix_patterns() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_features(&caps, &mut result.features, pat);
+                extract_features(&caps, &mut result.features);
                 if let Some(gw) = pat.gateway_name {
                     result.features.payment_gateway = Some(gw.to_string());
                 }
@@ -89,7 +89,7 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
 
         for pat in suffix_patterns() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_features(&caps, &mut result.features, pat);
+                extract_features(&caps, &mut result.features);
                 if let Some(gw) = pat.gateway_name {
                     result.features.payment_gateway = Some(gw.to_string());
                 }
@@ -111,7 +111,7 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
 pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     for pat in suffix_patterns() {
         if let Some(caps) = pat.regex.captures(&result.normalised) {
-            extract_features(&caps, &mut result.features, pat);
+            extract_features(&caps, &mut result.features);
             if let Some(gw) = pat.gateway_name {
                 result.features.payment_gateway = Some(gw.to_string());
             }
@@ -122,7 +122,7 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     result.normalised = result.normalised.trim().to_string();
 }
 
-fn extract_features(caps: &regex::Captures, features: &mut Features, pat: &StripPattern) {
+fn extract_features(caps: &regex::Captures, features: &mut Features) {
     if let Some(gateway) = caps.name("payment_gateway") {
         features.payment_gateway = Some(gateway.as_str().to_string());
     }
