@@ -15,7 +15,7 @@ pub(crate) fn suffix_patterns() -> &'static [StripPattern] {
             (r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", "Visa Refund receipt", false),
             (r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", "Osko Payment receipt", false),
             (r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", "Deposit receipt", false),
-            (r"\s*-\s*Alipay$", "Alipay", true),
+            (r"\s*-\s*(?P<payment_gateway>Alipay)$", "Alipay", false),
             (r"\s+Card\s+\d{6}x{6}(?P<account_ref>\d{4})$", "Full card number", false),
             (r"\s+Value [Dd]ate:?\s+(?P<date>\d{2}/\d{2}/\d{4})$", "Standalone value date", false),
             (r"\s+(?P<location_raw>NSWAU)$", "NSWAU suffix", false),
