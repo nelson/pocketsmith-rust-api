@@ -1,6 +1,7 @@
 mod expand;
 pub use expand::expand;
 mod merchants;
+mod persons;
 mod prefix;
 mod suffix;
 
