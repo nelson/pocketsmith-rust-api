@@ -2,9 +2,34 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::StripPattern;
+use super::{extract_features, NormalisationResult, StripPattern};
 
-pub(crate) fn prefix_patterns() -> &'static [StripPattern] {
+/// Strip metadata prefixes in a loop until no more match.
+/// Returns true if any prefix was stripped (for callers that loop over both prefix+suffix).
+pub fn strip_prefixes(result: &mut NormalisationResult) -> bool {
+    let mut any_matched = false;
+    loop {
+        let mut matched = false;
+        for pat in prefix_patterns() {
+            if let Some(caps) = pat.regex.captures(&result.normalised) {
+                extract_features(&caps, &mut result.features);
+                if let Some(gw) = pat.gateway_name {
+                    result.features.payment_gateway = Some(gw.to_string());
+                }
+                result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
+                matched = true;
+                any_matched = true;
+                break;
+            }
+        }
+        if !matched {
+            break;
+        }
+    }
+    any_matched
+}
+
+fn prefix_patterns() -> &'static [StripPattern] {
     static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
         let patterns: Vec<(&str, Option<&'static str>)> = vec![
