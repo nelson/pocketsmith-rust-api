@@ -1,5 +1,5 @@
 mod expand;
-pub use expand::expand_truncations;
+pub use expand::expand;
 mod prefix;
 mod suffix;
 
@@ -340,49 +340,49 @@ mod tests {
     #[test]
     fn test_expand_strathfield() {
         let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHF");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "WOOLWORTHS 1624 STRATHFIELD");
     }
 
     #[test]
     fn test_expand_burwood() {
         let mut r = NormalisationResult::new("COLES BURWOO");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "COLES BURWOOD");
     }
 
     #[test]
     fn test_expand_pharmacy() {
         let mut r = NormalisationResult::new("DISCOUNT PHARMCY");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "DISCOUNT PHARMACY");
     }
 
     #[test]
     fn test_expand_no_partial_match() {
         let mut r = NormalisationResult::new("STRATEGIC PLAN");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "STRATEGIC PLAN");
     }
 
     #[test]
     fn test_expand_multiple() {
         let mut r = NormalisationResult::new("PHARMCY BURWOO");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "PHARMACY BURWOOD");
     }
 
     #[test]
     fn test_expand_north_strathfield() {
         let mut r = NormalisationResult::new("SHOP NORTH STRATHF");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "SHOP NORTH STRATHFIELD");
     }
 
     #[test]
     fn test_expand_location_suburb() {
         let mut r = NormalisationResult::new("SHOP STRATHF");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "SHOP STRATHFIELD");
         assert_eq!(r.features.location.as_deref(), Some("STRATHFIELD"));
     }
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn test_expand_location_word() {
         let mut r = NormalisationResult::new("DISCOUNT PHARMCY");
-        expand_truncations(&mut r);
+        expand(&mut r);
         assert_eq!(r.normalised, "DISCOUNT PHARMACY");
         assert!(r.features.location.is_none());
     }
