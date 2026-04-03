@@ -83,6 +83,17 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     result.normalised = result.normalised.trim().to_string();
 }
 
+/// Run the full normalisation pipeline on a raw payee string.
+pub fn normalise(original: &str) -> NormalisationResult {
+    let mut result = NormalisationResult::new(original);
+    prefix::strip_prefixes(&mut result);
+    suffix::strip_suffixes(&mut result);
+    result.normalised = result.normalised.trim().to_string();
+    expand::expand(&mut result);
+    extract::extract_entities(&mut result);
+    result
+}
+
 pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) {
     if let Some(gateway) = caps.name("payment_gateway") {
         features.payment_gateway = Some(gateway.as_str().to_string());
