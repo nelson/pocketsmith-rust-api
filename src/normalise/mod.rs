@@ -1,7 +1,6 @@
 mod expand;
 pub use expand::expand_truncations;
 mod prefix;
-use prefix::prefix_patterns;
 mod suffix;
 use suffix::suffix_patterns;
 
@@ -70,23 +69,11 @@ impl NormalisationResult {
 /// then all suffix patterns, strips the first match, and restarts.
 pub fn strip_metadata(result: &mut NormalisationResult) {
     loop {
-        let mut matched = false;
-
-        for pat in prefix_patterns() {
-            if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_features(&caps, &mut result.features);
-                if let Some(gw) = pat.gateway_name {
-                    result.features.payment_gateway = Some(gw.to_string());
-                }
-                result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
-                matched = true;
-                break;
-            }
-        }
-        if matched {
+        if prefix::strip_prefixes(result) {
             continue;
         }
 
+        let mut matched = false;
         for pat in suffix_patterns() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features);
@@ -122,7 +109,7 @@ pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     result.normalised = result.normalised.trim().to_string();
 }
 
-fn extract_features(caps: &regex::Captures, features: &mut Features) {
+pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) {
     if let Some(gateway) = caps.name("payment_gateway") {
         features.payment_gateway = Some(gateway.as_str().to_string());
     }
