@@ -63,27 +63,15 @@ impl NormalisationResult {
 }
 
 /// Strip metadata prefixes and suffixes from a payee string.
-///
-/// Uses a unified single loop: each iteration tries all prefix patterns
-/// then all suffix patterns, strips the first match, and restarts.
 pub fn strip_metadata(result: &mut NormalisationResult) {
-    loop {
-        if prefix::strip_prefixes(result) {
-            continue;
-        }
-
-        if !suffix::strip_suffixes(result) {
-            break;
-        }
-    }
-
+    prefix::strip_prefixes(result);
+    suffix::strip_suffixes(result);
     result.normalised = result.normalised.trim().to_string();
 }
 
 /// Suffix-only variant (used by normalise_check binary).
 pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
     suffix::strip_suffixes(result);
-
     result.normalised = result.normalised.trim().to_string();
 }
 
