@@ -2,6 +2,7 @@ mod banking_ops;
 mod employers;
 mod expand;
 pub use expand::expand;
+mod extract;
 mod locations;
 mod merchants;
 mod persons;
