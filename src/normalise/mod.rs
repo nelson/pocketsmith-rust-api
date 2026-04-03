@@ -1,3 +1,4 @@
+mod banking_ops;
 mod expand;
 pub use expand::expand;
 mod locations;
@@ -15,11 +16,13 @@ pub(crate) struct StripPattern {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
+    Interest,
+    CreditCard,
     Transfer,
-    DirectDebit,
-    DirectCredit,
-    Salary,
-    Atm,
+    AccountServicing,
+    Loan,
+    Deposit,
+    Withdrawal,
 }
 
 /// Listed in order of priority for classification.
@@ -142,7 +145,7 @@ mod tests {
     #[test]
     fn test_banking_operation_variants() {
         assert_eq!(BankingOperation::Transfer, BankingOperation::Transfer);
-        assert_ne!(BankingOperation::Transfer, BankingOperation::DirectDebit);
+        assert_ne!(BankingOperation::Transfer, BankingOperation::Interest);
     }
 
     #[test]
