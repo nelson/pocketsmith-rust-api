@@ -402,4 +402,14 @@ mod tests {
         assert_eq!(r.normalised, "DISCOUNT PHARMACY");
         assert!(r.features.location.is_none());
     }
+
+    // --- normalise() integration tests ---
+
+    #[test]
+    fn test_normalise_woolworths_full() {
+        let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.features.entity_name.as_deref(), Some("Woolworths"));
+        assert_eq!(result.features.location.as_deref(), Some("STRATHFIELD"));
+    }
 }
