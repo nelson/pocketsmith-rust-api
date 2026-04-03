@@ -1,5 +1,6 @@
 mod expand;
 pub use expand::expand;
+mod locations;
 mod merchants;
 mod persons;
 mod prefix;
