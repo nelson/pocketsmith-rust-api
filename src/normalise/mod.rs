@@ -1,5 +1,6 @@
 mod expand;
 pub use expand::expand;
+mod merchants;
 mod prefix;
 mod suffix;
 
