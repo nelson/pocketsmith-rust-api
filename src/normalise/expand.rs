@@ -116,7 +116,7 @@ fn truncation_expansions() -> &'static Vec<Expansion> {
 }
 
 /// Expand truncated words in a payee string using word-boundary matching.
-pub fn expand_truncations(result: &mut NormalisationResult) {
+pub fn expand(result: &mut NormalisationResult) {
     let mut changed = true;
 
     while changed {
