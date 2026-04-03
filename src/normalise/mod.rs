@@ -2,7 +2,6 @@ mod expand;
 pub use expand::expand_truncations;
 mod prefix;
 mod suffix;
-use suffix::suffix_patterns;
 
 use regex::Regex;
 
@@ -73,20 +72,7 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
             continue;
         }
 
-        let mut matched = false;
-        for pat in suffix_patterns() {
-            if let Some(caps) = pat.regex.captures(&result.normalised) {
-                extract_features(&caps, &mut result.features);
-                if let Some(gw) = pat.gateway_name {
-                    result.features.payment_gateway = Some(gw.to_string());
-                }
-                result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
-                matched = true;
-                break;
-            }
-        }
-
-        if !matched {
+        if !suffix::strip_suffixes(result) {
             break;
         }
     }
@@ -96,15 +82,7 @@ pub fn strip_metadata(result: &mut NormalisationResult) {
 
 /// Suffix-only variant (used by normalise_check binary).
 pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
-    for pat in suffix_patterns() {
-        if let Some(caps) = pat.regex.captures(&result.normalised) {
-            extract_features(&caps, &mut result.features);
-            if let Some(gw) = pat.gateway_name {
-                result.features.payment_gateway = Some(gw.to_string());
-            }
-            result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
-        }
-    }
+    suffix::strip_suffixes(result);
 
     result.normalised = result.normalised.trim().to_string();
 }
