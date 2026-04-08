@@ -28,7 +28,7 @@ pub fn extract_entities(result: &mut NormalisationResult) {
     }
 
     if let Some(op) = banking_ops::extract_banking_op(original) {
-        result.features.banking_op = Some(op);
+        result.features.operation = Some(op);
         result.class = PayeeClass::Other;
         return;
     }

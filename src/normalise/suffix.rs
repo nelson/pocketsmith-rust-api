@@ -33,15 +33,15 @@ fn suffix_patterns() -> &'static [StripPattern] {
     static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
         let patterns: Vec<(&str, Option<&'static str>)> = vec![
-            (r",?\s*Card xx(?P<account_ref>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", None),
-            (r"\s+Card xx(?P<account_ref>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", None),
-            (r"\s+Tap and Pay xx(?P<account_ref>\d{4}).*$", None),
+            (r",?\s*Card xx(?P<account>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", None),
+            (r"\s+Card xx(?P<account>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", None),
+            (r"\s+Tap and Pay xx(?P<account>\d{4}).*$", None),
             (r"\s*-?\s*Visa Purchase\s*-\s*Receipt\s+\w+\s*In\s+.*$", None),
             (r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", None),
             (r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", None),
             (r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", None),
             (r"\s*-\s*(?P<gateway>Alipay)$", None),
-            (r"\s+Card\s+\d{6}x{6}(?P<account_ref>\d{4})$", None),
+            (r"\s+Card\s+\d{6}x{6}(?P<account>\d{4})$", None),
             (r"\s+Value [Dd]ate:?\s+(?P<date>\d{2}/\d{2}/\d{4})$", None),
             (r"\s+(?P<location_raw>NSWAU)$", None),
             (r"\s+(?P<location_raw>NS) AUS$", None),
