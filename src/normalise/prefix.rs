@@ -2,7 +2,19 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::{extract_features, NormalisationResult, StripPattern};
+use super::{extract_features, NormalisationResult};
+
+struct Prefix {
+    pattern: &'static str,
+    gateway: Option<&'static str>,
+    has_date: bool,
+}
+
+struct CompiledPrefix {
+    regex: Regex,
+    gateway: Option<&'static str>,
+    has_date: bool,
+}
 
 /// Strip metadata prefixes in a loop until no more match.
 /// Returns true if any prefix was stripped (for callers that loop over both prefix+suffix).
@@ -10,10 +22,10 @@ pub fn strip_prefixes(result: &mut NormalisationResult) -> bool {
     let mut any_matched = false;
     loop {
         let mut matched = false;
-        for pat in prefix_patterns() {
+        for pat in data() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features);
-                if let Some(gw) = pat.gateway_name {
+                if let Some(gw) = pat.gateway {
                     result.features.gateway = Some(gw.to_string());
                 }
                 result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
@@ -29,12 +41,12 @@ pub fn strip_prefixes(result: &mut NormalisationResult) -> bool {
     any_matched
 }
 
-fn prefix_patterns() -> &'static [StripPattern] {
-    static PATTERNS: OnceLock<Vec<StripPattern>> = OnceLock::new();
+// @cc use Prefix and CompiledPrefix
+fn data() -> &'static [Prefix] {
+    static PATTERNS: OnceLock<Vec<Prefix>> = OnceLock::new();
     PATTERNS.get_or_init(|| {
         let patterns: Vec<(&str, Option<&'static str>)> = vec![
             // --- Non-gateway prefixes ---
-            // (r"^Cafes - ", None),
             (r"^(?P<date>\d{2}/\d{2}/\d{2,4}),?\s+", None),
             (r"^-([A-Z]+-)*", None),
             (r"^EFTPOS\s+", None),
@@ -75,9 +87,9 @@ fn prefix_patterns() -> &'static [StripPattern] {
         ];
         patterns
             .into_iter()
-            .map(|(p, gw)| StripPattern {
+            .map(|(p, gw)| Prefix {
                 regex: Regex::new(p).expect("invalid prefix pattern"),
-                gateway_name: gw,
+                gateway: gw,
             })
             .collect()
     })
