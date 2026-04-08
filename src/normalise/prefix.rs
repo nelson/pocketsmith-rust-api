@@ -14,7 +14,7 @@ pub fn strip_prefixes(result: &mut NormalisationResult) -> bool {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features);
                 if let Some(gw) = pat.gateway_name {
-                    result.features.payment_gateway = Some(gw.to_string());
+                    result.features.gateway = Some(gw.to_string());
                 }
                 result.normalised = result.normalised[caps.get(0).unwrap().end()..].to_string();
                 matched = true;

@@ -14,7 +14,7 @@ pub fn strip_suffixes(result: &mut NormalisationResult) -> bool {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 extract_features(&caps, &mut result.features);
                 if let Some(gw) = pat.gateway_name {
-                    result.features.payment_gateway = Some(gw.to_string());
+                    result.features.gateway = Some(gw.to_string());
                 }
                 result.normalised = result.normalised[..caps.get(0).unwrap().start()].to_string();
                 matched = true;
@@ -40,7 +40,7 @@ fn suffix_patterns() -> &'static [StripPattern] {
             (r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", None),
             (r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", None),
             (r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", None),
-            (r"\s*-\s*(?P<payment_gateway>Alipay)$", None),
+            (r"\s*-\s*(?P<gateway>Alipay)$", None),
             (r"\s+Card\s+\d{6}x{6}(?P<account_ref>\d{4})$", None),
             (r"\s+Value [Dd]ate:?\s+(?P<date>\d{2}/\d{2}/\d{4})$", None),
             (r"\s+(?P<location_raw>NSWAU)$", None),
@@ -53,7 +53,7 @@ fn suffix_patterns() -> &'static [StripPattern] {
             (r"\s+(?P<location_raw>USA)$", None),
             (r"\s+(?P<location_raw>IDN)$", None),
             (r"\s+(?P<location_raw>GBR)$", None),
-            (r"\s+(?P<foreign_currency>[A-Z]{3})\s+(?P<foreign_amount>\d+\.\d{2})$", None),
+            (r"\s+(?P<currency_code>[A-Z]{3})\s+(?P<amount_in_cents>\d+\.\d{2})$", None),
             (r"\s*,\s*\d{4}$", None),
             (r"\s*-\s*negative\s+\$[\d.]+.*$", None),
             (r"\s*-?\s*Eftpos (?:Purchase|Cash Out)\s*-\s*Receipt\s+.*$", None),

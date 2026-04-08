@@ -43,12 +43,12 @@ pub struct Features {
     pub location: Option<String>,
     pub banking_op: Option<BankingOperation>,
     pub reason: Option<String>,
-    pub payment_gateway: Option<String>,
-    pub account_ref: Option<String>,
+    pub gateway: Option<String>,
+    pub account_ref: Option<String>, // e.g. last 4 digits of card
     pub bank_name: Option<String>,
     pub date: Option<String>,
-    pub foreign_currency: Option<String>,
-    pub foreign_amount: Option<u32>, // cents
+    pub currency_code: Option<String>,
+    pub amount_in_cents: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -70,33 +70,37 @@ impl NormalisationResult {
     }
 }
 
+// @cc make this function redundant
 /// Strip metadata prefixes and suffixes from a payee string.
-pub fn strip_metadata(result: &mut NormalisationResult) {
-    prefix::strip_prefixes(result);
-    suffix::strip_suffixes(result);
-    result.normalised = result.normalised.trim().to_string();
-}
+// pub fn strip_metadata(result: &mut NormalisationResult) {
+//     prefix::strip_prefixes(result);
+//     suffix::strip_suffixes(result);
+//     result.normalised = result.normalised.trim().to_string();
+// }
 
+// @cc this function is not called anywhere
 /// Suffix-only variant (used by normalise_check binary).
-pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
-    suffix::strip_suffixes(result);
-    result.normalised = result.normalised.trim().to_string();
-}
+// pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
+//     suffix::strip_suffixes(result);
+//     result.normalised = result.normalised.trim().to_string();
+// }
 
 /// Run the full normalisation pipeline on a raw payee string.
 pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
     prefix::strip_prefixes(&mut result);
     suffix::strip_suffixes(&mut result);
+    // @cc reomve this line. trim strings after each step instead of at the end?
     result.normalised = result.normalised.trim().to_string();
     expand::expand(&mut result);
     extract::extract_entities(&mut result);
     result
 }
 
+// @cc we are trying to get rid of this function
 pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) {
-    if let Some(gateway) = caps.name("payment_gateway") {
-        features.payment_gateway = Some(gateway.as_str().to_string());
+    if let Some(gateway) = caps.name("gateway") {
+        features.gateway = Some(gateway.as_str().to_string());
     }
     if let Some(date) = caps.name("date") {
         features.date = Some(date.as_str().to_string());
@@ -109,14 +113,15 @@ pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) 
     } else if let Some(raw) = caps.name("location_raw") {
         features.location = Some(map_location_raw(raw.as_str()).to_string());
     }
-    if let Some(currency) = caps.name("foreign_currency") {
-        features.foreign_currency = Some(currency.as_str().to_string());
+    if let Some(currency) = caps.name("currency_code") {
+        features.currency_code = Some(currency.as_str().to_string());
     }
-    if let Some(amount) = caps.name("foreign_amount") {
-        features.foreign_amount = parse_amount_cents(amount.as_str());
+    if let Some(amount) = caps.name("amount_in_cents") {
+        features.amount_in_cents = parse_amount_cents(amount.as_str());
     }
 }
 
+// @cc location_raw doesn't make sense. Move this to
 fn map_location_raw(raw: &str) -> &'static str {
     match raw {
         "NSWAU" | "NS" => "NSW",
@@ -138,6 +143,12 @@ fn parse_amount_cents(s: &str) -> Option<u32> {
 mod tests {
     use super::*;
 
+    fn strip_metadata(result: &mut NormalisationResult) {
+        prefix::strip_prefixes(result);
+        suffix::strip_suffixes(result);
+        result.normalised = result.normalised.trim().to_string();
+    }
+
     #[test]
     fn test_features_default() {
         let f = Features::default();
@@ -145,8 +156,8 @@ mod tests {
         assert!(f.location.is_none());
         assert!(f.banking_op.is_none());
         assert!(f.date.is_none());
-        assert!(f.foreign_currency.is_none());
-        assert!(f.foreign_amount.is_none());
+        assert!(f.currency_code.is_none());
+        assert!(f.amount_in_cents.is_none());
     }
 
     #[test]
@@ -185,12 +196,14 @@ mod tests {
 
     // --- Strip metadata prefix tests ---
 
+    // @cc all tests with strip_metadata() should be replaced with the prefix or suffix version,
+    // and moved tho their own files
     #[test]
     fn test_strip_prefix_square() {
         let mut r = NormalisationResult::new("SQ *SOME MERCHANT SYDNEY");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "SOME MERCHANT SYDNEY");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
+        assert_eq!(r.features.gateway.as_deref(), Some("Square"));
     }
 
     #[test]
@@ -198,7 +211,7 @@ mod tests {
         let mut r = NormalisationResult::new("DOORDASH*THAI PLACE");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "THAI PLACE");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("DoorDash"));
+        assert_eq!(r.features.gateway.as_deref(), Some("DoorDash"));
     }
 
     #[test]
@@ -222,7 +235,7 @@ mod tests {
         let mut r = NormalisationResult::new("Woolworths Strathfield");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "Woolworths Strathfield");
-        assert!(r.features.payment_gateway.is_none());
+        assert!(r.features.gateway.is_none());
     }
 
     #[test]
@@ -230,7 +243,7 @@ mod tests {
         let mut r = NormalisationResult::new("PAYPAL *SOME STORE");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "SOME STORE");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("PayPal"));
+        assert_eq!(r.features.gateway.as_deref(), Some("PayPal"));
     }
 
     #[test]
@@ -238,7 +251,7 @@ mod tests {
         let mut r = NormalisationResult::new("28/01/26, SQ *COFFEE SHOP");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "COFFEE SHOP");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square"));
+        assert_eq!(r.features.gateway.as_deref(), Some("Square"));
         assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
     }
 
@@ -313,7 +326,7 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT - Alipay");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("Alipay"));
+        assert_eq!(r.features.gateway.as_deref(), Some("Alipay"));
     }
 
     #[test]
@@ -328,7 +341,7 @@ mod tests {
         let mut r = NormalisationResult::new("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "CAFE NAME");
-        assert_eq!(r.features.payment_gateway.as_deref(), Some("Square Marketplace"));
+        assert_eq!(r.features.gateway.as_deref(), Some("Square Marketplace"));
     }
 
     #[test]
@@ -343,8 +356,8 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT SGD 12.50");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.foreign_currency.as_deref(), Some("SGD"));
-        assert_eq!(r.features.foreign_amount, Some(1250));
+        assert_eq!(r.features.currency_code.as_deref(), Some("SGD"));
+        assert_eq!(r.features.amount_in_cents, Some(1250));
     }
 
     #[test]
