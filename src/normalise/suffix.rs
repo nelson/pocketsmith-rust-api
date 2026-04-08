@@ -180,3 +180,120 @@ fn data() -> &'static [CompiledSuffix] {
             .collect()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::normalise::NormalisationResult;
+
+    #[test]
+    fn test_card_and_date() {
+        let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        apply(&mut r);
+        assert_eq!(r.normalised, "WOOLWORTHS 1624 STRATHF");
+        assert_eq!(r.features.date.as_deref(), Some("01/01/2026"));
+        assert_eq!(r.features.account.as_deref(), Some("9172"));
+    }
+
+    #[test]
+    fn test_full_card_number() {
+        let mut r = NormalisationResult::new("MERCHANT Card 123456xxxxxx7890");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.account.as_deref(), Some("7890"));
+    }
+
+    #[test]
+    fn test_standalone_value_date() {
+        let mut r = NormalisationResult::new("MERCHANT Value Date: 15/03/2026");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.date.as_deref(), Some("15/03/2026"));
+    }
+
+    #[test]
+    fn test_country_code() {
+        let mut r = NormalisationResult::new("SOME MERCHANT NSWAU");
+        apply(&mut r);
+        assert_eq!(r.normalised, "SOME MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("NSW"));
+    }
+
+    #[test]
+    fn test_state_postcode() {
+        let mut r = NormalisationResult::new("MERCHANT NSW 2140");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("NSW 2140"));
+    }
+
+    #[test]
+    fn test_au_aus() {
+        let mut r = NormalisationResult::new("MERCHANT AU AUS");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("AU"));
+    }
+
+    #[test]
+    fn test_state_only() {
+        let mut r = NormalisationResult::new("MERCHANT VIC");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.location.as_deref(), Some("VIC"));
+    }
+
+    #[test]
+    fn test_pty_ltd() {
+        let mut r = NormalisationResult::new("COMPANY NAME PTY LTD");
+        apply(&mut r);
+        assert_eq!(r.normalised, "COMPANY NAME");
+    }
+
+    #[test]
+    fn test_alipay_gateway() {
+        let mut r = NormalisationResult::new("MERCHANT - Alipay");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.gateway.as_deref(), Some("Alipay"));
+    }
+
+    #[test]
+    fn test_long_reference() {
+        let mut r = NormalisationResult::new("MERCHANT 12345678");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+    }
+
+    #[test]
+    fn test_prefix_then_suffix() {
+        let mut r = NormalisationResult::new("SMP*CAFE NAME, Card xx1234 Value Date: 01/01/2026");
+        crate::normalise::prefix::apply(&mut r);
+        apply(&mut r);
+        assert_eq!(r.normalised, "CAFE NAME");
+        assert_eq!(r.features.gateway.as_deref(), Some("Square Marketplace"));
+    }
+
+    #[test]
+    fn test_eftpos_receipt() {
+        let mut r = NormalisationResult::new("MERCHANT - Eftpos Purchase - Receipt 123Date01/01");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+    }
+
+    #[test]
+    fn test_foreign_currency() {
+        let mut r = NormalisationResult::new("MERCHANT SGD 12.50");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MERCHANT");
+        assert_eq!(r.features.currency_code.as_deref(), Some("SGD"));
+        assert_eq!(r.features.amount_in_cents, Some(1250));
+    }
+
+    #[test]
+    fn test_email_suffix() {
+        let mut r = NormalisationResult::new("PAYPAL - paypal-aud@airbnb.com");
+        apply(&mut r);
+        assert_eq!(r.normalised, "PAYPAL");
+    }
+}
