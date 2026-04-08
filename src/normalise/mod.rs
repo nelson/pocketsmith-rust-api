@@ -194,67 +194,6 @@ mod tests {
         assert!(result.features.location.is_none());
     }
 
-    // --- Strip metadata prefix tests ---
-
-    // @cc all tests with strip_metadata() should be replaced with the prefix or suffix version,
-    // and moved tho their own files
-    #[test]
-    fn test_strip_prefix_square() {
-        let mut r = NormalisationResult::new("SQ *SOME MERCHANT SYDNEY");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "SOME MERCHANT SYDNEY");
-        assert_eq!(r.features.gateway.as_deref(), Some("Square"));
-    }
-
-    #[test]
-    fn test_strip_prefix_doordash() {
-        let mut r = NormalisationResult::new("DOORDASH*THAI PLACE");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "THAI PLACE");
-        assert_eq!(r.features.gateway.as_deref(), Some("DoorDash"));
-    }
-
-    #[test]
-    fn test_strip_prefix_visa_debit() {
-        let mut r = NormalisationResult::new("Visa Debit Purchase Card 9172 MERCHANT NAME");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "MERCHANT NAME");
-        assert_eq!(r.features.account.as_deref(), Some("9172"));
-    }
-
-    #[test]
-    fn test_strip_prefix_date() {
-        let mut r = NormalisationResult::new("28/01/26, Direct Debit 123 ENTITY");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "Direct Debit 123 ENTITY");
-        assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
-    }
-
-    #[test]
-    fn test_strip_prefix_none() {
-        let mut r = NormalisationResult::new("Woolworths Strathfield");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "Woolworths Strathfield");
-        assert!(r.features.gateway.is_none());
-    }
-
-    #[test]
-    fn test_strip_prefix_paypal() {
-        let mut r = NormalisationResult::new("PAYPAL *SOME STORE");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "SOME STORE");
-        assert_eq!(r.features.gateway.as_deref(), Some("PayPal"));
-    }
-
-    #[test]
-    fn test_strip_multiple_prefixes() {
-        let mut r = NormalisationResult::new("28/01/26, SQ *COFFEE SHOP");
-        strip_metadata(&mut r);
-        assert_eq!(r.normalised, "COFFEE SHOP");
-        assert_eq!(r.features.gateway.as_deref(), Some("Square"));
-        assert_eq!(r.features.date.as_deref(), Some("28/01/26"));
-    }
-
     // --- Strip metadata suffix tests ---
 
     #[test]
