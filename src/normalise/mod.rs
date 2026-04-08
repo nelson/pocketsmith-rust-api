@@ -41,11 +41,11 @@ pub enum PayeeClass {
 pub struct Features {
     pub entity_name: Option<String>,
     pub location: Option<String>,
-    pub banking_op: Option<BankingOperation>,
+    pub operation: Option<BankingOperation>,
     pub reason: Option<String>,
+    pub bank: Option<String>,
     pub gateway: Option<String>,
-    pub account_ref: Option<String>, // e.g. last 4 digits of card
-    pub bank_name: Option<String>,
+    pub account: Option<String>, // e.g. last 4 digits of card
     pub date: Option<String>,
     pub currency_code: Option<String>,
     pub amount_in_cents: Option<u32>,
@@ -88,7 +88,7 @@ impl NormalisationResult {
 /// Run the full normalisation pipeline on a raw payee string.
 pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
-    prefix::strip_prefixes(&mut result);
+    prefix::apply(&mut result);
     suffix::strip_suffixes(&mut result);
     // @cc reomve this line. trim strings after each step instead of at the end?
     result.normalised = result.normalised.trim().to_string();
@@ -105,8 +105,8 @@ pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) 
     if let Some(date) = caps.name("date") {
         features.date = Some(date.as_str().to_string());
     }
-    if let Some(account_ref) = caps.name("account_ref") {
-        features.account_ref = Some(account_ref.as_str().to_string());
+    if let Some(account) = caps.name("account") {
+        features.account = Some(account.as_str().to_string());
     }
     if let Some(location) = caps.name("location") {
         features.location = Some(location.as_str().to_string());
@@ -144,7 +144,7 @@ mod tests {
     use super::*;
 
     fn strip_metadata(result: &mut NormalisationResult) {
-        prefix::strip_prefixes(result);
+        prefix::apply(result);
         suffix::strip_suffixes(result);
         result.normalised = result.normalised.trim().to_string();
     }
@@ -154,7 +154,7 @@ mod tests {
         let f = Features::default();
         assert!(f.entity_name.is_none());
         assert!(f.location.is_none());
-        assert!(f.banking_op.is_none());
+        assert!(f.operation.is_none());
         assert!(f.date.is_none());
         assert!(f.currency_code.is_none());
         assert!(f.amount_in_cents.is_none());
@@ -219,7 +219,7 @@ mod tests {
         let mut r = NormalisationResult::new("Visa Debit Purchase Card 9172 MERCHANT NAME");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "MERCHANT NAME");
-        assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
+        assert_eq!(r.features.account.as_deref(), Some("9172"));
     }
 
     #[test]
@@ -263,7 +263,7 @@ mod tests {
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "WOOLWORTHS 1624 STRATHF");
         assert_eq!(r.features.date.as_deref(), Some("01/01/2026"));
-        assert_eq!(r.features.account_ref.as_deref(), Some("9172"));
+        assert_eq!(r.features.account.as_deref(), Some("9172"));
     }
 
     #[test]
@@ -271,7 +271,7 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT Card 123456xxxxxx7890");
         strip_metadata(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.account_ref.as_deref(), Some("7890"));
+        assert_eq!(r.features.account.as_deref(), Some("7890"));
     }
 
     #[test]
