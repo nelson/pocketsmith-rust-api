@@ -17,6 +17,3 @@ libc = "0.2"
 name = "transfers"
 path = "src/bin/transfers.rs"
 
-[[bin]]
-name = "normalise_check"
-path = "src/bin/normalise_check.rs"
