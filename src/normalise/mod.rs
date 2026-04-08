@@ -9,13 +9,6 @@ mod persons;
 mod prefix;
 mod suffix;
 
-use regex::Regex;
-
-pub(crate) struct StripPattern {
-    pub(crate) regex: Regex,
-    pub(crate) gateway_name: Option<&'static str>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BankingOperation {
     Interest,
@@ -43,7 +36,7 @@ pub struct Features {
     pub location: Option<String>,
     pub operation: Option<BankingOperation>,
     pub reason: Option<String>,
-    pub bank: Option<String>,
+    pub institution: Option<String>,
     pub gateway: Option<String>,
     pub account: Option<String>, // e.g. last 4 digits of card
     pub date: Option<String>,
@@ -70,73 +63,16 @@ impl NormalisationResult {
     }
 }
 
-// @cc make this function redundant
-/// Strip metadata prefixes and suffixes from a payee string.
-// pub fn strip_metadata(result: &mut NormalisationResult) {
-//     prefix::strip_prefixes(result);
-//     suffix::strip_suffixes(result);
-//     result.normalised = result.normalised.trim().to_string();
-// }
-
-// @cc this function is not called anywhere
-/// Suffix-only variant (used by normalise_check binary).
-// pub fn strip_metadata_suffix_only(result: &mut NormalisationResult) {
-//     suffix::strip_suffixes(result);
-//     result.normalised = result.normalised.trim().to_string();
-// }
-
 /// Run the full normalisation pipeline on a raw payee string.
 pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
     prefix::apply(&mut result);
-    suffix::strip_suffixes(&mut result);
+    suffix::apply(&mut result);
     // @cc reomve this line. trim strings after each step instead of at the end?
     result.normalised = result.normalised.trim().to_string();
     expand::expand(&mut result);
     extract::extract_entities(&mut result);
     result
-}
-
-// @cc we are trying to get rid of this function
-pub(crate) fn extract_features(caps: &regex::Captures, features: &mut Features) {
-    if let Some(gateway) = caps.name("gateway") {
-        features.gateway = Some(gateway.as_str().to_string());
-    }
-    if let Some(date) = caps.name("date") {
-        features.date = Some(date.as_str().to_string());
-    }
-    if let Some(account) = caps.name("account") {
-        features.account = Some(account.as_str().to_string());
-    }
-    if let Some(location) = caps.name("location") {
-        features.location = Some(location.as_str().to_string());
-    } else if let Some(raw) = caps.name("location_raw") {
-        features.location = Some(map_location_raw(raw.as_str()).to_string());
-    }
-    if let Some(currency) = caps.name("currency_code") {
-        features.currency_code = Some(currency.as_str().to_string());
-    }
-    if let Some(amount) = caps.name("amount_in_cents") {
-        features.amount_in_cents = parse_amount_cents(amount.as_str());
-    }
-}
-
-// @cc location_raw doesn't make sense. Move this to
-fn map_location_raw(raw: &str) -> &'static str {
-    match raw {
-        "NSWAU" | "NS" => "NSW",
-        "AU" | "AUS" => "AU",
-        "NLD" => "NL",
-        "SGP" => "SG",
-        "USA" => "US",
-        "IDN" => "ID",
-        "GBR" => "GB",
-        other => panic!("unmapped location_raw: {other}"),
-    }
-}
-
-fn parse_amount_cents(s: &str) -> Option<u32> {
-    s.replace('.', "").parse().ok()
 }
 
 #[cfg(test)]
@@ -145,7 +81,7 @@ mod tests {
 
     fn strip_metadata(result: &mut NormalisationResult) {
         prefix::apply(result);
-        suffix::strip_suffixes(result);
+        suffix::apply(result);
         result.normalised = result.normalised.trim().to_string();
     }
 
