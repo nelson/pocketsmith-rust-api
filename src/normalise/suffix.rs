@@ -44,7 +44,7 @@ struct CompiledSuffix {
 pub fn apply(result: &mut NormalisationResult) {
     loop {
         let mut matched = false;
-        for pat in data() {
+        for pat in compiled_suffixes() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 if let Some(gw) = pat.gateway {
                     result.features.gateway = Some(gw.to_string());
@@ -68,7 +68,11 @@ pub fn apply(result: &mut NormalisationResult) {
                 }
                 if pat.has_location {
                     if let Some(loc) = caps.name("location") {
-                        result.features.location = Some(map_location(loc.as_str()).to_string());
+                        let location = match loc.as_str() {
+                            "NS" => "NSW",
+                            other => other,
+                        };
+                        result.features.location = Some(location.to_string());
                     }
                 }
                 if pat.has_currency_code {
@@ -118,17 +122,10 @@ const SUFFIXES: &[Suffix] = &[
     Suffix { pattern: r"\s*-\s*Internal Transfer\s*-\s*Receipt\s+\d+.*$", operation: Some("Transfer"), ..DEFAULT },
     // --- Gateway ---
     Suffix { pattern: r"\s*-\s*Alipay$", gateway: Some("Alipay"), ..DEFAULT },
-    // --- Location (country codes, mapped to standard form) ---
-    Suffix { pattern: r"\s+(?P<location>NSWAU)$", has_location: true, ..DEFAULT },
+    // --- Location (country codes, stripped with location extraction) ---
     Suffix { pattern: r"\s+(?P<location>NS) AUS$", has_location: true, ..DEFAULT },
     Suffix { pattern: r"\s+(?P<location>AU) AUS$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>AUS)$", has_location: true, ..DEFAULT },
     Suffix { pattern: r"\s+(?P<location>AU)$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>NLD)$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>SGP)$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>USA)$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>IDN)$", has_location: true, ..DEFAULT },
-    Suffix { pattern: r"\s+(?P<location>GBR)$", has_location: true, ..DEFAULT },
     // --- Location (state + optional postcode) ---
     Suffix { pattern: r"\s+(?P<location>(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4,6})$", has_location: true, ..DEFAULT },
     Suffix { pattern: r"\s+(?P<location>(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT))$", has_location: true, ..DEFAULT },
@@ -143,25 +140,11 @@ const SUFFIXES: &[Suffix] = &[
     Suffix { pattern: r"\s+\d{7,}$", ..DEFAULT },
 ];
 
-/// Map raw location codes to standard form. Unknown values pass through unchanged.
-fn map_location(raw: &str) -> &str {
-    match raw {
-        "NSWAU" | "NS" => "NSW",
-        "AU" | "AUS" => "AU",
-        "NLD" => "NL",
-        "SGP" => "SG",
-        "USA" => "US",
-        "IDN" => "ID",
-        "GBR" => "GB",
-        other => other,
-    }
-}
-
 fn parse_amount_cents(s: &str) -> Option<u32> {
     s.replace('.', "").parse().ok()
 }
 
-fn data() -> &'static [CompiledSuffix] {
+fn compiled_suffixes() -> &'static [CompiledSuffix] {
     static COMPILED: OnceLock<Vec<CompiledSuffix>> = OnceLock::new();
     COMPILED.get_or_init(|| {
         SUFFIXES
@@ -212,8 +195,8 @@ mod tests {
     }
 
     #[test]
-    fn test_country_code() {
-        let mut r = NormalisationResult::new("SOME MERCHANT NSWAU");
+    fn test_ns_aus() {
+        let mut r = NormalisationResult::new("SOME MERCHANT NS AUS");
         apply(&mut r);
         assert_eq!(r.normalised, "SOME MERCHANT");
         assert_eq!(r.features.location.as_deref(), Some("NSW"));

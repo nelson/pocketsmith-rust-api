@@ -24,7 +24,7 @@ struct CompiledPrefix {
 pub fn apply(result: &mut NormalisationResult) {
     loop {
         let mut matched = false;
-        for pat in data() {
+        for pat in compiled_prefixes() {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
                 if let Some(gw) = pat.gateway {
                     result.features.gateway = Some(gw.to_string());
@@ -93,7 +93,7 @@ const PREFIXES: &[Prefix] = &[
     Prefix { pattern: r"^ZLR\*", gateway: Some("Zeller"), ..DEFAULT },
 ];
 
-fn data() -> &'static [CompiledPrefix] {
+fn compiled_prefixes() -> &'static [CompiledPrefix] {
     static COMPILED: OnceLock<Vec<CompiledPrefix>> = OnceLock::new();
     COMPILED.get_or_init(|| {
         PREFIXES
