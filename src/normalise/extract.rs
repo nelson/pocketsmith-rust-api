@@ -1,6 +1,4 @@
-use super::{
-    banking_ops, employers, locations, merchants, persons, NormalisationResult, PayeeClass,
-};
+use super::{banking_ops, employers, locations, merchants, NormalisationResult, PayeeClass};
 
 /// Orchestrate entity extraction from all sub-extractors.
 /// Sets `features.entity_name` from whichever matched, and `result.class` by priority.
@@ -15,11 +13,11 @@ pub fn extract_entities(result: &mut NormalisationResult) {
         return;
     }
 
-    if let Some(person) = persons::extract_person(stripped, original) {
-        result.features.entity_name = Some(person);
-        result.class = PayeeClass::Person;
-        return;
-    }
+    // if let Some(person) = persons::extract_person(stripped, original) {
+    //     result.features.entity_name = Some(person);
+    //     result.class = PayeeClass::Person;
+    //     return;
+    // }
 
     if let Some(merchant) = merchants::extract_merchant(stripped, original) {
         result.features.entity_name = Some(merchant);
