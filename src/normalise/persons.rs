@@ -37,7 +37,7 @@ pub fn apply(result: &mut NormalisationResult) {
     for cp in compiled_persons() {
         if cp.regex.is_match(&result.normalised) {
             result.features.entity_name = Some(cp.canonical.to_string());
-            result.class = PayeeClass::Person;
+            result.set_class(PayeeClass::Person);
             return;
         }
     }
@@ -165,7 +165,7 @@ mod tests {
         let mut r = NormalisationResult::new("JOHNNY TAM");
         apply(&mut r);
         assert_eq!(r.features.entity_name.as_deref(), Some("Johnny Tam"));
-        assert_eq!(r.class, PayeeClass::Person);
+        assert_eq!(r.class(), Some(&PayeeClass::Person));
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         let mut r = NormalisationResult::new("TRANSFER FROM NELSON TAM");
         apply(&mut r);
         assert_eq!(r.features.entity_name.as_deref(), Some("Nelson Tam"));
-        assert_eq!(r.class, PayeeClass::Person);
+        assert_eq!(r.class(), Some(&PayeeClass::Person));
     }
 
     #[test]
@@ -181,6 +181,6 @@ mod tests {
         let mut r = NormalisationResult::new("WOOLWORTHS STRATHFIELD");
         apply(&mut r);
         assert!(r.features.entity_name.is_none());
-        assert_eq!(r.class, PayeeClass::Unclassified);
+        assert!(r.class().is_none());
     }
 }

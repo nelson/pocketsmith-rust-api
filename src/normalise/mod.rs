@@ -23,10 +23,9 @@ pub enum BankingOperation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PayeeClass {
     Person,
-    Employer, // a special case of Merchant, if it fits known past employers and money is incoming
+    Employer,
     Merchant,
     Other,
-    Unclassified,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -45,9 +44,9 @@ pub struct Features {
 
 #[derive(Debug, Clone)]
 pub struct NormalisationResult {
-    pub original: String,
+    original: String,
     pub normalised: String,
-    pub class: PayeeClass,
+    class: Option<PayeeClass>,
     pub features: Features,
 }
 
@@ -56,9 +55,24 @@ impl NormalisationResult {
         Self {
             original: payee.to_string(),
             normalised: payee.to_string(),
-            class: PayeeClass::Unclassified,
+            class: None,
             features: Features::default(),
         }
+    }
+
+    pub fn original(&self) -> &str {
+        &self.original
+    }
+
+    pub fn class(&self) -> Option<&PayeeClass> {
+        self.class.as_ref()
+    }
+
+    pub fn set_class(&mut self, class: PayeeClass) {
+        if self.class.is_some() {
+            panic!("class already set");
+        }
+        self.class = Some(class);
     }
 }
 
@@ -102,25 +116,21 @@ mod tests {
     }
 
     #[test]
-    fn test_normalisation_result_construction() {
-        let result = NormalisationResult {
-            original: "TEST".to_string(),
-            normalised: "Test".to_string(),
-            class: PayeeClass::Unclassified,
-            features: Features::default(),
-        };
-        assert_eq!(result.original, "TEST");
-        assert_eq!(result.class, PayeeClass::Unclassified);
+    fn test_normalisation_result_new() {
+        let result = NormalisationResult::new("TEST");
+        assert_eq!(result.original(), "TEST");
+        assert_eq!(result.normalised, "TEST");
+        assert!(result.class().is_none());
+        assert!(result.features.entity_name.is_none());
+        assert!(result.features.location.is_none());
     }
 
     #[test]
-    fn test_normalisation_result_new() {
-        let result = NormalisationResult::new("TEST");
-        assert_eq!(result.original, "TEST");
-        assert_eq!(result.normalised, "TEST");
-        assert_eq!(result.class, PayeeClass::Unclassified);
-        assert!(result.features.entity_name.is_none());
-        assert!(result.features.location.is_none());
+    #[should_panic(expected = "class already set")]
+    fn test_set_class_twice_panics() {
+        let mut r = NormalisationResult::new("TEST");
+        r.set_class(PayeeClass::Person);
+        r.set_class(PayeeClass::Merchant);
     }
 
     // --- Expand truncations tests ---
@@ -187,7 +197,7 @@ mod tests {
     #[test]
     fn test_normalise_woolworths_full() {
         let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
-        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.class(), Some(&PayeeClass::Merchant));
         assert_eq!(result.features.entity_name.as_deref(), Some("Woolworths"));
     }
 }
