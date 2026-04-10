@@ -1,39 +1,26 @@
-use super::{banking_ops, employers, locations, merchants, NormalisationResult, PayeeClass};
+use super::{banking_ops, locations, merchants, NormalisationResult, PayeeClass};
 
 /// Orchestrate entity extraction from all sub-extractors.
 /// Sets `features.entity_name` from whichever matched, and `result.class` by priority.
 pub fn extract_entities(result: &mut NormalisationResult) {
-    let stripped = &result.normalised;
-    let original = &result.original;
-
-    // Try each extractor in priority order
-    if let Some(employer) = employers::extract_employer(original) {
-        result.features.entity_name = Some(employer);
-        result.class = PayeeClass::Employer;
-        return;
-    }
-
-    // if let Some(person) = persons::extract_person(stripped, original) {
-    //     result.features.entity_name = Some(person);
-    //     result.class = PayeeClass::Person;
-    //     return;
-    // }
-
-    if let Some(merchant) = merchants::extract_merchant(stripped, original) {
+    let merchant = merchants::extract_merchant(&result.normalised, result.original());
+    if let Some(merchant) = merchant {
         result.features.entity_name = Some(merchant);
-        result.class = PayeeClass::Merchant;
+        result.set_class(PayeeClass::Merchant);
         return;
     }
 
-    if let Some(op) = banking_ops::extract_banking_op(original) {
+    let op = banking_ops::extract_banking_op(result.original());
+    if let Some(op) = op {
         result.features.operation = Some(op);
-        result.class = PayeeClass::Other;
+        result.set_class(PayeeClass::Other);
         return;
     }
 
     // Extract location even if no entity matched
     if result.features.location.is_none() {
-        result.features.location = locations::extract_location(stripped);
+        let location = locations::extract_location(&result.normalised);
+        result.features.location = location;
     }
 }
 
@@ -46,6 +33,6 @@ mod tests {
         let mut result = NormalisationResult::new("WOOLWORTHS 1624 STRATHFIELD");
         extract_entities(&mut result);
         assert_eq!(result.features.entity_name.as_deref(), Some("Woolworths"));
-        assert_eq!(result.class, PayeeClass::Merchant);
+        assert_eq!(result.class(), Some(&PayeeClass::Merchant));
     }
 }
