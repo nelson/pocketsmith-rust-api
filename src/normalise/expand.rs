@@ -101,14 +101,17 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "WOOLLOOMOOL", canonical: "WOOLLOOMOOLOO" },
     // --- Word truncations ---
     Expansion { pattern: "ACUPUNCT", canonical: "ACUPUNCTURE" },
+    Expansion { pattern: "AMZNPRIMEAU", canonical: "AMAZON PRIME AU" },
     Expansion { pattern: "AUSTRA", canonical: "AUSTRALIA" },
     Expansion { pattern: "BOULEVAR", canonical: "BOULEVARD" },
     Expansion { pattern: "BREADTO", canonical: "BREADTOP" },
     Expansion { pattern: "CHEMIS", canonical: "CHEMIST" },
     Expansion { pattern: "CHEMI", canonical: "CHEMIST" },
+    Expansion { pattern: "CHILDASSISTPYMT", canonical: "CHILD ASSISTANCE PAYMENT" },
     Expansion { pattern: "CHOCOLA", canonical: "CHOCOLATES" },
     Expansion { pattern: "COFF", canonical: "COFFEE" },
     Expansion { pattern: "COF", canonical: "COFFEE" },
+    Expansion { pattern: "COMMINSURE", canonical: "COMMINSURE" },
     Expansion { pattern: "COSME", canonical: "COSMETICS" },
     Expansion { pattern: "ENTERTAINMEN", canonical: "ENTERTAINMENT" },
     Expansion { pattern: "ENTERTAIN", canonical: "ENTERTAINMENT" },
@@ -122,7 +125,9 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "KITCH", canonical: "KITCHEN" },
     Expansion { pattern: "MKTPLC", canonical: "MARKETPLACE" },
     Expansion { pattern: "MKTPL", canonical: "MARKETPLACE" },
+    Expansion { pattern: "MCARE BENEFITS", canonical: "MEDICARE BENEFITS" },
     Expansion { pattern: "PHARMCY", canonical: "PHARMACY" },
+    Expansion { pattern: "PLINE PH", canonical: "PRICELINE PHARMACY" },
     Expansion { pattern: "RESTAURAN", canonical: "RESTAURANT" },
     Expansion { pattern: "RETA", canonical: "RETAIL" },
     Expansion { pattern: "STARBUC", canonical: "STARBUCKS" },
@@ -204,5 +209,33 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT AUS");
         apply(&mut r);
         assert_eq!(r.normalised, "MERCHANT Australia");
+    }
+
+    #[test]
+    fn test_expand_mcare_benefits() {
+        let mut r = NormalisationResult::new("MCARE BENEFITS 024037941");
+        apply(&mut r);
+        assert_eq!(r.normalised, "MEDICARE BENEFITS 024037941");
+    }
+
+    #[test]
+    fn test_expand_pline_ph() {
+        let mut r = NormalisationResult::new("PLINE PH STRATHFIELD");
+        apply(&mut r);
+        assert_eq!(r.normalised, "PRICELINE PHARMACY STRATHFIELD");
+    }
+
+    #[test]
+    fn test_expand_childassistpymt() {
+        let mut r = NormalisationResult::new("CHILDASSISTPYMT");
+        apply(&mut r);
+        assert_eq!(r.normalised, "CHILD ASSISTANCE PAYMENT");
+    }
+
+    #[test]
+    fn test_expand_amznprimeau() {
+        let mut r = NormalisationResult::new("AMZNPRIMEAU MEMBERSHIP");
+        apply(&mut r);
+        assert_eq!(r.normalised, "AMAZON PRIME AU MEMBERSHIP");
     }
 }
