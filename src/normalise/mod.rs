@@ -1,7 +1,6 @@
 mod banking_ops;
 mod employers;
 mod expand;
-mod extract;
 mod locations;
 mod merchants;
 mod persons;
@@ -17,6 +16,11 @@ pub enum BankingOperation {
     Loan,
     Deposit,
     Withdrawal,
+    DirectDebit,
+    DirectCredit,
+    BPay,
+    InternalTransfer,
+    Fee,
 }
 
 /// Listed in order of priority for classification.
@@ -81,10 +85,10 @@ pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
     prefix::apply(&mut result);
     suffix::apply(&mut result);
-    // @cc reomve this line. trim strings after each step instead of at the end?
-    result.normalised = result.normalised.trim().to_string();
     expand::apply(&mut result);
-    extract::extract_entities(&mut result);
+    persons::apply(&mut result);
+    employers::apply(&mut result);
+    merchants::apply(&mut result);
     result
 }
 
