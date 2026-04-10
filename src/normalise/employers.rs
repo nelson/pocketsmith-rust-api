@@ -14,6 +14,19 @@ struct CompiledEmployer {
     canonical: &'static str,
 }
 
+pub fn apply(result: &mut NormalisationResult) {
+    if result.class().is_some() {
+        return;
+    }
+    for ce in compiled_employers() {
+        if ce.regex.is_match(&result.normalised) {
+            result.features.entity_name = Some(ce.canonical.to_string());
+            result.set_class(PayeeClass::Employer);
+            return;
+        }
+    }
+}
+
 const KNOWN_EMPLOYERS: &[Employer] = &[
     Employer {
         canonical: "AFES",
@@ -55,16 +68,6 @@ fn compiled_employers() -> &'static [CompiledEmployer] {
             })
             .collect()
     })
-}
-
-pub fn apply(result: &mut NormalisationResult) {
-    for ce in compiled_employers() {
-        if ce.regex.is_match(&result.normalised) {
-            result.features.entity_name = Some(ce.canonical.to_string());
-            result.set_class(PayeeClass::Employer);
-            return;
-        }
-    }
 }
 
 #[cfg(test)]

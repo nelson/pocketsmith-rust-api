@@ -1,3 +1,5 @@
+use crate::normalise::{NormalisationResult, PayeeClass};
+
 use regex::Regex;
 use std::sync::OnceLock;
 
@@ -9,6 +11,22 @@ struct CompiledMerchant {
 struct KnownMerchantPattern {
     pattern: &'static str,
     canonical: &'static str,
+}
+
+/// Match the normalised payee against known merchant patterns, set class.
+pub fn apply(result: &mut NormalisationResult) {
+    // Don't apply if already classified as a person or employer.
+    if result.class().is_some() {
+        return;
+    }
+    // loop through all merchant patterns and compare to `normalised` and apply the first one that matches
+    for cm in compiled_merchants() {
+        if cm.regex.is_match(&result.normalised) {
+            result.features.entity_name = Some(cm.canonical.to_string());
+            result.set_class(PayeeClass::Merchant);
+            return;
+        }
+    }
 }
 
 const KNOWN_MERCHANT_PATTERNS: &[KnownMerchantPattern] = &[
@@ -184,24 +202,15 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
     })
 }
 
-/// Match the uppercase stripped payee against known merchant patterns.
-pub fn extract_merchant(stripped: &str, _original: &str) -> Option<String> {
-    let upper = stripped.to_uppercase();
-    for m in compiled_merchants() {
-        if m.regex.is_match(&upper) {
-            return Some(m.canonical.to_string());
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_merchant_woolworths() {
-        let result = extract_merchant("WOOLWORTHS 1624 STRATHFIELD", "WOOLWORTHS 1624 STRATHFIELD");
-        assert_eq!(result, Some("Woolworths".to_string()));
+    fn test_merchant_woolworths() {
+        let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHFIELD");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Woolworths"));
+        assert_eq!(r.class(), Some(&PayeeClass::Merchant));
     }
 }
