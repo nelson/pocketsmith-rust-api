@@ -7,7 +7,7 @@ mod persons;
 mod prefix;
 mod suffix;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BankingOperation {
     Interest,
     CreditCard,
