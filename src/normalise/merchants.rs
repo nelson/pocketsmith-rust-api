@@ -15,13 +15,12 @@ struct KnownMerchantPattern {
 
 /// Match the normalised payee against known merchant patterns, set class.
 pub fn apply(result: &mut NormalisationResult) {
-    // Don't apply if already classified as a person or employer.
     if result.class().is_some() {
         return;
     }
-    // loop through all merchant patterns and compare to `normalised` and apply the first one that matches
+    let upper = result.normalised.to_uppercase();
     for cm in compiled_merchants() {
-        if cm.regex.is_match(&result.normalised) {
+        if cm.regex.is_match(&upper) {
             result.features.entity_name = Some(cm.canonical.to_string());
             result.set_class(PayeeClass::Merchant);
             return;
