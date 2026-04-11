@@ -1,6 +1,7 @@
 mod schema;
 
 pub mod categories;
+pub mod payee_metadata;
 pub mod transaction_accounts;
 pub mod transactions;
 pub mod users;

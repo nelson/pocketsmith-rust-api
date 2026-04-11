@@ -136,15 +136,15 @@ pub fn escape(s: &str) -> String {
     regex::escape(s)
 }
 
-fn compile_re(pattern: &str, context: &str) -> Result<Re> {
+pub(crate) fn compile_re(pattern: &str, context: &str) -> Result<Re> {
     Re::new(pattern).map_err(|e| anyhow::anyhow!("Bad {} pattern '{}': {}", context, pattern, e))
 }
 
-fn compile_icase(pattern: &str, context: &str) -> Result<Re> {
+pub(crate) fn compile_icase(pattern: &str, context: &str) -> Result<Re> {
     compile_re(&format!("(?i){}", pattern), context)
 }
 
-fn load_yaml<T: serde::de::DeserializeOwned>(rules_dir: &Path, filename: &str) -> Result<T> {
+pub(crate) fn load_yaml<T: serde::de::DeserializeOwned>(rules_dir: &Path, filename: &str) -> Result<T> {
     let path = rules_dir.join(filename);
     let content = std::fs::read_to_string(&path)
         .map_err(|e| anyhow::anyhow!("Reading {}: {}", path.display(), e))?;

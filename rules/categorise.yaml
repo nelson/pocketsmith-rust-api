@@ -1,0 +1,100 @@
+type_rules:
+  salary: _Income
+  transfer_in: _Transfer
+  transfer_out: _Transfer
+  banking_operation: _Bills
+
+payee_overrides:
+  - pattern: "\\(Donation\\)"
+    category: _Giving
+  - pattern: "^AFES\\b"
+    category: _Giving
+  - pattern: "Loan Repayment|Mortgage"
+    category: _Mortgage
+  - pattern: "Transport NSW|Opal"
+    category: _Transport
+
+google_places_mappings:
+  # Groceries
+  supermarket: _Groceries
+  grocery_store: _Groceries
+  grocery_or_supermarket: _Groceries
+
+  # Dining
+  restaurant: _Dining
+  cafe: _Dining
+  bakery: _Dining
+  bar: _Dining
+  coffee_shop: _Dining
+  fast_food_restaurant: _Dining
+  meal_delivery: _Dining
+  meal_takeaway: _Dining
+  food: _Dining
+  ice_cream_shop: _Dining
+  pizza_restaurant: _Dining
+  sandwich_shop: _Dining
+  steak_house: _Dining
+  sushi_restaurant: _Dining
+  breakfast_restaurant: _Dining
+  brunch_restaurant: _Dining
+  chinese_restaurant: _Dining
+  indian_restaurant: _Dining
+  italian_restaurant: _Dining
+  japanese_restaurant: _Dining
+  korean_restaurant: _Dining
+  thai_restaurant: _Dining
+  vietnamese_restaurant: _Dining
+
+  # Transport
+  gas_station: _Transport
+  parking: _Transport
+  car_rental: _Transport
+  car_repair: _Transport
+  car_wash: _Transport
+  transit_station: _Transport
+
+  # Bills
+  pharmacy: _Bills
+  dentist: _Bills
+  doctor: _Bills
+  hospital: _Bills
+  veterinary_care: _Bills
+  insurance_agency: _Bills
+  laundry: _Bills
+
+  # Shopping
+  clothing_store: _Shopping
+  shoe_store: _Shopping
+  jewelry_store: _Shopping
+  electronics_store: _Shopping
+  furniture_store: _Shopping
+  home_goods_store: _Shopping
+  hardware_store: _Shopping
+  book_store: _Shopping
+  pet_store: _Shopping
+  florist: _Shopping
+  gift_shop: _Shopping
+  shopping_mall: _Shopping
+  department_store: _Shopping
+  beauty_salon: _Shopping
+  hair_care: _Shopping
+  spa: _Shopping
+  gym: _Shopping
+  store: _Shopping
+
+  # Education
+  school: _Education
+  university: _Education
+  library: _Education
+
+  # Holidays
+  travel_agency: _Holidays
+  lodging: _Holidays
+  hotel: _Holidays
+
+  # Household
+  plumber: _Household
+  electrician: _Household
+  locksmith: _Household
+  moving_company: _Household
+  real_estate_agency: _Household

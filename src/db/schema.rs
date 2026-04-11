@@ -147,6 +147,37 @@ BEGIN
     );
 END;
 
+CREATE TABLE IF NOT EXISTS payee_metadata (
+    normalised_payee  TEXT PRIMARY KEY,
+    payee_type        TEXT NOT NULL,
+    extracted_entity  TEXT,
+    extract_kind      TEXT,
+    identity          TEXT,
+    merchant_group    TEXT,
+    detected_location TEXT,
+    extra             TEXT,
+    sample_original   TEXT,
+    transaction_count INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS categorisation_audit (
+    normalised_payee  TEXT PRIMARY KEY,
+    payee_type        TEXT,
+    method            TEXT NOT NULL,
+    category          TEXT,
+    reason            TEXT,
+    transaction_count INTEGER NOT NULL DEFAULT 0,
+    place_name        TEXT,
+    place_types       TEXT,
+    place_address     TEXT,
+    raw_response      TEXT,
+    metadata          TEXT,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TRIGGER IF NOT EXISTS _transactions_history_delete
 AFTER DELETE ON transactions
 BEGIN

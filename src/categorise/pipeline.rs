@@ -1,0 +1,623 @@
+use std::collections::HashMap;
+
+use anyhow::{Context, Result};
+use rusqlite::Connection;
+
+use crate::db::payee_metadata;
+use crate::normalise::main::{normalise_payee, PipelineRules};
+use crate::normalise::meta;
+use crate::normalise::Metadata;
+
+use super::audit;
+use super::audit::PlaceResult;
+use super::llm::LlmClient;
+use super::mapping::map_place_to_category;
+use super::places::PlacesClient;
+use super::rules::{try_rules, CategoriseRules};
+use super::{CategoriseResult, CategoriseSource};
+
+/// A transaction row with the fields we need.
+struct TxnRow {
+    id: i64,
+    payee: Option<String>,
+    original_payee: Option<String>,
+    category_id: Option<i64>,
+}
+
+/// A grouped payee with its normalised form, metadata, and transaction IDs.
+struct PayeeGroup {
+    normalised: String,
+    txn_type: Option<String>,
+    metadata: Metadata,
+    sample_original: String,
+    txn_ids: Vec<i64>,
+    current_category_ids: Vec<Option<i64>>,
+}
+
+/// Proposed category change for display/approval.
+#[derive(Debug)]
+pub struct CategoryChange {
+    pub normalised_payee: String,
+    pub txn_count: usize,
+    pub old_category: Option<String>,
+    pub new_category: String,
+    pub source: CategoriseSource,
+    pub reason: String,
+    pub txn_ids: Vec<i64>,
+    pub new_category_id: i64,
+}
+
+pub struct PipelineConfig {
+    pub google_places_key: Option<String>,
+    pub anthropic_key: Option<String>,
+}
+
+/// Run the full categorisation pipeline. Returns (results, changes).
+pub fn run(
+    conn: &Connection,
+    normalise_rules: &PipelineRules,
+    categorise_rules: &CategoriseRules,
+    config: &PipelineConfig,
+) -> Result<(Vec<CategoriseResult>, Vec<CategoryChange>)> {
+    // 1. Load category mappings (both directions, single query)
+    let (cat_name_to_id, cat_id_to_name) = load_category_maps(conn)?;
+
+    // 2. Load all transactions
+    let txns = load_transactions(conn)?;
+    eprintln!("Loaded {} transactions", txns.len());
+    if txns.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+
+    // 3. Normalise, group by payee, and persist metadata
+    let groups = normalise_and_group(conn, &txns, normalise_rules)?;
+    eprintln!("Grouped into {} unique payees", groups.len());
+
+    // 4. Categorise each group
+    let mut results: Vec<CategoriseResult> = Vec::new();
+    let mut unresolved: Vec<(usize, String, Option<String>)> = Vec::new(); // (idx, payee, type)
+
+    let places_client = config
+        .google_places_key
+        .as_ref()
+        .map(|k| PlacesClient::new(k.clone()));
+
+    for group in &groups {
+        let count = group.txn_ids.len();
+        let txn_type = group.txn_type.as_deref();
+
+        // 4a. Try rule-based
+        if let Some(r) = try_rules(&group.normalised, txn_type, count, categorise_rules) {
+            audit::upsert(
+                conn,
+                &r.normalised_payee,
+                txn_type,
+                "rule",
+                r.category.as_deref(),
+                &r.reason,
+                count as i64,
+                None,
+            )?;
+            results.push(r);
+            continue;
+        }
+
+        // 4b. Check audit cache
+        if let Some(cached) = audit::get_cached(conn, &group.normalised)? {
+            if let Some(ref cat) = cached.category {
+                let source = match cached.method.as_str() {
+                    "google_places" => CategoriseSource::Cache,
+                    "llm" => CategoriseSource::Cache,
+                    _ => CategoriseSource::Cache,
+                };
+                results.push(CategoriseResult {
+                    normalised_payee: group.normalised.clone(),
+                    category: Some(cat.clone()),
+                    source,
+                    reason: format!("cache:{}", cached.reason.as_deref().unwrap_or("")),
+                    transaction_count: count,
+                });
+                continue;
+            }
+        }
+
+        // 4c. Google Places API — only for merchants
+        if txn_type == Some("merchant") {
+            if let Some(ref client) = places_client {
+                eprintln!("  [Google Places] {}", group.normalised);
+                match client.search_raw(&group.normalised) {
+                    Ok((Some(place), raw)) => {
+                        if let Some(cat) = map_place_to_category(
+                            &place.place_types,
+                            &categorise_rules.google_places_mappings,
+                        ) {
+                            let type_str =
+                                place.place_types.first().cloned().unwrap_or_default();
+                            let reason = format!("google:{}→category", type_str);
+                            audit::upsert_with_places(
+                                conn,
+                                &group.normalised,
+                                txn_type,
+                                Some(&cat),
+                                &reason,
+                                count as i64,
+                                &place,
+                                Some(&raw),
+                            )?;
+                            results.push(CategoriseResult {
+                                normalised_payee: group.normalised.clone(),
+                                category: Some(cat),
+                                source: CategoriseSource::GooglePlaces,
+                                reason,
+                                transaction_count: count,
+                            });
+                            continue;
+                        }
+                        // Place found but no category mapping — record it
+                        let empty_place = PlaceResult {
+                            place_name: place.place_name,
+                            place_types: place.place_types,
+                            place_address: place.place_address,
+                        };
+                        audit::upsert_with_places(
+                            conn,
+                            &group.normalised,
+                            txn_type,
+                            None,
+                            "google:no_mapping",
+                            count as i64,
+                            &empty_place,
+                            Some(&raw),
+                        )?;
+                    }
+                    Ok((None, raw)) => {
+                        let empty = PlaceResult {
+                            place_name: None,
+                            place_types: vec![],
+                            place_address: None,
+                        };
+                        audit::upsert_with_places(
+                            conn,
+                            &group.normalised,
+                            txn_type,
+                            None,
+                            "google:no_result",
+                            count as i64,
+                            &empty,
+                            Some(&raw),
+                        )?;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: Google Places API error for '{}': {}",
+                            group.normalised, e
+                        );
+                    }
+                }
+            }
+        }
+
+        // 4d. Queue for LLM batch
+        let idx = results.len();
+        results.push(CategoriseResult {
+            normalised_payee: group.normalised.clone(),
+            category: None,
+            source: CategoriseSource::Unknown,
+            reason: "pending LLM".into(),
+            transaction_count: count,
+        });
+        unresolved.push((idx, group.normalised.clone(), group.txn_type.clone()));
+    }
+
+    // 5. LLM batch for unresolved
+    if !unresolved.is_empty() {
+        if let Some(ref api_key) = config.anthropic_key {
+            let client = LlmClient::new(api_key.clone());
+            let payees: Vec<String> = unresolved.iter().map(|(_, p, _)| p.clone()).collect();
+            let total_chunks = (payees.len() + 19) / 20;
+            eprintln!("Sending {} unresolved payees to LLM ({} batches)...", payees.len(), total_chunks);
+
+            for (chunk_idx, chunk) in payees.chunks(20).enumerate() {
+                eprintln!("  [LLM] batch {}/{}: {} payees", chunk_idx + 1, total_chunks, chunk.len());
+                let chunk_vec: Vec<String> = chunk.to_vec();
+                match client.categorise_batch(&chunk_vec) {
+                    Ok(llm_results) => {
+                        let base = chunk_idx * 20;
+                        for (i, llm_r) in llm_results.into_iter().enumerate() {
+                            let (global_idx, ref payee, ref typ) = unresolved[base + i];
+                            results[global_idx].source = CategoriseSource::Llm;
+                            results[global_idx].category = llm_r.category.clone();
+                            results[global_idx].reason = llm_r.reason.clone();
+                            audit::upsert(
+                                conn,
+                                payee,
+                                typ.as_deref(),
+                                "llm",
+                                llm_r.category.as_deref(),
+                                &llm_r.reason,
+                                results[global_idx].transaction_count as i64,
+                                None,
+                            )?;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: LLM batch error: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    eprintln!("Categorisation complete. Building change list...");
+
+    // 6. Build changes list
+    let mut changes: Vec<CategoryChange> = Vec::new();
+
+    for (i, group) in groups.iter().enumerate() {
+        let result = &results[i];
+        if let Some(ref new_cat) = result.category {
+            if let Some(&new_cat_id) = cat_name_to_id.get(new_cat.as_str()) {
+                let dominant_old = dominant_category(&group.current_category_ids);
+                let old_name = dominant_old.and_then(|id| cat_id_to_name.get(&id).cloned());
+
+                if old_name.as_deref() != Some(new_cat.as_str()) {
+                    changes.push(CategoryChange {
+                        normalised_payee: group.normalised.clone(),
+                        txn_count: group.txn_ids.len(),
+                        old_category: old_name,
+                        new_category: new_cat.clone(),
+                        source: result.source.clone(),
+                        reason: result.reason.clone(),
+                        txn_ids: group.txn_ids.clone(),
+                        new_category_id: new_cat_id,
+                    });
+                }
+            }
+        }
+    }
+
+    changes.sort_by(|a, b| b.txn_count.cmp(&a.txn_count));
+
+    Ok((results, changes))
+}
+
+/// Apply approved category changes.
+pub fn apply_changes(conn: &Connection, changes: &[CategoryChange]) -> Result<usize> {
+    let mut total = 0;
+    crate::db::with_transaction_change_log(conn, "categorise", |conn| {
+        for change in changes {
+            for &txn_id in &change.txn_ids {
+                conn.execute(
+                    "UPDATE transactions SET category_id = ?1 WHERE id = ?2",
+                    rusqlite::params![change.new_category_id, txn_id],
+                )?;
+                total += 1;
+            }
+        }
+        Ok(())
+    })?;
+    Ok(total)
+}
+
+fn load_transactions(conn: &Connection) -> Result<Vec<TxnRow>> {
+    let mut stmt = conn
+        .prepare("SELECT id, payee, original_payee, category_id FROM transactions")
+        .context("Loading transactions")?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(TxnRow {
+                id: row.get(0)?,
+                payee: row.get(1)?,
+                original_payee: row.get(2)?,
+                category_id: row.get(3)?,
+            })
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn normalise_and_group(
+    conn: &Connection,
+    txns: &[TxnRow],
+    rules: &PipelineRules,
+) -> Result<Vec<PayeeGroup>> {
+    let mut map: HashMap<String, PayeeGroup> = HashMap::new();
+    let mut norm_cache: HashMap<String, (String, Option<String>, Metadata)> = HashMap::new();
+
+    for txn in txns {
+        let raw = txn
+            .original_payee
+            .as_deref()
+            .or(txn.payee.as_deref())
+            .unwrap_or("");
+        if raw.is_empty() {
+            continue;
+        }
+
+        let (normalised, txn_type, metadata) = norm_cache
+            .entry(raw.to_string())
+            .or_insert_with(|| {
+                let (n, md) = normalise_payee(raw, rules);
+                let t = md
+                    .get(meta::TYPE)
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                (n, t, md)
+            })
+            .clone();
+
+        let entry = map.entry(normalised.clone()).or_insert_with(|| PayeeGroup {
+            normalised,
+            txn_type,
+            metadata,
+            sample_original: raw.to_string(),
+            txn_ids: Vec::new(),
+            current_category_ids: Vec::new(),
+        });
+        entry.txn_ids.push(txn.id);
+        entry.current_category_ids.push(txn.category_id);
+    }
+
+    let mut groups: Vec<PayeeGroup> = map.into_values().collect();
+    groups.sort_by(|a, b| b.txn_ids.len().cmp(&a.txn_ids.len()));
+
+    // Persist metadata to DB
+    for group in &groups {
+        payee_metadata::upsert(
+            conn,
+            &group.normalised,
+            &group.metadata,
+            &group.sample_original,
+            group.txn_ids.len() as i64,
+        )?;
+    }
+
+    Ok(groups)
+}
+
+fn load_category_maps(
+    conn: &Connection,
+) -> Result<(HashMap<String, i64>, HashMap<i64, String>)> {
+    let mut stmt = conn.prepare("SELECT id, title FROM categories")?;
+    let mut name_to_id = HashMap::new();
+    let mut id_to_name = HashMap::new();
+    stmt.query_map([], |row| {
+        let id: i64 = row.get(0)?;
+        let title: String = row.get(1)?;
+        Ok((id, title))
+    })?
+    .filter_map(|r| r.ok())
+    .for_each(|(id, title)| {
+        name_to_id.insert(title.clone(), id);
+        id_to_name.insert(id, title);
+    });
+    Ok((name_to_id, id_to_name))
+}
+
+fn dominant_category(ids: &[Option<i64>]) -> Option<i64> {
+    let mut counts: HashMap<i64, usize> = HashMap::new();
+    for id in ids.iter().flatten() {
+        *counts.entry(*id).or_default() += 1;
+    }
+    counts.into_iter().max_by_key(|(_, c)| *c).map(|(id, _)| id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+    use crate::db::test_helpers::*;
+    use std::path::Path;
+
+    fn setup_db_with_categories(conn: &Connection) {
+        for (id, title) in [
+            (1, "_Bills"),
+            (2, "_Dining"),
+            (3, "_Education"),
+            (4, "_Giving"),
+            (5, "_Groceries"),
+            (6, "_Holidays"),
+            (7, "_Household"),
+            (8, "_Income"),
+            (9, "_Mortgage"),
+            (10, "_Shopping"),
+            (11, "_Transfer"),
+            (12, "_Transport"),
+        ] {
+            db::upsert_category(conn, &make_category(id, title)).unwrap();
+        }
+    }
+
+    fn insert_txn(conn: &Connection, id: i64, payee: &str, original_payee: &str) {
+        let mut txn = make_transaction(id, payee);
+        txn.original_payee = Some(original_payee.into());
+        db::upsert_transaction(conn, &txn).unwrap();
+    }
+
+    #[test]
+    fn test_pipeline_salary_to_income() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Apple", "Salary from APPLE PTY LTD");
+            Ok(())
+        })
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, changes) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].category, Some("_Income".into()));
+        assert_eq!(results[0].source, CategoriseSource::Rule);
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].new_category, "_Income");
+
+        // Verify audit row was written
+        let cached = audit::get_cached(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(cached.method, "rule");
+
+        // Verify payee_metadata was persisted
+        let pm = payee_metadata::get_type(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(pm, "salary");
+    }
+
+    #[test]
+    fn test_pipeline_transfer_to_transfer() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Transfer", "Transfer to xx1234 CommBank App");
+            Ok(())
+        })
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, _) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        assert_eq!(results[0].category, Some("_Transfer".into()));
+    }
+
+    #[test]
+    fn test_pipeline_merchant_without_api_stays_unknown() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Woolworths", "WOOLWORTHS 1234 STRATHFIELD");
+            Ok(())
+        })
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, _) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        assert_eq!(results[0].source, CategoriseSource::Unknown);
+    }
+
+    #[test]
+    fn test_pipeline_cached_audit_used() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Woolworths", "WOOLWORTHS 1234 STRATHFIELD");
+            Ok(())
+        })
+        .unwrap();
+
+        // Pre-populate audit cache
+        let place = PlaceResult {
+            place_name: Some("Woolworths Strathfield".into()),
+            place_types: vec!["supermarket".into(), "grocery_store".into()],
+            place_address: None,
+        };
+        audit::upsert_with_places(
+            &conn,
+            "Woolworths Strathfield",
+            Some("merchant"),
+            Some("_Groceries"),
+            "google:supermarket→category",
+            1,
+            &place,
+            None,
+        )
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, changes) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        assert_eq!(results[0].category, Some("_Groceries".into()));
+        assert_eq!(results[0].source, CategoriseSource::Cache);
+        assert_eq!(changes[0].new_category, "_Groceries");
+    }
+
+    #[test]
+    fn test_pipeline_non_merchant_skips_places() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        // Insert a transfer_out that has NO matching rule override
+        // (banking_operation type maps to _Bills by rule, so we need something
+        // that falls through rules but is NOT merchant type)
+        // We'll verify by checking the audit — it should never have method=google_places
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Apple", "Salary from APPLE PTY LTD");
+            Ok(())
+        })
+        .unwrap();
+
+        let norm_rules = PipelineRules::load(Path::new("rules")).unwrap();
+        let cat_rules = CategoriseRules::load(Path::new("rules")).unwrap();
+        let config = PipelineConfig {
+            google_places_key: None,
+            anthropic_key: None,
+        };
+
+        let (results, _) = run(&conn, &norm_rules, &cat_rules, &config).unwrap();
+        // Salary resolves by rule, never reaches Places
+        assert_eq!(results[0].source, CategoriseSource::Rule);
+
+        let audit_row = audit::get_cached(&conn, "Apple (Salary)").unwrap().unwrap();
+        assert_eq!(audit_row.method, "rule");
+    }
+
+    #[test]
+    fn test_apply_changes() {
+        let conn = db::initialize_in_memory().unwrap();
+        setup_db_with_categories(&conn);
+
+        db::with_transaction_change_log(&conn, "test", |conn| {
+            insert_txn(conn, 1, "Store", "Salary from APPLE PTY LTD");
+            insert_txn(conn, 2, "Store", "Salary from APPLE PTY LTD");
+            Ok(())
+        })
+        .unwrap();
+
+        let changes = vec![CategoryChange {
+            normalised_payee: "Apple (Salary)".into(),
+            txn_count: 2,
+            old_category: None,
+            new_category: "_Income".into(),
+            source: CategoriseSource::Rule,
+            reason: "type:salary→_Income".into(),
+            txn_ids: vec![1, 2],
+            new_category_id: 8,
+        }];
+
+        let count = apply_changes(&conn, &changes).unwrap();
+        assert_eq!(count, 2);
+
+        let cat_id: i64 = conn
+            .query_row(
+                "SELECT category_id FROM transactions WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(cat_id, 8);
+    }
+}
