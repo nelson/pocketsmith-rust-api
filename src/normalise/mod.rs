@@ -89,6 +89,7 @@ pub fn normalise(original: &str) -> NormalisationResult {
     persons::apply(&mut result);
     employers::apply(&mut result);
     merchants::apply(&mut result);
+    banking_ops::apply(&mut result);
     result
 }
 
@@ -203,5 +204,21 @@ mod tests {
         let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
         assert_eq!(result.class(), Some(&PayeeClass::Merchant));
         assert_eq!(result.features.entity_name.as_deref(), Some("Woolworths"));
+    }
+
+    #[test]
+    fn test_normalise_direct_debit_comminsure() {
+        let result = normalise("Direct Debit 062246 CommInsure 3791272--147492387");
+        assert_eq!(result.features.entity_name.as_deref(), Some("CommInsure"));
+        assert_eq!(result.features.operation, Some(BankingOperation::DirectDebit));
+        assert_eq!(result.features.account.as_deref(), Some("062246"));
+        assert_eq!(result.class(), Some(&PayeeClass::Merchant));
+    }
+
+    #[test]
+    fn test_normalise_bpay() {
+        let result = normalise("BPAY PAYMENT");
+        assert_eq!(result.class(), Some(&PayeeClass::Other));
+        assert_eq!(result.features.operation, Some(BankingOperation::BPay));
     }
 }

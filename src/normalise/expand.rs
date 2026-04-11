@@ -111,7 +111,6 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "CHOCOLA", canonical: "CHOCOLATES" },
     Expansion { pattern: "COFF", canonical: "COFFEE" },
     Expansion { pattern: "COF", canonical: "COFFEE" },
-    Expansion { pattern: "COMMINSURE", canonical: "COMMINSURE" },
     Expansion { pattern: "COSME", canonical: "COSMETICS" },
     Expansion { pattern: "ENTERTAINMEN", canonical: "ENTERTAINMENT" },
     Expansion { pattern: "ENTERTAIN", canonical: "ENTERTAINMENT" },
