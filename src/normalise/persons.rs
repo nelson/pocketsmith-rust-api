@@ -80,7 +80,7 @@ const KNOWN_PERSONS: &[Person] = &[
     Person { canonical: "Hoi Wan Li and Jason Tam", patterns: &["MS HOI WAN LI & MR KI"] },
     Person { canonical: "James Mulholland", patterns: &["JAMES MULHOLLAND"] },
     Person { canonical: "Janette Vardy", patterns: &["JANETTE VARDY", "JANETTE"] },
-    Person { canonical: "Jason Hui", patterns: &["JASON HU"] },
+    Person { canonical: "Jason Hui", patterns: &["JASON HU", "JASON HUI"] },
     Person { canonical: "Jen Tan", patterns: &["JEN"] },
     Person { canonical: "Jessica Pireh", patterns: &["JESSICA PIREH"] },
     Person {

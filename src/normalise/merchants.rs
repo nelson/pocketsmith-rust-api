@@ -41,10 +41,12 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)AMAZON PRIME", canonical: "Amazon Prime" },
     Merchant { pattern: r"(?i)AMAZON\b", canonical: "Amazon" },
     Merchant { pattern: r"(?i)AMERICAN EXPRESS\b", canonical: "American Express Payment" },
+    Merchant { pattern: r"(?i)APPLE PARK CAFFE", canonical: "Apple Park Caffe" },
     Merchant { pattern: r"(?i)APPLE\.COM/", canonical: "Apple.com" },
     Merchant { pattern: r"(?i)AMOREPACIFIC", canonical: "Amorepacific" },
     Merchant { pattern: r"(?i)\bATM\b", canonical: "ATM" },
     Merchant { pattern: r"(?i)\bATO\b", canonical: "ATO" },
+    Merchant { pattern: r"(?i)AUSSIE BROADBAND", canonical: "Aussie Broadband" },
     Merchant { pattern: r"(?i)AUSKO COOPERATION", canonical: "Ausko Cooperation Concord" },
     Merchant { pattern: r"(?i)AUVERS (?:CAFE|INGENS)", canonical: "Auvers Cafe" },
     // --- B ---
@@ -66,6 +68,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)CHILD ASSISTANCE PAYMENT", canonical: "Child Assistance Payment" },
     Merchant { pattern: r"(?i)COLES\b", canonical: "Coles" },
     Merchant { pattern: r"(?i)COMMINSURE\b", canonical: "CommInsure" },
+    Merchant { pattern: r"(?i)COMPASSION AUSTRALIA", canonical: "Compassion Australia" },
     Merchant { pattern: r"(?i)CORNERSTONE CONCORD", canonical: "Cornerstone Concord" },
     Merchant { pattern: r"(?i)COST OF LIVING", canonical: "Cost of Living Payment" },
     Merchant { pattern: r"(?i)\bCS(?:\s+EDUCATION)?$", canonical: "CS Education Strathfield" },
@@ -110,7 +113,8 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)INTERPARK UTS", canonical: "Interpark UTS" },
     Merchant { pattern: r"(?i)IVY.*MUMU", canonical: "Ivy Mumu" },
     // --- J ---
-    Merchant { pattern: r"(?i)JASON HUI?$", canonical: "Jason Hui" },
+    Merchant { pattern: r"(?i)J YANG\b", canonical: "J Yang" }, // Massage
+    Merchant { pattern: r"(?i)JAEKYUN PARK\b", canonical: "Jaekyun Park" }, // Cleaning
     Merchant { pattern: r"(?i)JFC\b", canonical: "JFC" },
     Merchant { pattern: r"(?i)(?:PAYMENT|TRANSFER) FROM TAM S", canonical: "Joint Account (Tam)" },
     // --- K ---
@@ -140,7 +144,7 @@ const MERCHANTS: &[Merchant] = &[
     // --- O ---
     Merchant { pattern: r"(?i)OFFICEWORKS\b", canonical: "Officeworks" },
     Merchant { pattern: r"(?i)OILSTONE", canonical: "Oilstone" },
-    Merchant { pattern: r"(?i)\bOMF(?:\s+INTERNATIONAL)?$", canonical: "OMF International" },
+    Merchant { pattern: r"(?i)\bOMF(?:\s+INTERNATIONA?L?)?\b", canonical: "OMF International" },
     // --- P ---
     Merchant { pattern: r"(?i)PAPPARICH\b", canonical: "Papparich" },
     Merchant { pattern: r"(?i)PARKNPAY\b", canonical: "ParkNPay" },
@@ -150,6 +154,8 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)POP MART\b", canonical: "Pop Mart" },
     Merchant { pattern: r"(?i)POWERSHOP", canonical: "Powershop" },
     Merchant { pattern: r"(?i)PRICELINE PHARMACY\b", canonical: "Priceline Pharmacy" },
+    // --- Q ---
+    Merchant { pattern: r"(?i)QANTAS\b", canonical: "Qantas" },
     // --- R ---
     Merchant { pattern: r"(?i)REGIMENT SPECIAL(?:I?TY|TY) (?:COF(?:FEE?)?|CAF)", canonical: "Regiment Coffee" },
     // --- S ---
@@ -168,8 +174,10 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)TAN HANDS", canonical: "Tan Hands Physiotherapy" },
     Merchant { pattern: r"(?i)TARGET\b", canonical: "Target" },
     Merchant { pattern: r"(?i)TEA SPOT\b", canonical: "Tea Spot" },
+    Merchant { pattern: r"(?i)TENCENT\b", canonical: "Tencent" },
     Merchant { pattern: r"(?i)THE AVENUE.*NEWINGTON", canonical: "The Avenue Newington" },
     Merchant { pattern: r"(?i)THE LOCAL ENFIELD", canonical: "The Local Enfield" },
+    Merchant { pattern: r"(?i)THE MANDOO DUMPLING", canonical: "The Mandoo Dumpling" },
     Merchant { pattern: r"(?i)TRANSPORT\s*(?:FOR\s*)?NSW", canonical: "Transport for NSW" },
     // --- U ---
     Merchant { pattern: r"(?i)UBER\s*\*?\s*EATS\b", canonical: "Uber Eats" },
@@ -435,5 +443,50 @@ mod tests {
     #[test]
     fn test_vodafone_star() {
         assert_merchant("VODAFONE *AUSTRALIA NORTH SYDNEY", "Vodafone");
+    }
+
+    #[test]
+    fn test_apple_park_caffe() {
+        assert_merchant("APPLE PARK CAFFE EB C00 CUPERTINO", "Apple Park Caffe");
+    }
+
+    #[test]
+    fn test_aussie_broadband() {
+        assert_merchant("Aussie Broadband limited", "Aussie Broadband");
+    }
+
+    #[test]
+    fn test_compassion_australia() {
+        assert_merchant("COMPASSION AUSTRALIA WARABROOK", "Compassion Australia");
+    }
+
+    #[test]
+    fn test_j_yang_cleaning() {
+        assert_merchant("Transfer To J YANG, PayID Phone from CommBank App, Massage", "J Yang");
+    }
+
+    #[test]
+    fn test_jaekyun_park_cleaning() {
+        assert_merchant("Transfer To Jaekyun Park, CommBank App Cleaning", "Jaekyun Park");
+    }
+
+    #[test]
+    fn test_omf_international_with_suffix() {
+        assert_merchant("OMF INTERNATIONAL, 21231", "OMF International");
+    }
+
+    #[test]
+    fn test_qantas() {
+        assert_merchant("QANTAS MASCOT", "Qantas");
+    }
+
+    #[test]
+    fn test_tencent() {
+        assert_merchant("TENCENT SHENZHEN", "Tencent");
+    }
+
+    #[test]
+    fn test_the_mandoo_dumpling() {
+        assert_merchant("THE MANDOO DUMPLING STRATHFIELD", "The Mandoo Dumpling");
     }
 }
