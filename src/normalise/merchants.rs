@@ -52,6 +52,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)BAKERS DELIGHT\b", canonical: "Bakers Delight" },
     Merchant { pattern: r"(?i)BEST MART\b", canonical: "Best Mart" },
     Merchant { pattern: r"(?i)\bBP\b", canonical: "BP" },
+    Merchant { pattern: r"(?i)BROADWAYSHOPPINGCENT", canonical: "Broadway Shopping Centre Carpark" },
     Merchant { pattern: r"(?i)BUNNINGS\b", canonical: "Bunnings" },
     Merchant { pattern: r"(?i)BUPA\b", canonical: "BUPA" },
     Merchant { pattern: r"(?i)BURWOOD DISCOUNT CHEMIST", canonical: "Burwood Discount Chemist" },
@@ -71,6 +72,7 @@ const MERCHANTS: &[Merchant] = &[
     // --- D ---
     Merchant { pattern: r"(?i)DAISO\b", canonical: "Daiso" },
     Merchant { pattern: r"(?i)DAVID JONES\b", canonical: "David Jones" },
+    Merchant { pattern: r"(?i)DIGGY DOO['\u{2019}]?S?\b", canonical: "Diggy Doo's Coffee" },
     Merchant { pattern: r"(?i)DOPA\b", canonical: "Dopa" },
     Merchant { pattern: r"(?i)DOROTHY COWIE SCHOOL", canonical: "Dorothy Cowie School" },
     // --- E ---
@@ -83,11 +85,13 @@ const MERCHANTS: &[Merchant] = &[
     // --- F ---
     Merchant { pattern: r"(?i)FLOWER POWER\b", canonical: "Flower Power" },
     Merchant { pattern: r"(?i)\bFMC$", canonical: "FMC" },
+    Merchant { pattern: r"(?i)FRESH SEAFOOD", canonical: "Fresh Seafood Strathfield" },
     // --- G ---
     Merchant { pattern: r"(?i)GENESIS GARDENS", canonical: "Genesis Gardens" },
     Merchant { pattern: r"(?i)GNT SERVICES", canonical: "GNT Services" },
     Merchant { pattern: r"(?i)GONG CHA\b", canonical: "Gong Cha" },
     Merchant { pattern: r"(?i)GOOD VEN(?:TURE|TRE)", canonical: "Good Venture Partners" },
+    Merchant { pattern: r"(?i)GR BUY\b", canonical: "GR Buy Supermarket" },
     Merchant { pattern: r"(?i)GREENWAY MEAT\b", canonical: "Greenway Meat" },
     Merchant { pattern: r"(?i)GUMPTION COFFEE", canonical: "Gumption Coffee" },
     Merchant { pattern: r"(?i)GUZMAN Y GOMEZ\b", canonical: "Guzman Y Gomez" },
@@ -127,9 +131,11 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)MEDICARE BENEFITS", canonical: "Medicare Benefits" },
     Merchant { pattern: r"(?i)MEET FRESH\b", canonical: "Meet Fresh" },
     Merchant { pattern: r"(?i)MEMOCORP AUSTRALIA", canonical: "Memocorp Australia" },
+    Merchant { pattern: r"(?i)MERIDEN SCHOOL", canonical: "Meriden School" },
     Merchant { pattern: r"(?i)MINISO\b", canonical: "Miniso" },
     // --- N ---
     Merchant { pattern: r"(?i)NDIS NSW", canonical: "NDIS Payment" },
+    Merchant { pattern: r"(?i)NETFLIX\b", canonical: "Netflix" },
     Merchant { pattern: r"(?i)NEWYEN INVESTMENT", canonical: "Newyen Investment" },
     // --- O ---
     Merchant { pattern: r"(?i)OFFICEWORKS\b", canonical: "Officeworks" },
@@ -137,9 +143,12 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)\bOMF(?:\s+INTERNATIONAL)?$", canonical: "OMF International" },
     // --- P ---
     Merchant { pattern: r"(?i)PAPPARICH\b", canonical: "Papparich" },
+    Merchant { pattern: r"(?i)PARKNPAY\b", canonical: "ParkNPay" },
+    Merchant { pattern: r"(?i)PASTA PANTRY", canonical: "Pasta Pantry MLC" },
     Merchant { pattern: r"(?i)PAYPAL \*BUDGETPETPR", canonical: "PayPal Budget Pet Products" },
     Merchant { pattern: r"(?i)PIONEERS OF(?:\s+AUST(?:RALIA)?)?$", canonical: "Pioneers of Australia" },
     Merchant { pattern: r"(?i)POP MART\b", canonical: "Pop Mart" },
+    Merchant { pattern: r"(?i)POWERSHOP", canonical: "Powershop" },
     Merchant { pattern: r"(?i)PRICELINE PHARMACY\b", canonical: "Priceline Pharmacy" },
     // --- R ---
     Merchant { pattern: r"(?i)REGIMENT SPECIAL(?:I?TY|TY) (?:COF(?:FEE?)?|CAF)", canonical: "Regiment Coffee" },
@@ -148,6 +157,8 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)SLOWER DEEPER WISER", canonical: "Slower Deeper Wiser" },
     Merchant { pattern: r"(?i)SOULGRAM PARTNERS", canonical: "Soulgram Partners" },
     Merchant { pattern: r"(?i)STARBUCKS\b", canonical: "Starbucks" },
+    Merchant { pattern: r"(?i)STITCH COFFEE", canonical: "Stitch Coffee" },
+    Merchant { pattern: r"(?i)STOCK MARKET KITCHEN", canonical: "Stock Market Kitchen" },
     Merchant { pattern: r"(?i)STRATHFIELD COUNCIL", canonical: "Strathfield Council" },
     Merchant { pattern: r"(?i)SUSHI HUB\b", canonical: "Sushi Hub" },
     Merchant { pattern: r"(?i)SUSHI NAYA\b", canonical: "Sushi Naya" },
@@ -167,6 +178,7 @@ const MERCHANTS: &[Merchant] = &[
     // --- V ---
     Merchant { pattern: r"(?i)VISCO UNIVERSAL", canonical: "Visco Universal" },
     Merchant { pattern: r"(?i)VN CITY\b", canonical: "VN City" },
+    Merchant { pattern: r"(?i)VODAFONE\b", canonical: "Vodafone" },
     // --- W ---
     Merchant { pattern: r"(?i)WOOLWORTHS\b", canonical: "Woolworths" },
     // --- Y ---
@@ -190,6 +202,12 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
 mod tests {
     use super::*;
 
+    fn assert_merchant(input: &str, expected: &str) {
+        let mut r = NormalisationResult::new(input);
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some(expected));
+    }
+
     #[test]
     fn test_woolworths() {
         let mut r = NormalisationResult::new("WOOLWORTHS 1624 STRATHFIELD");
@@ -207,27 +225,6 @@ mod tests {
     }
 
     #[test]
-    fn test_transfer_to_afes() {
-        let mut r = NormalisationResult::new("TRANSFER TO AFES");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("AFES (Donation)"));
-    }
-
-    #[test]
-    fn test_comminsure_post_prefix() {
-        let mut r = NormalisationResult::new("COMMINSURE");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("CommInsure"));
-    }
-
-    #[test]
-    fn test_centrelink_pension() {
-        let mut r = NormalisationResult::new("DIRECT CREDIT PENSION XX1234");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Centrelink Pension"));
-    }
-
-    #[test]
     fn test_skip_if_classified() {
         let mut r = NormalisationResult::new("WOOLWORTHS");
         r.set_class(PayeeClass::Person);
@@ -237,155 +234,206 @@ mod tests {
 
     #[test]
     fn test_case_insensitive() {
-        let mut r = NormalisationResult::new("woolworths");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Woolworths"));
+        assert_merchant("woolworths", "Woolworths");
+    }
+
+    #[test]
+    fn test_transfer_to_afes() {
+        assert_merchant("TRANSFER TO AFES", "AFES (Donation)");
+    }
+
+    #[test]
+    fn test_comminsure_post_prefix() {
+        assert_merchant("COMMINSURE", "CommInsure");
+    }
+
+    #[test]
+    fn test_centrelink_pension() {
+        assert_merchant("DIRECT CREDIT PENSION XX1234", "Centrelink Pension");
     }
 
     #[test]
     fn test_transport_nsw_no_spaces() {
-        let mut r = NormalisationResult::new("TRANSPORTFORNSWTRAVEL SYDNEY");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Transport for NSW"));
+        assert_merchant("TRANSPORTFORNSWTRAVEL SYDNEY", "Transport for NSW");
     }
 
     #[test]
     fn test_transport_nsw_opal() {
-        let mut r = NormalisationResult::new("TRANSPORT FOR NSW-OPAL HAYMARKET");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Transport for NSW"));
+        assert_merchant("TRANSPORT FOR NSW-OPAL HAYMARKET", "Transport for NSW");
     }
 
     #[test]
     fn test_apple_com_bill() {
-        let mut r = NormalisationResult::new("APPLE.COM/BILL SYDNEY");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Apple.com"));
+        assert_merchant("APPLE.COM/BILL SYDNEY", "Apple.com");
     }
 
     #[test]
     fn test_apple_com_au() {
-        let mut r = NormalisationResult::new("APPLE.COM/AU SYDNEY");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Apple.com"));
+        assert_merchant("APPLE.COM/AU SYDNEY", "Apple.com");
     }
 
     #[test]
     fn test_edition_roasters() {
-        let mut r = NormalisationResult::new("EDITION ROASTERS WYN 99 SYDNEY");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Edition Roasters"));
+        assert_merchant("EDITION ROASTERS WYN 99 SYDNEY", "Edition Roasters");
     }
 
     #[test]
     fn test_the_local_enfield() {
-        let mut r = NormalisationResult::new("THE LOCAL ENFIELD Croydon Park");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("The Local Enfield"));
+        assert_merchant("THE LOCAL ENFIELD Croydon Park", "The Local Enfield");
     }
 
     #[test]
     fn test_best_mart() {
-        let mut r = NormalisationResult::new("BEST MART STRATHFIELD P STRATHFIELD");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Best Mart"));
+        assert_merchant("BEST MART STRATHFIELD P STRATHFIELD", "Best Mart");
     }
 
     #[test]
     fn test_amazon_marketplace() {
-        let mut r = NormalisationResult::new("AMAZON MARKETPLACE AU SYDNEY SOUTH");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon"));
+        assert_merchant("AMAZON MARKETPLACE AU SYDNEY SOUTH", "Amazon");
     }
 
     #[test]
     fn test_amazon_au() {
-        let mut r = NormalisationResult::new("AMAZON AU SYDNEY SOUTH");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon"));
+        assert_merchant("AMAZON AU SYDNEY SOUTH", "Amazon");
     }
 
     #[test]
     fn test_amazon_prime_still_works() {
-        let mut r = NormalisationResult::new("AMAZON PRIME AU");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon Prime"));
+        assert_merchant("AMAZON PRIME AU", "Amazon Prime");
     }
 
     #[test]
     fn test_regiment_speciality_truncated() {
-        let mut r = NormalisationResult::new("REGIMENT SPECIALITY CAF Sydney");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Regiment Coffee"));
+        assert_merchant("REGIMENT SPECIALITY CAF Sydney", "Regiment Coffee");
     }
 
     #[test]
     fn test_regiment_specialty_coffee() {
-        let mut r = NormalisationResult::new("REGIMENT SPECIALTY COFFEE Sydney");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Regiment Coffee"));
+        assert_merchant("REGIMENT SPECIALTY COFFEE Sydney", "Regiment Coffee");
     }
 
     #[test]
     fn test_gumption_coffee() {
-        let mut r = NormalisationResult::new("GUMPTION COFFEE Sydney");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Gumption Coffee"));
+        assert_merchant("GUMPTION COFFEE Sydney", "Gumption Coffee");
     }
 
     #[test]
     fn test_uber_trip() {
-        let mut r = NormalisationResult::new("UBER TRIP HELP.UBER.COM");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Trip"));
+        assert_merchant("UBER TRIP HELP.UBER.COM", "Uber Trip");
     }
 
     #[test]
     fn test_uber_star_trip() {
-        let mut r = NormalisationResult::new("UBER *TRIP Sydney AU AUS");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Trip"));
+        assert_merchant("UBER *TRIP Sydney AU AUS", "Uber Trip");
     }
 
     #[test]
     fn test_uber_eats() {
-        let mut r = NormalisationResult::new("UBER EATS HELP.UBER.COM");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+        assert_merchant("UBER EATS HELP.UBER.COM", "Uber Eats");
     }
 
     #[test]
     fn test_uber_star_eats() {
-        let mut r = NormalisationResult::new("UBER *EATS Sydney AU AUS");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+        assert_merchant("UBER *EATS Sydney AU AUS", "Uber Eats");
     }
 
     #[test]
     fn test_paypal_ubereats() {
-        let mut r = NormalisationResult::new("UBEREATS AU");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+        assert_merchant("UBEREATS AU", "Uber Eats");
     }
 
     #[test]
     fn test_uber_australia_refund() {
-        let mut r = NormalisationResult::new("Uber Australia Pty Ltd");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber"));
+        assert_merchant("Uber Australia Pty Ltd", "Uber");
     }
 
     #[test]
     fn test_uber_au_paypal_stripped() {
-        let mut r = NormalisationResult::new("UBER AU");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Uber"));
+        assert_merchant("UBER AU", "Uber");
     }
 
     #[test]
     fn test_marrickville_pork_roll() {
-        let mut r = NormalisationResult::new("MARRICKVILLE PORK ROLL Sydney");
-        apply(&mut r);
-        assert_eq!(r.features.entity_name.as_deref(), Some("Marrickville Pork Roll"));
+        assert_merchant("MARRICKVILLE PORK ROLL Sydney", "Marrickville Pork Roll");
+    }
+
+    #[test]
+    fn test_broadway_shopping_centre() {
+        assert_merchant("THEBROADWAYSHOPPINGCENT BROADWAY", "Broadway Shopping Centre Carpark");
+    }
+
+    #[test]
+    fn test_diggy_doos_apostrophe() {
+        assert_merchant("DIGGY DOO'S COFFEE PTY Sydney", "Diggy Doo's Coffee");
+    }
+
+    #[test]
+    fn test_diggy_doos_no_apostrophe() {
+        assert_merchant("DIGGY DOOS COFFEE Sydney", "Diggy Doo's Coffee");
+    }
+
+    #[test]
+    fn test_fresh_seafood() {
+        assert_merchant("FRESH SEAFOOD STRATHFIELD Strathfield", "Fresh Seafood Strathfield");
+    }
+
+    #[test]
+    fn test_gr_buy_supermarket() {
+        assert_merchant("GR BUY ASIAN SUPERMARKET BURWOOD", "GR Buy Supermarket");
+    }
+
+    #[test]
+    fn test_meriden_school() {
+        assert_merchant("MERIDEN SCHOOL STRATHFIELD STRATHFIELD", "Meriden School");
+    }
+
+    #[test]
+    fn test_netflix_dot_com() {
+        assert_merchant("NETFLIX.COM MELBOURNE", "Netflix");
+    }
+
+    #[test]
+    fn test_netflix_australia() {
+        assert_merchant("NETFLIX AUSTRALIA PTY L MELBOURNE", "Netflix");
+    }
+
+    #[test]
+    fn test_parknpay() {
+        assert_merchant("PARKNPAY NSW*BURWOOD ST LEONARDS", "ParkNPay");
+    }
+
+    #[test]
+    fn test_pasta_pantry() {
+        assert_merchant("PASTA PANTRY MLC KIRRAWEE", "Pasta Pantry MLC");
+    }
+
+    #[test]
+    fn test_powershop() {
+        assert_merchant("POWERSHOPAUSTRALIA POWE MELBOURNE", "Powershop");
+    }
+
+    #[test]
+    fn test_stitch_coffee_broadway() {
+        assert_merchant("STITCH COFFEE BROADWAY Haymarket", "Stitch Coffee");
+    }
+
+    #[test]
+    fn test_stitch_coffee_ultimo() {
+        assert_merchant("STITCH COFFEE ULTIMO", "Stitch Coffee");
+    }
+
+    #[test]
+    fn test_stock_market_kitchen() {
+        assert_merchant("STOCK MARKET KITCHEN 25 Sydney", "Stock Market Kitchen");
+    }
+
+    #[test]
+    fn test_vodafone_australia() {
+        assert_merchant("VODAFONE AUSTRALIA North Sydney", "Vodafone");
+    }
+
+    #[test]
+    fn test_vodafone_star() {
+        assert_merchant("VODAFONE *AUSTRALIA NORTH SYDNEY", "Vodafone");
     }
 }
