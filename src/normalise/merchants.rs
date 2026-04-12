@@ -39,7 +39,9 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)AIRPORT RETAIL ENTER", canonical: "Airport Retail Enterprises" },
     Merchant { pattern: r"(?i)ALDI\b", canonical: "ALDI" },
     Merchant { pattern: r"(?i)AMAZON PRIME", canonical: "Amazon Prime" },
+    Merchant { pattern: r"(?i)AMAZON\b", canonical: "Amazon" },
     Merchant { pattern: r"(?i)AMERICAN EXPRESS\b", canonical: "American Express Payment" },
+    Merchant { pattern: r"(?i)APPLE\.COM/", canonical: "Apple.com" },
     Merchant { pattern: r"(?i)AMOREPACIFIC", canonical: "Amorepacific" },
     Merchant { pattern: r"(?i)\bATM\b", canonical: "ATM" },
     Merchant { pattern: r"(?i)\bATO\b", canonical: "ATO" },
@@ -48,6 +50,7 @@ const MERCHANTS: &[Merchant] = &[
     // --- B ---
     Merchant { pattern: r"(?i)BAKED BEATS", canonical: "Baked Beats" },
     Merchant { pattern: r"(?i)BAKERS DELIGHT\b", canonical: "Bakers Delight" },
+    Merchant { pattern: r"(?i)BEST MART\b", canonical: "Best Mart" },
     Merchant { pattern: r"(?i)\bBP\b", canonical: "BP" },
     Merchant { pattern: r"(?i)BUNNINGS\b", canonical: "Bunnings" },
     Merchant { pattern: r"(?i)BUPA\b", canonical: "BUPA" },
@@ -74,6 +77,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)EARLY PURPOSE", canonical: "Early Purpose" },
     Merchant { pattern: r"(?i)EAT ISTANBUL\b", canonical: "Eat Istanbul" },
     Merchant { pattern: r"(?i)ECONOMIC SUPPORT", canonical: "Economic Support Payment" },
+    Merchant { pattern: r"(?i)EDITION ROASTERS", canonical: "Edition Roasters" },
     Merchant { pattern: r"(?i)EG FUELCO\b", canonical: "EG Fuelco" },
     Merchant { pattern: r"(?i)ENERGYAUSTRALIA", canonical: "EnergyAustralia" },
     // --- F ---
@@ -85,6 +89,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)GONG CHA\b", canonical: "Gong Cha" },
     Merchant { pattern: r"(?i)GOOD VEN(?:TURE|TRE)", canonical: "Good Venture Partners" },
     Merchant { pattern: r"(?i)GREENWAY MEAT\b", canonical: "Greenway Meat" },
+    Merchant { pattern: r"(?i)GUMPTION COFFEE", canonical: "Gumption Coffee" },
     Merchant { pattern: r"(?i)GUZMAN Y GOMEZ\b", canonical: "Guzman Y Gomez" },
     // --- H ---
     Merchant { pattern: r"(?i)HAN SANG\b", canonical: "Han Sang" },
@@ -117,6 +122,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)MACQUARIE UNIVERSITY", canonical: "Macquarie University" },
     Merchant { pattern: r"(?i)MAENAM LAO\b", canonical: "Maenam Lao" },
     Merchant { pattern: r"(?i)MANCINI.?S (?:PIZZERIA|WOOD)", canonical: "Mancini's" },
+    Merchant { pattern: r"(?i)MARRICKVILLE PORK ROLL", canonical: "Marrickville Pork Roll" },
     Merchant { pattern: r"(?i)MCDONALD'S\b", canonical: "McDonald's" },
     Merchant { pattern: r"(?i)MEDICARE BENEFITS", canonical: "Medicare Benefits" },
     Merchant { pattern: r"(?i)MEET FRESH\b", canonical: "Meet Fresh" },
@@ -135,6 +141,8 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)PIONEERS OF(?:\s+AUST(?:RALIA)?)?$", canonical: "Pioneers of Australia" },
     Merchant { pattern: r"(?i)POP MART\b", canonical: "Pop Mart" },
     Merchant { pattern: r"(?i)PRICELINE PHARMACY\b", canonical: "Priceline Pharmacy" },
+    // --- R ---
+    Merchant { pattern: r"(?i)REGIMENT SPECIAL(?:I?TY|TY) (?:COF(?:FEE?)?|CAF)", canonical: "Regiment Coffee" },
     // --- S ---
     Merchant { pattern: r"(?i)SERVICE NSW\b", canonical: "Service NSW" },
     Merchant { pattern: r"(?i)SLOWER DEEPER WISER", canonical: "Slower Deeper Wiser" },
@@ -150,6 +158,12 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)TARGET\b", canonical: "Target" },
     Merchant { pattern: r"(?i)TEA SPOT\b", canonical: "Tea Spot" },
     Merchant { pattern: r"(?i)THE AVENUE.*NEWINGTON", canonical: "The Avenue Newington" },
+    Merchant { pattern: r"(?i)THE LOCAL ENFIELD", canonical: "The Local Enfield" },
+    Merchant { pattern: r"(?i)TRANSPORT\s*(?:FOR\s*)?NSW", canonical: "Transport for NSW" },
+    // --- U ---
+    Merchant { pattern: r"(?i)UBER\s*\*?\s*EATS\b", canonical: "Uber Eats" },
+    Merchant { pattern: r"(?i)UBER\s*\*?\s*TRIP\b", canonical: "Uber Trip" },
+    Merchant { pattern: r"(?i)UBER\b", canonical: "Uber" },
     // --- V ---
     Merchant { pattern: r"(?i)VISCO UNIVERSAL", canonical: "Visco Universal" },
     Merchant { pattern: r"(?i)VN CITY\b", canonical: "VN City" },
@@ -226,5 +240,152 @@ mod tests {
         let mut r = NormalisationResult::new("woolworths");
         apply(&mut r);
         assert_eq!(r.features.entity_name.as_deref(), Some("Woolworths"));
+    }
+
+    #[test]
+    fn test_transport_nsw_no_spaces() {
+        let mut r = NormalisationResult::new("TRANSPORTFORNSWTRAVEL SYDNEY");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Transport for NSW"));
+    }
+
+    #[test]
+    fn test_transport_nsw_opal() {
+        let mut r = NormalisationResult::new("TRANSPORT FOR NSW-OPAL HAYMARKET");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Transport for NSW"));
+    }
+
+    #[test]
+    fn test_apple_com_bill() {
+        let mut r = NormalisationResult::new("APPLE.COM/BILL SYDNEY");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Apple.com"));
+    }
+
+    #[test]
+    fn test_apple_com_au() {
+        let mut r = NormalisationResult::new("APPLE.COM/AU SYDNEY");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Apple.com"));
+    }
+
+    #[test]
+    fn test_edition_roasters() {
+        let mut r = NormalisationResult::new("EDITION ROASTERS WYN 99 SYDNEY");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Edition Roasters"));
+    }
+
+    #[test]
+    fn test_the_local_enfield() {
+        let mut r = NormalisationResult::new("THE LOCAL ENFIELD Croydon Park");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("The Local Enfield"));
+    }
+
+    #[test]
+    fn test_best_mart() {
+        let mut r = NormalisationResult::new("BEST MART STRATHFIELD P STRATHFIELD");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Best Mart"));
+    }
+
+    #[test]
+    fn test_amazon_marketplace() {
+        let mut r = NormalisationResult::new("AMAZON MARKETPLACE AU SYDNEY SOUTH");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon"));
+    }
+
+    #[test]
+    fn test_amazon_au() {
+        let mut r = NormalisationResult::new("AMAZON AU SYDNEY SOUTH");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon"));
+    }
+
+    #[test]
+    fn test_amazon_prime_still_works() {
+        let mut r = NormalisationResult::new("AMAZON PRIME AU");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Amazon Prime"));
+    }
+
+    #[test]
+    fn test_regiment_speciality_truncated() {
+        let mut r = NormalisationResult::new("REGIMENT SPECIALITY CAF Sydney");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Regiment Coffee"));
+    }
+
+    #[test]
+    fn test_regiment_specialty_coffee() {
+        let mut r = NormalisationResult::new("REGIMENT SPECIALTY COFFEE Sydney");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Regiment Coffee"));
+    }
+
+    #[test]
+    fn test_gumption_coffee() {
+        let mut r = NormalisationResult::new("GUMPTION COFFEE Sydney");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Gumption Coffee"));
+    }
+
+    #[test]
+    fn test_uber_trip() {
+        let mut r = NormalisationResult::new("UBER TRIP HELP.UBER.COM");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Trip"));
+    }
+
+    #[test]
+    fn test_uber_star_trip() {
+        let mut r = NormalisationResult::new("UBER *TRIP Sydney AU AUS");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Trip"));
+    }
+
+    #[test]
+    fn test_uber_eats() {
+        let mut r = NormalisationResult::new("UBER EATS HELP.UBER.COM");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+    }
+
+    #[test]
+    fn test_uber_star_eats() {
+        let mut r = NormalisationResult::new("UBER *EATS Sydney AU AUS");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+    }
+
+    #[test]
+    fn test_paypal_ubereats() {
+        let mut r = NormalisationResult::new("UBEREATS AU");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber Eats"));
+    }
+
+    #[test]
+    fn test_uber_australia_refund() {
+        let mut r = NormalisationResult::new("Uber Australia Pty Ltd");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber"));
+    }
+
+    #[test]
+    fn test_uber_au_paypal_stripped() {
+        let mut r = NormalisationResult::new("UBER AU");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Uber"));
+    }
+
+    #[test]
+    fn test_marrickville_pork_roll() {
+        let mut r = NormalisationResult::new("MARRICKVILLE PORK ROLL Sydney");
+        apply(&mut r);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Marrickville Pork Roll"));
     }
 }
