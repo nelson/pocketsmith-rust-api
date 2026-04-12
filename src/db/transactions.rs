@@ -6,6 +6,14 @@ use crate::models::*;
 use super::categories::upsert_category;
 use super::transaction_accounts::upsert_transaction_account;
 
+pub fn update_payee(conn: &Connection, id: i64, payee: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE transactions SET payee = ?1 WHERE id = ?2 AND payee IS NOT ?1",
+        params![payee, id],
+    )?;
+    Ok(())
+}
+
 pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
     // Upsert embedded category first
     if let Some(ref cat) = t.category {
@@ -84,6 +92,61 @@ mod tests {
     use super::*;
     use crate::db::test_helpers::*;
     use crate::db::with_transaction_change_log;
+
+    #[test]
+    fn test_update_payee() {
+        let conn = test_db();
+        with_transaction_change_log(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Raw Payee"))?;
+            update_payee(conn, 1, "Clean Payee")
+        })
+        .unwrap();
+
+        let payee: String = conn
+            .query_row("SELECT payee FROM transactions WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(payee, "Clean Payee");
+    }
+
+    #[test]
+    fn test_update_payee_creates_history() {
+        let conn = test_db();
+        with_transaction_change_log(&conn, "normalisation", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Raw Payee"))?;
+            update_payee(conn, 1, "Clean Payee")
+        })
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2); // insert + update
+    }
+
+    #[test]
+    fn test_update_payee_unchanged_skips_history() {
+        let conn = test_db();
+        with_transaction_change_log(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "Same Payee"))?;
+            update_payee(conn, 1, "Same Payee")
+        })
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1); // only the initial insert, no update row
+    }
 
     #[test]
     fn test_upsert_transaction_simple() {

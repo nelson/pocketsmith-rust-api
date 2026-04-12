@@ -85,6 +85,81 @@ GROUP BY tp.confidence, tp.status;
 
 Each transaction can appear in at most one pair (enforced by unique constraints on `txn_id_a` and `txn_id_b`).
 
+## Payee Normalisation
+
+Cleans raw bank payee strings (e.g. `"WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026"`) into structured, human-readable payee names (e.g. `"Woolworths Strathfield"`). The pipeline runs in stages: prefix stripping, suffix stripping, abbreviation expansion, then classification (person, employer, merchant, banking operation).
+
+### Dry run
+
+Preview what the normalisation would produce without writing to the database. Prints a summary report showing classification breakdown, merchant coverage metrics, and the top gaps:
+
+```
+cargo run --bin normalise -- --dry-run
+```
+
+Example output:
+
+```
+=== DRY RUN (no DB writes) ===
+
+=== Normalisation Summary ===
+Total unique original_payees: 10190
+Total transactions: 21353
+  Merchant:      1792 unique (3124 txns, 15%)
+  Person:         777 unique (1551 txns, 7%)
+  Employer:        83 unique (264 txns, 1%)
+  Other:          205 unique (1533 txns, 7%)
+  Unclassified:  7333 unique (14881 txns, 70%)
+
+=== Merchant Coverage ===
+  entity_name extracted: 1792/1792 (100%)
+  location extracted:    837/1792 (47%)
+  full query (both):     837/1792 (47%)
+
+=== Top Unclassified (by txn count) ===
+   1. "TRANSPORTFORNSWTRAVEL SYDNEY" → "TRANSPORTFORNSWTRAVEL SYDNEY" (870 txns)
+   ...
+```
+
+### Apply
+
+Run the pipeline and write normalised payee strings to `transactions.payee`. All changes are tracked via `_transaction_change_log` with reason `"normalisation"`. Only rows where the payee actually changes are written (unchanged values are skipped to avoid polluting the history table):
+
+```
+cargo run --bin normalise
+```
+
+Formatting rules:
+- **Merchants with entity + location**: `"Woolworths Strathfield"`
+- **Merchants with entity only**: `"Vodafone Australia"`
+- **Non-merchants and unclassified**: uses the cleaned/normalised string from the pipeline
+
+### Iterating
+
+The typical workflow is: dry-run, review the "Top Unclassified" list, add patterns to `src/normalise/merchants.rs` (or `persons.rs`, `employers.rs`), then dry-run again to measure improvement. Repeat until coverage is satisfactory.
+
+## Claude Code Skills
+
+### `/normalise` - Review normalisation gaps
+
+Runs the normalise binary in dry-run mode, presents coverage metrics, then walks through the top unclassified payees asking which ones need new patterns. Use this to identify the highest-impact payees to classify next:
+
+```
+/normalise
+```
+
+This is a review-only skill - it does not modify source files or the database.
+
+### `/review-transfers` - Batch review transfer pairs
+
+Presents pending transfer pairs 16 at a time for interactive confirmation. Each pair shows the amount, dates, payees, and accounts. You confirm (yes), reject (no), or skip each one, then the decisions are applied in bulk:
+
+```
+/review-transfers
+```
+
+Loops automatically until all pending pairs are reviewed or you choose to stop.
+
 ## Testing
 
 ```

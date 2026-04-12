@@ -8,7 +8,7 @@ pub mod users;
 
 pub use categories::upsert_category;
 pub use transaction_accounts::upsert_transaction_account;
-pub use transactions::upsert_transaction;
+pub use transactions::{update_payee, upsert_transaction};
 pub use users::upsert_user;
 
 use anyhow::{Context, Result};
