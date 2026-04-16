@@ -31,8 +31,8 @@ pub fn apply(result: &mut NormalisationResult) {
                 if let Some(gw) = pat.gateway {
                     result.features.gateway = Some(gw.to_string());
                 }
-                if let Some(ref op) = pat.operation {
-                    result.features.operation = Some(op.clone());
+                if let Some(op) = pat.operation {
+                    result.features.operation = Some(op);
                 }
                 if pat.has_date {
                     if let Some(date) = caps.name("date") {
@@ -61,6 +61,7 @@ const PREFIXES: &[Prefix] = &[
     // --- Non-gateway prefixes ---
     Prefix { pattern: r"^(?P<date>\d{2}/\d{2}/\d{2,4}),?\s+", has_date: true, ..DEFAULT },
     Prefix { pattern: r"^-([A-Z]+-)*", ..DEFAULT },
+    Prefix { pattern: r"^(?i)Refund Purchase,?\s*", operation: Some(BankingOperation::Refund), ..DEFAULT },
     Prefix { pattern: r"^EFTPOS\s+", ..DEFAULT },
     Prefix { pattern: r"^\*\s+", ..DEFAULT },
     Prefix { pattern: r"^\s*-\s+", ..DEFAULT },
@@ -74,6 +75,9 @@ const PREFIXES: &[Prefix] = &[
     // --- Gateway prefixes ---
     Prefix { pattern: r"^ALI\*", gateway: Some("AliExpress"), ..DEFAULT },
     Prefix { pattern: r"^Alipay ", gateway: Some("Alipay"), ..DEFAULT },
+    Prefix { pattern: r"^(?i)BEEM IT$", gateway: Some("Beem"), operation: Some(BankingOperation::Cash), ..DEFAULT },
+    Prefix { pattern: r"^(?i)BEEM IT\b\s*-?\s*", gateway: Some("Beem"), ..DEFAULT },
+    Prefix { pattern: r"^(?i)BEEM\.COM\.AU\s*-?\s*", gateway: Some("Beem"), ..DEFAULT },
     Prefix { pattern: r"^CKO\*", gateway: Some("Checkout.com"), ..DEFAULT },
     Prefix { pattern: r"^DBS\*", gateway: Some("DBS"), ..DEFAULT },
     Prefix { pattern: r"^DNH\*", gateway: Some("DNH"), ..DEFAULT },
