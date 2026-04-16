@@ -62,15 +62,17 @@ const MERCHANTS: &[Merchant] = &[
     // --- C ---
     Merchant { pattern: r"(?i)CAFE SIENNA", canonical: "Cafe Sienna" },
     Merchant { pattern: r"(?i)CAMPION EDUCATION", canonical: "Campion Education" },
-    Merchant { pattern: r"(?i)CASH DEPOSIT.*BEEM IT", canonical: "Cash Deposit Beem It" },
     Merchant { pattern: r"(?i)DIRECT CREDIT PENSION (?:XX)?\d+$", canonical: "Centrelink Pension" },
     Merchant { pattern: r"(?i)CHEMIST WAREHOUSE\b", canonical: "Chemist Warehouse" },
     Merchant { pattern: r"(?i)CHILD ASSISTANCE PAYMENT", canonical: "Child Assistance Payment" },
     Merchant { pattern: r"(?i)COLES\b", canonical: "Coles" },
     Merchant { pattern: r"(?i)COMMINSURE\b", canonical: "CommInsure" },
     Merchant { pattern: r"(?i)COMPASSION AUSTRALIA", canonical: "Compassion Australia" },
+    Merchant { pattern: r"(?i)CORNERSTONE CAFE", canonical: "Cornerstone Cafe UTS" },
     Merchant { pattern: r"(?i)CORNERSTONE CONCORD", canonical: "Cornerstone Concord" },
+    Merchant { pattern: r"(?i)COSTIS FISH AND CHIPS", canonical: "Costis Fish & Chips" },
     Merchant { pattern: r"(?i)COST OF LIVING", canonical: "Cost of Living Payment" },
+    Merchant { pattern: r"(?i)CULT EATERY", canonical: "Cult Eatery" },
     Merchant { pattern: r"(?i)\bCS(?:\s+EDUCATION)?$", canonical: "CS Education Strathfield" },
     // --- D ---
     Merchant { pattern: r"(?i)DAISO\b", canonical: "Daiso" },
@@ -96,11 +98,12 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)GOOD VEN(?:TURE|TRE)", canonical: "Good Venture Partners" },
     Merchant { pattern: r"(?i)GR BUY\b", canonical: "GR Buy Supermarket" },
     Merchant { pattern: r"(?i)GREENWAY MEAT\b", canonical: "Greenway Meat" },
+    Merchant { pattern: r"(?i)GU HEALTH\b", canonical: "GU Health" },
     Merchant { pattern: r"(?i)GUMPTION COFFEE", canonical: "Gumption Coffee" },
     Merchant { pattern: r"(?i)GUZMAN Y GOMEZ\b", canonical: "Guzman Y Gomez" },
     // --- H ---
     Merchant { pattern: r"(?i)HAN SANG\b", canonical: "Han Sang" },
-    Merchant { pattern: r"(?i)\bHCF\b", canonical: "HCF Health" },
+    Merchant { pattern: r"(?i)\bHCF(?:HEALTH)?\b", canonical: "HCF Health" },
     Merchant { pattern: r"(?i)HEALTHY CARE\b", canonical: "Healthy Care" },
     Merchant { pattern: r"(?i)HERITAGE COFFEE", canonical: "Heritage Coffee" },
     Merchant { pattern: r"(?i)HERO SUSHI\b", canonical: "Hero Sushi" },
@@ -119,6 +122,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)(?:PAYMENT|TRANSFER) FROM TAM S", canonical: "Joint Account (Tam)" },
     // --- K ---
     Merchant { pattern: r"(?i)KFC\b", canonical: "KFC" },
+    Merchant { pattern: r"(?i)KIM SUN YOUNG HAIR", canonical: "Kim Sun Young Hair" },
     Merchant { pattern: r"(?i)KMART\b", canonical: "Kmart" },
     Merchant { pattern: r"(?i)KOMART\b", canonical: "Komart" },
     // --- L ---
@@ -129,14 +133,17 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)MACHI\b", canonical: "Machi" },
     Merchant { pattern: r"(?i)MACQUARIE UNIVERSITY", canonical: "Macquarie University" },
     Merchant { pattern: r"(?i)MAENAM LAO\b", canonical: "Maenam Lao" },
+    Merchant { pattern: r"(?i)MAMAK(?:S(?:MLC)?|(?:\s+VILLAGE))", canonical: "Mamak" },
     Merchant { pattern: r"(?i)MANCINI.?S (?:PIZZERIA|WOOD)", canonical: "Mancini's" },
     Merchant { pattern: r"(?i)MARRICKVILLE PORK ROLL", canonical: "Marrickville Pork Roll" },
-    Merchant { pattern: r"(?i)MCDONALD'S\b", canonical: "McDonald's" },
+    Merchant { pattern: r"(?i)MCM SOUP\b", canonical: "MCM Soup" },
+    Merchant { pattern: r"(?i)MCDONALD'?S\b", canonical: "McDonald's" },
     Merchant { pattern: r"(?i)MEDICARE BENEFITS", canonical: "Medicare Benefits" },
     Merchant { pattern: r"(?i)MEET FRESH\b", canonical: "Meet Fresh" },
     Merchant { pattern: r"(?i)MEMOCORP AUSTRALIA", canonical: "Memocorp Australia" },
     Merchant { pattern: r"(?i)MERIDEN SCHOOL", canonical: "Meriden School" },
     Merchant { pattern: r"(?i)MINISO\b", canonical: "Miniso" },
+    Merchant { pattern: r"(?i)MONKEY HOUSE\b", canonical: "Monkey House" },
     // --- N ---
     Merchant { pattern: r"(?i)NDIS NSW", canonical: "NDIS Payment" },
     Merchant { pattern: r"(?i)NETFLIX\b", canonical: "Netflix" },
@@ -175,6 +182,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)TARGET\b", canonical: "Target" },
     Merchant { pattern: r"(?i)TEA SPOT\b", canonical: "Tea Spot" },
     Merchant { pattern: r"(?i)TENCENT\b", canonical: "Tencent" },
+    Merchant { pattern: r"(?i)TELSTRA\b", canonical: "Telstra" },
     Merchant { pattern: r"(?i)THE AVENUE.*NEWINGTON", canonical: "The Avenue Newington" },
     Merchant { pattern: r"(?i)THE LOCAL ENFIELD", canonical: "The Local Enfield" },
     Merchant { pattern: r"(?i)THE MANDOO DUMPLING", canonical: "The Mandoo Dumpling" },
@@ -183,11 +191,13 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)UBER\s*\*?\s*EATS\b", canonical: "Uber Eats" },
     Merchant { pattern: r"(?i)UBER\s*\*?\s*TRIP\b", canonical: "Uber Trip" },
     Merchant { pattern: r"(?i)UBER\b", canonical: "Uber" },
+    Merchant { pattern: r"(?i)UNIQLO\b", canonical: "Uniqlo" },
     // --- V ---
     Merchant { pattern: r"(?i)VISCO UNIVERSAL", canonical: "Visco Universal" },
     Merchant { pattern: r"(?i)VN CITY\b", canonical: "VN City" },
     Merchant { pattern: r"(?i)VODAFONE\b", canonical: "Vodafone" },
     // --- W ---
+    Merchant { pattern: r"(?i)WISE AUSTRALIA\b", canonical: "Wise" },
     Merchant { pattern: r"(?i)WOOLWORTHS\b", canonical: "Woolworths" },
     // --- Y ---
     Merchant { pattern: r"(?i)YAKITORI JIN", canonical: "Yakitori Jin" },
@@ -488,5 +498,80 @@ mod tests {
     #[test]
     fn test_the_mandoo_dumpling() {
         assert_merchant("THE MANDOO DUMPLING STRATHFIELD", "The Mandoo Dumpling");
+    }
+
+    #[test]
+    fn test_cornerstone_cafe_uts() {
+        assert_merchant("CORNERSTONE CAFE UTS ULTIMO", "Cornerstone Cafe UTS");
+    }
+
+    #[test]
+    fn test_cornerstone_cafe_haymarket() {
+        assert_merchant("CORNERSTONE CAFE UTS Haymarket", "Cornerstone Cafe UTS");
+    }
+
+    #[test]
+    fn test_costis_fish_and_chips() {
+        assert_merchant("COSTIS FISH AND CHIPS 1 SYDNEY", "Costis Fish & Chips");
+    }
+
+    #[test]
+    fn test_cult_eatery() {
+        assert_merchant("CULT EATERY NORTH RYDE", "Cult Eatery");
+    }
+
+    #[test]
+    fn test_gu_health() {
+        assert_merchant("GU HEALTH NEWCASTLE", "GU Health");
+    }
+
+    #[test]
+    fn test_hcf_health_no_space() {
+        assert_merchant("HCFHEALTH SYDNEY SYDNEY", "HCF Health");
+    }
+
+    #[test]
+    fn test_kim_sun_young_hair() {
+        assert_merchant("KIM SUN YOUNG HAIR PTY SYDNEY", "Kim Sun Young Hair");
+    }
+
+    #[test]
+    fn test_mamaks_mlc() {
+        assert_merchant("MAMAKSMLC XX2906 SYDNEY", "Mamak");
+    }
+
+    #[test]
+    fn test_mamak_village() {
+        assert_merchant("MAMAK VILLAGE MLC SYDNEY", "Mamak");
+    }
+
+    #[test]
+    fn test_mcm_soup() {
+        assert_merchant("MCM SOUP PTY LTD BURWOOD", "MCM Soup");
+    }
+
+    #[test]
+    fn test_mcdonalds_no_apostrophe() {
+        assert_merchant("MCDONALDS WYNYARD RAIL SYDNEY", "McDonald's");
+    }
+
+    #[test]
+    fn test_monkey_house() {
+        assert_merchant("MONKEY HOUSE STRATHFIELD STRATHFIELD", "Monkey House");
+    }
+
+    #[test]
+    fn test_telstra() {
+        assert_merchant("TELSTRA RECURRING PAYME MELBOURNE", "Telstra");
+    }
+
+    #[test]
+    fn test_uniqlo() {
+        assert_merchant("UNIQLO AUSTRALIA PTY LT MELBOURNE", "Uniqlo");
+    }
+
+    #[test]
+    fn test_wise_australia() {
+        assert_merchant("To Wise Australia Pty Ltd -", "Wise");
     }
 }

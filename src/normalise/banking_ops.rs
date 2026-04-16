@@ -17,20 +17,21 @@ struct CompiledBankingOp {
 }
 
 pub fn apply(result: &mut NormalisationResult) {
-    if result.class().is_some() {
-        return;
-    }
-    for cop in compiled_banking_ops() {
-        if let Some(caps) = cop.regex.captures(&result.normalised) {
-            result.features.operation = Some(cop.operation.clone());
-            if cop.has_account {
-                if let Some(account) = caps.name("account") {
-                    result.features.account = Some(account.as_str().to_string());
+    if result.features.operation.is_none() {
+        for cop in compiled_banking_ops() {
+            if let Some(caps) = cop.regex.captures(&result.normalised) {
+                result.features.operation = Some(cop.operation);
+                if cop.has_account {
+                    if let Some(account) = caps.name("account") {
+                        result.features.account = Some(account.as_str().to_string());
+                    }
                 }
+                break;
             }
-            result.set_class(PayeeClass::Other);
-            return;
         }
+    }
+    if result.class().is_none() && result.features.operation.is_some() {
+        result.set_class(PayeeClass::Other);
     }
 }
 
@@ -53,8 +54,20 @@ const BANKING_OPS: &[BankingOp] = &[
         has_account: false,
         patterns: &[
             r"(?i)ACCOUNT SERVICING FEE",
+            r"(?i)ACCOUNT FEE$",
+            r"(?i)ADMINISTRATION FEE$",
             r"(?i)CONTRIBUTION TAX ADJUSTMENT$",
+            r"(?i)CONTRIBUTION TAX$",
             r"(?i)INTERNATIONAL TRANSACTION FEE",
+            r"(?i)UNPAID PAYMENT FEE",
+            r"(?i)PACKAGE FEE$",
+        ],
+    },
+    BankingOp {
+        operation: BankingOperation::DirectCredit,
+        has_account: false,
+        patterns: &[
+            r"(?i)PAYID PAYMENT RECEIVED",
         ],
     },
     BankingOp {
@@ -113,7 +126,7 @@ fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
             .flat_map(|op| {
                 op.patterns.iter().map(move |&pat| CompiledBankingOp {
                     regex: Regex::new(pat).expect("invalid banking op pattern"),
-                    operation: op.operation.clone(),
+                    operation: op.operation,
                     has_account: op.has_account,
                 })
             })
@@ -168,10 +181,48 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_if_classified() {
+    fn test_skip_class_if_already_classified() {
         let mut r = NormalisationResult::new("BPAY PAYMENT");
         r.set_class(PayeeClass::Person);
         apply(&mut r);
-        assert!(r.features.operation.is_none());
+        assert_eq!(r.features.operation, Some(BankingOperation::BPay));
+        assert_eq!(r.class(), Some(&PayeeClass::Person));
+    }
+
+    #[test]
+    fn test_contribution_tax() {
+        let mut r = NormalisationResult::new("Contribution Tax");
+        apply(&mut r);
+        assert_eq!(r.features.operation, Some(BankingOperation::Fee));
+        assert_eq!(r.class(), Some(&PayeeClass::Other));
+    }
+
+    #[test]
+    fn test_unpaid_payment_fee() {
+        let mut r = NormalisationResult::new("Unpaid Payment Fee");
+        apply(&mut r);
+        assert_eq!(r.features.operation, Some(BankingOperation::Fee));
+    }
+
+    #[test]
+    fn test_administration_fee() {
+        let mut r = NormalisationResult::new("Administration Fee");
+        apply(&mut r);
+        assert_eq!(r.features.operation, Some(BankingOperation::Fee));
+    }
+
+    #[test]
+    fn test_account_fee() {
+        let mut r = NormalisationResult::new("Account Fee");
+        apply(&mut r);
+        assert_eq!(r.features.operation, Some(BankingOperation::Fee));
+    }
+
+    #[test]
+    fn test_payid_payment_received() {
+        let mut r = NormalisationResult::new("PayID Payment Received, Thank you");
+        apply(&mut r);
+        assert_eq!(r.features.operation, Some(BankingOperation::DirectCredit));
+        assert_eq!(r.class(), Some(&PayeeClass::Other));
     }
 }

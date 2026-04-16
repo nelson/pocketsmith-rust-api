@@ -21,6 +21,31 @@ pub enum BankingOperation {
     BPay,
     InternalTransfer,
     Fee,
+    Purchase,
+    Refund,
+    Cash,
+}
+
+impl BankingOperation {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Interest => "Interest",
+            Self::CreditCard => "Credit Card",
+            Self::Transfer => "Transfer",
+            Self::AccountServicing => "Account Servicing",
+            Self::Loan => "Loan",
+            Self::Deposit => "Deposit",
+            Self::Withdrawal => "Withdrawal",
+            Self::DirectDebit => "Direct Debit",
+            Self::DirectCredit => "Direct Credit",
+            Self::BPay => "BPay",
+            Self::InternalTransfer => "Internal Transfer",
+            Self::Fee => "Fee",
+            Self::Purchase => "Purchase",
+            Self::Refund => "Refund",
+            Self::Cash => "Cash",
+        }
+    }
 }
 
 /// Listed in order of priority for classification.
@@ -90,6 +115,13 @@ pub fn normalise(original: &str) -> NormalisationResult {
     employers::apply(&mut result);
     merchants::apply(&mut result);
     banking_ops::apply(&mut result);
+    // If normalised string is empty after stripping, use banking op name or "Cash"
+    if result.normalised.trim().is_empty() {
+        result.normalised = match &result.features.operation {
+            Some(op) => op.display_name().to_string(),
+            None => BankingOperation::Cash.display_name().to_string(),
+        };
+    }
     result
 }
 

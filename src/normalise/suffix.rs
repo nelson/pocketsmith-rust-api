@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::NormalisationResult;
+use super::{BankingOperation, NormalisationResult};
 
 const DEFAULT: Suffix = Suffix {
     pattern: "",
@@ -19,7 +19,7 @@ const DEFAULT: Suffix = Suffix {
 struct Suffix {
     pattern: &'static str,
     gateway: Option<&'static str>,
-    operation: Option<&'static str>,
+    operation: Option<BankingOperation>,
     institution: Option<&'static str>,
     has_account: bool,
     has_date: bool,
@@ -31,7 +31,7 @@ struct Suffix {
 struct CompiledSuffix {
     regex: Regex,
     gateway: Option<&'static str>,
-    operation: Option<&'static str>,
+    operation: Option<BankingOperation>,
     institution: Option<&'static str>,
     has_account: bool,
     has_date: bool,
@@ -50,8 +50,7 @@ pub fn apply(result: &mut NormalisationResult) {
                     result.features.gateway = Some(gw.to_string());
                 }
                 if let Some(op) = pat.operation {
-                    // TODO: map to BankingOperation when Purchase/Refund variants are added
-                    let _ = op;
+                    result.features.operation = Some(op);
                 }
                 if let Some(inst) = pat.institution {
                     result.features.institution = Some(inst.to_string());
@@ -106,22 +105,29 @@ const SUFFIXES: &[Suffix] = &[
     Suffix { pattern: r"\s+Tap and Pay xx(?P<account>\d{4}).*$", has_account: true, ..DEFAULT },
     Suffix { pattern: r"\s+Card\s+\d{6}x{6}(?P<account>\d{4})$", has_account: true, ..DEFAULT },
     Suffix { pattern: r"\s+Card\s+\d[A-Z]\d{4}[A-Za-z]{6}(?P<account>\d{4})$", has_account: true, ..DEFAULT },
+    Suffix { pattern: r"\s+Card\s+xx(?P<account>\d{4})\s*$", has_account: true, ..DEFAULT },
     Suffix { pattern: r"\s*,\s*(?P<account>\d{4})$", has_account: true, ..DEFAULT },
     Suffix { pattern: r"\s*,\s*\d{4}\s+Last 4 Card Digits\s+(?P<account>\d{4})$", has_account: true, ..DEFAULT },
     Suffix { pattern: r"\s*,?\s*\d{4}\s+Last\s+4\s+Card\s+Digits\s+(?P<account>\d{4})$", has_account: true, ..DEFAULT },
     // --- Date only ---
     Suffix { pattern: r"\s+Value [Dd]ate:?\s+(?P<date>\d{2}/\d{2}/\d{4})$", has_date: true, ..DEFAULT },
     // --- Operations (institution + operation type) ---
-    Suffix { pattern: r"\s*-?\s*Visa Purchase\s*-\s*Receipt\s+\w+\s*In\s+.*$", operation: Some("Purchase"), institution: Some("Visa"), ..DEFAULT },
-    Suffix { pattern: r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", operation: Some("Refund"), institution: Some("Visa"), ..DEFAULT },
-    Suffix { pattern: r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", operation: Some("Transfer"), institution: Some("Osko"), ..DEFAULT },
-    Suffix { pattern: r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", operation: Some("Deposit"), ..DEFAULT },
-    Suffix { pattern: r"\s*-?\s*Eftpos (?:Purchase|Cash Out)\s*-\s*Receipt\s+.*$", operation: Some("Purchase"), institution: Some("Eftpos"), ..DEFAULT },
-    Suffix { pattern: r"\s+Eftpos Purchase\s*-\s*Receipt\s+.*$", operation: Some("Purchase"), institution: Some("Eftpos"), ..DEFAULT },
-    Suffix { pattern: r"\s*-\s*Eftpos Purchase\s*-\s*Receipt\s+\d+Date.*$", operation: Some("Purchase"), institution: Some("Eftpos"), ..DEFAULT },
-    Suffix { pattern: r"\s*-\s*Internal Transfer\s*-\s*Receipt\s+\d+.*$", operation: Some("Transfer"), ..DEFAULT },
+    Suffix { pattern: r"\s*-?\s*Visa Purchase\s*-\s*Receipt\s+\w+\s*In\s+.*$", operation: Some(BankingOperation::Purchase), institution: Some("Visa"), ..DEFAULT },
+    Suffix { pattern: r"\s*-?\s*Visa Refund\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Refund), institution: Some("Visa"), ..DEFAULT },
+    Suffix { pattern: r"\s*-?\s*Osko Payment.*Receipt\s+\d+.*$", operation: Some(BankingOperation::Transfer), institution: Some("Osko"), ..DEFAULT },
+    Suffix { pattern: r"\s*-\s*Deposit\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Deposit), ..DEFAULT },
+    Suffix { pattern: r"\s*-?\s*Eftpos (?:Purchase|Cash Out)\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Purchase), institution: Some("Eftpos"), ..DEFAULT },
+    Suffix { pattern: r"\s+Eftpos Purchase\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Purchase), institution: Some("Eftpos"), ..DEFAULT },
+    Suffix { pattern: r"\s*-\s*Eftpos Purchase\s*-\s*Receipt\s+\d+Date.*$", operation: Some(BankingOperation::Purchase), institution: Some("Eftpos"), ..DEFAULT },
+    Suffix { pattern: r"\s*-?\s*Eftpos Refund\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Refund), institution: Some("Eftpos"), ..DEFAULT },
+    Suffix { pattern: r"(?i)\s*-?\s*Cash Out\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Cash), ..DEFAULT },
+    Suffix { pattern: r"(?i)\s*-?\s*Refund\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Refund), ..DEFAULT },
+    Suffix { pattern: r"(?i)\s*-?\s*Purchase\s*-\s*Receipt\s+.*$", operation: Some(BankingOperation::Purchase), ..DEFAULT },
+    Suffix { pattern: r"\s*-\s*Internal Transfer\s*-\s*Receipt\s+\d+.*$", operation: Some(BankingOperation::Transfer), ..DEFAULT },
+    Suffix { pattern: r"(?i)\s*-?\s*Receipt\s+\d+\s*$", ..DEFAULT },
     // --- Gateway ---
     Suffix { pattern: r"\s*-\s*Alipay$", gateway: Some("Alipay"), ..DEFAULT },
+    Suffix { pattern: r"(?i)\s*-?\s*Beem It\s*$", gateway: Some("Beem"), ..DEFAULT },
     // --- Location (country codes, stripped with location extraction) ---
     Suffix { pattern: r"\s+(?P<location>NS) AUS$", has_location: true, ..DEFAULT },
     Suffix { pattern: r"\s+(?P<location>AU) AUS$", has_location: true, ..DEFAULT },
