@@ -67,15 +67,27 @@ const PAIR_ROW_QUERY: &str = "
 pub fn get_pending_pairs(conn: &Connection, limit: usize) -> Result<Vec<TransferPairRow>> {
     let query = format!(
         "{} WHERE tp.status = 'pending' ORDER BY
+            ta.date DESC,
             CASE tp.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-            tp.amount_cents DESC,
-            tp.txn_id_a
+            tp.amount_cents DESC
          LIMIT ?1",
         PAIR_ROW_QUERY
     );
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
         .query_map([limit], |row| row_to_pair_row(row))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
+pub fn get_pairs_by_status(conn: &Connection, status: &str, limit: usize) -> Result<Vec<TransferPairRow>> {
+    let query = format!(
+        "{} WHERE tp.status = ?1 ORDER BY ta.date DESC LIMIT ?2",
+        PAIR_ROW_QUERY
+    );
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt
+        .query_map(rusqlite::params![status, limit], |row| row_to_pair_row(row))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }

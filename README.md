@@ -13,7 +13,7 @@ cp .env.example .env  # add your POCKETSMITH_API_KEY
 Pull all transactions, accounts, and categories from PocketSmith into `pocketsmith.db`:
 
 ```
-cargo run
+cargo run --bin sync
 ```
 
 Subsequent runs fetch only transactions updated since the last sync.

@@ -1,6 +1,7 @@
 mod banking_ops;
 mod employers;
 mod expand;
+#[allow(dead_code)]
 mod locations;
 mod merchants;
 mod persons;
