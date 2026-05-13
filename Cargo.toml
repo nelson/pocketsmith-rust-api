@@ -3,6 +3,9 @@ name = "pocketsmith-sync"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+web = ["tiny_http", "maud"]
+
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
@@ -12,6 +15,12 @@ anyhow = "1"
 dotenvy = "0.15"
 regex = "1"
 libc = "0.2"
+tiny_http = { version = "0.12", optional = true }
+maud = { version = "0.26", optional = true }
+
+[[bin]]
+name = "sync"
+path = "src/main.rs"
 
 [[bin]]
 name = "transfers"
@@ -20,4 +29,9 @@ path = "src/bin/transfers.rs"
 [[bin]]
 name = "normalise"
 path = "src/bin/normalise.rs"
+
+[[bin]]
+name = "serve"
+path = "src/bin/serve.rs"
+required-features = ["web"]
 
