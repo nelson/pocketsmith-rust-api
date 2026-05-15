@@ -30,6 +30,23 @@ impl Confidence {
             _ => None,
         }
     }
+
+    pub fn to_i32(self) -> i32 {
+        match self {
+            Confidence::High => 0,
+            Confidence::Medium => 1,
+            Confidence::Low => 2,
+        }
+    }
+
+    pub fn from_i32(v: i32) -> Option<Confidence> {
+        match v {
+            0 => Some(Confidence::High),
+            1 => Some(Confidence::Medium),
+            2 => Some(Confidence::Low),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Confidence {
@@ -62,6 +79,25 @@ impl Status {
             _ => None,
         }
     }
+
+    pub fn to_i32(self) -> i32 {
+        match self {
+            Status::Pending => 0,
+            Status::Confirmed => 1,
+            Status::Rejected => 2,
+        }
+    }
+
+    pub fn from_i32(v: i32) -> Option<Status> {
+        match v {
+            0 => Some(Status::Pending),
+            1 => Some(Status::Confirmed),
+            2 => Some(Status::Rejected),
+            _ => None,
+        }
+    }
+
+    pub const ALL: [Status; 3] = [Status::Pending, Status::Confirmed, Status::Rejected];
 }
 
 impl fmt::Display for Status {

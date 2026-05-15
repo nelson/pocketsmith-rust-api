@@ -26,8 +26,8 @@ pub fn insert_pair(conn: &Connection, pair: &TransferPair) -> Result<()> {
             pair.txn_id_a,
             pair.txn_id_b,
             pair.amount_cents,
-            pair.confidence.as_str(),
-            pair.status.as_str(),
+            pair.confidence.to_i32(),
+            pair.status.to_i32(),
         ],
     )
     .context("Failed to insert transfer pair")?;
@@ -35,14 +35,14 @@ pub fn insert_pair(conn: &Connection, pair: &TransferPair) -> Result<()> {
 }
 
 fn row_to_pair_row(row: &rusqlite::Row) -> rusqlite::Result<TransferPairRow> {
-    let confidence_str: String = row.get(3)?;
-    let status_str: String = row.get(4)?;
+    let confidence_int: i32 = row.get(3)?;
+    let status_int: i32 = row.get(4)?;
     Ok(TransferPairRow {
         txn_id_a: row.get(0)?,
         txn_id_b: row.get(1)?,
         amount_cents: row.get(2)?,
-        confidence: Confidence::from_str(&confidence_str).unwrap_or(Confidence::Low),
-        status: Status::from_str(&status_str).unwrap_or(Status::Pending),
+        confidence: Confidence::from_i32(confidence_int).unwrap_or(Confidence::Low),
+        status: Status::from_i32(status_int).unwrap_or(Status::Pending),
         date_a: row.get(5)?,
         date_b: row.get(6)?,
         payee_a: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
@@ -66,9 +66,9 @@ const PAIR_ROW_QUERY: &str = "
 
 pub fn get_pending_pairs(conn: &Connection, limit: usize) -> Result<Vec<TransferPairRow>> {
     let query = format!(
-        "{} WHERE tp.status = 'pending' ORDER BY
+        "{} WHERE tp.status = 0 ORDER BY
             ta.date DESC,
-            CASE tp.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+            tp.confidence ASC,
             tp.amount_cents DESC
          LIMIT ?1",
         PAIR_ROW_QUERY
@@ -80,14 +80,14 @@ pub fn get_pending_pairs(conn: &Connection, limit: usize) -> Result<Vec<Transfer
     Ok(rows)
 }
 
-pub fn get_pairs_by_status(conn: &Connection, status: &str, limit: usize) -> Result<Vec<TransferPairRow>> {
+pub fn get_pairs_by_status(conn: &Connection, status: Status, limit: usize) -> Result<Vec<TransferPairRow>> {
     let query = format!(
         "{} WHERE tp.status = ?1 ORDER BY ta.date DESC LIMIT ?2",
         PAIR_ROW_QUERY
     );
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
-        .query_map(rusqlite::params![status, limit], |row| row_to_pair_row(row))?
+        .query_map(rusqlite::params![status.to_i32(), limit], |row| row_to_pair_row(row))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
@@ -120,7 +120,7 @@ pub fn get_pair_by_id(conn: &Connection, txn_id_a: i64, txn_id_b: i64) -> Result
 }
 
 pub fn get_confirmed_pairs(conn: &Connection) -> Result<Vec<TransferPairRow>> {
-    let query = format!("{} WHERE tp.status = 'confirmed'", PAIR_ROW_QUERY);
+    let query = format!("{} WHERE tp.status = 1", PAIR_ROW_QUERY);
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
         .query_map([], |row| row_to_pair_row(row))?
@@ -136,7 +136,7 @@ pub fn update_status(
 ) -> Result<()> {
     conn.execute(
         "UPDATE transfer_pairs SET status = ?1 WHERE txn_id_a = ?2 AND txn_id_b = ?3",
-        rusqlite::params![status.as_str(), txn_id_a, txn_id_b],
+        rusqlite::params![status.to_i32(), txn_id_a, txn_id_b],
     )?;
     Ok(())
 }
@@ -145,13 +145,13 @@ pub fn count_by_status(conn: &Connection) -> Result<std::collections::HashMap<St
     let mut map = std::collections::HashMap::new();
     let mut stmt = conn.prepare("SELECT status, COUNT(*) FROM transfer_pairs GROUP BY status")?;
     let rows = stmt.query_map([], |row| {
-        let status_str: String = row.get(0)?;
+        let status_int: i32 = row.get(0)?;
         let count: usize = row.get(1)?;
-        Ok((status_str, count))
+        Ok((status_int, count))
     })?;
     for row in rows {
-        let (status_str, count) = row?;
-        if let Some(status) = Status::from_str(&status_str) {
+        let (status_int, count) = row?;
+        if let Some(status) = Status::from_i32(status_int) {
             map.insert(status, count);
         }
     }

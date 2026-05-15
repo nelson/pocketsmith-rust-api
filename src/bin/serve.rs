@@ -180,7 +180,7 @@ fn get_prior_pairs(
     conn: &rusqlite::Connection,
     account_a: &str,
     account_b: &str,
-) -> Vec<(String, i64, String)> {
+) -> Vec<(String, i64, Status)> {
     let sql = "
         SELECT ta.date, tp.amount_cents, tp.status
         FROM transfer_pairs tp
@@ -188,7 +188,7 @@ fn get_prior_pairs(
         LEFT JOIN transaction_accounts aa ON aa.id = ta.transaction_account_id
         LEFT JOIN transactions tb ON tb.id = tp.txn_id_b
         LEFT JOIN transaction_accounts ab ON ab.id = tb.transaction_account_id
-        WHERE tp.status != 'pending'
+        WHERE tp.status != 0
           AND ((aa.name = ?1 AND ab.name = ?2) OR (aa.name = ?2 AND ab.name = ?1))
         ORDER BY ta.date DESC
         LIMIT 5
@@ -197,7 +197,8 @@ fn get_prior_pairs(
         .ok()
         .map(|mut stmt| {
             stmt.query_map(rusqlite::params![account_a, account_b], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                let status_int: i32 = row.get(2)?;
+                Ok((row.get(0)?, row.get(1)?, Status::from_i32(status_int).unwrap_or(Status::Pending)))
             })
             .ok()
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -216,11 +217,13 @@ fn next_pair_after(pairs: &[TransferPairRow], current: (i64, i64)) -> Option<(i6
     Some((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b))
 }
 
-fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Vec<TransferPairRow> {
-    let pairs = if status_filter == "all" || status_filter == "skipped" {
-        transfer_pairs::get_all_pairs(conn, 2000).unwrap_or_default()
-    } else {
-        transfer_pairs::get_pairs_by_status(conn, status_filter, 2000).unwrap_or_default()
+fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, confidence_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Vec<TransferPairRow> {
+    let pairs = match status_filter {
+        "all" | "skipped" => transfer_pairs::get_all_pairs(conn, 2000).unwrap_or_default(),
+        "pending" => transfer_pairs::get_pairs_by_status(conn, Status::Pending, 2000).unwrap_or_default(),
+        "confirmed" => transfer_pairs::get_pairs_by_status(conn, Status::Confirmed, 2000).unwrap_or_default(),
+        "rejected" => transfer_pairs::get_pairs_by_status(conn, Status::Rejected, 2000).unwrap_or_default(),
+        _ => Vec::new(),
     };
     pairs.into_iter()
         .filter(|p| {
@@ -231,7 +234,7 @@ fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_fil
             if status_filter == "pending" && decisions.get(&key) == Some(&Decision::Skip) {
                 return false;
             }
-            if conf_filter != "all" && p.confidence.as_str() != conf_filter {
+            if confidence_filter != "all" && p.confidence.as_str() != confidence_filter {
                 return false;
             }
             true
@@ -239,7 +242,7 @@ fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_fil
         .collect()
 }
 
-fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, conf_filter: &str) -> Markup {
+fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
     let selected = state.active_pair
         .and_then(|id| find_pair_index(pairs, id).map(|_| id))
         .or_else(|| pairs.first().map(|p| (p.txn_id_a, p.txn_id_b)));
@@ -262,7 +265,7 @@ fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, c
             body {
                 div.layout {
                     div.queue-panel #queue {
-                        (render_queue(pairs, selected, status_filter, conf_filter, &state.decisions))
+                        (render_queue(pairs, selected, status_filter, confidence_filter, &state.decisions))
                     }
                     div.detail-panel #detail {
                         @if let Some(pair) = active {
@@ -290,21 +293,21 @@ fn page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     full_page(&state, &pairs, &state.status_filter, &state.confidence_filter)
 }
 
-fn queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, conf_filter: &str) -> Markup {
+fn queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, confidence_filter: &str) -> Markup {
     let mut state = state.lock().unwrap();
     state.status_filter = status_filter.to_string();
-    state.confidence_filter = conf_filter.to_string();
-    let pairs = get_filtered_pairs(&state.conn, status_filter, conf_filter, &state.decisions);
+    state.confidence_filter = confidence_filter.to_string();
+    let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.decisions);
     let current = state.active_pair;
     let in_new_list = current.and_then(|id| find_pair_index(&pairs, id)).is_some();
     if !in_new_list {
         state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
     }
     let selected = state.active_pair;
-    render_queue(&pairs, selected, status_filter, conf_filter, &state.decisions)
+    render_queue(&pairs, selected, status_filter, confidence_filter, &state.decisions)
 }
 
-fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
+fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_filter: &str, confidence_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
     html! {
         div.queue-header {
             h2 { (pairs.len()) " pairs" }
@@ -312,7 +315,7 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_
                 @for f in &["all", "pending", "confirmed", "rejected", "skipped"] {
                     button.filter-btn
                         .(if *f == status_filter { "active" } else { "" })
-                        hx-get=(format!("/queue?filter={f}&conf={conf_filter}"))
+                        hx-get=(format!("/queue?filter={f}&conf={confidence_filter}"))
                         hx-target="#queue"
                         hx-swap="innerHTML"
                     { (f.to_uppercase()) }
@@ -321,7 +324,7 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_
             div.filter-row {
                 @for f in &["all", "high", "medium", "low"] {
                     button.filter-btn.conf-filter
-                        .(if *f == conf_filter { "active" } else { "" })
+                        .(if *f == confidence_filter { "active" } else { "" })
                         hx-get=(format!("/queue?filter={status_filter}&conf={f}"))
                         hx-target="#queue"
                         hx-swap="innerHTML"
@@ -395,7 +398,7 @@ fn detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Mark
     }
 }
 
-fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Markup {
+fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) -> Markup {
     let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
     let days = transfers::date_diff_days(&pair.date_a, &pair.date_b);
 
@@ -471,8 +474,8 @@ fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Mar
                         div.prior-row {
                             span { (format_short_date(date)) }
                             span { (format_dollars(*amount)) }
-                            span.((if status == "confirmed" { "status-confirmed" } else { "status-rejected" })) {
-                                @if status == "confirmed" { "✓" } @else { "✗" }
+                            span.((if *status == Status::Confirmed { "status-confirmed" } else { "status-rejected" })) {
+                                @if *status == Status::Confirmed { "✓" } @else { "✗" }
                             }
                         }
                     }
