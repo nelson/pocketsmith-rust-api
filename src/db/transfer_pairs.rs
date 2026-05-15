@@ -92,6 +92,21 @@ pub fn get_pairs_by_status(conn: &Connection, status: &str, limit: usize) -> Res
     Ok(rows)
 }
 
+pub fn get_pair_by_id(conn: &Connection, txn_id_a: i64, txn_id_b: i64) -> Result<Option<TransferPairRow>> {
+    let query = format!(
+        "{} WHERE tp.txn_id_a = ?1 AND tp.txn_id_b = ?2",
+        PAIR_ROW_QUERY
+    );
+    let mut stmt = conn.prepare(&query)?;
+    let mut rows = stmt
+        .query_map(rusqlite::params![txn_id_a, txn_id_b], |row| row_to_pair_row(row))?;
+    match rows.next() {
+        Some(Ok(row)) => Ok(Some(row)),
+        Some(Err(e)) => Err(e.into()),
+        None => Ok(None),
+    }
+}
+
 pub fn get_confirmed_pairs(conn: &Connection) -> Result<Vec<TransferPairRow>> {
     let query = format!("{} WHERE tp.status = 'confirmed'", PAIR_ROW_QUERY);
     let mut stmt = conn.prepare(&query)?;
