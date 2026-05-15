@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -8,9 +9,26 @@ use pocketsmith_sync::db;
 use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
 use pocketsmith_sync::transfers::{self, Confidence, Status};
 
+#[derive(Clone, Copy, PartialEq)]
+enum Decision {
+    Confirm,
+    Reject,
+    Skip,
+}
+
+impl Decision {
+    fn css_class(self) -> &'static str {
+        match self {
+            Decision::Confirm => "decided-confirmed",
+            Decision::Reject => "decided-rejected",
+            Decision::Skip => "decided-skipped",
+        }
+    }
+}
+
 struct ActivityEntry {
     pair_id: (i64, i64),
-    action: String,
+    decision: Decision,
     amount_cents: i64,
     account_a: String,
     account_b: String,
@@ -19,11 +37,9 @@ struct ActivityEntry {
 struct AppState {
     conn: rusqlite::Connection,
     activity: Vec<ActivityEntry>,
-    confirmed: usize,
-    rejected: usize,
-    skipped: usize,
     undone: usize,
     filter: String,
+    decisions: HashMap<(i64, i64), Decision>,
 }
 
 fn main() -> Result<()> {
@@ -38,11 +54,9 @@ fn main() -> Result<()> {
     let state = Arc::new(Mutex::new(AppState {
         conn,
         activity: Vec::new(),
-        confirmed: 0,
-        rejected: 0,
-        skipped: 0,
         undone: 0,
-        filter: "pending".to_string(),
+        filter: "all".to_string(),
+        decisions: HashMap::new(),
     }));
 
     let addr = format!("127.0.0.1:{port}");
@@ -74,10 +88,12 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             let conf = extract_param(params, "conf").unwrap_or("all".to_string());
             queue_fragment(&state, &filter, &conf)
         }
-        (Method::Get, "/queue") => queue_fragment(&state, "pending", "all"),
+        (Method::Get, "/queue") => queue_fragment(&state, "all", "all"),
         (Method::Post, p) if p.contains("/confirm") => action_handler(&state, p, "confirm"),
         (Method::Post, p) if p.contains("/reject") => action_handler(&state, p, "reject"),
         (Method::Post, p) if p.contains("/skip") => action_handler(&state, p, "skip"),
+        (Method::Post, "/clear-all-skipped") => clear_all_skipped(&state),
+        (Method::Post, p) if p.contains("/unskip") => unskip_handler(&state, p),
         (Method::Post, p) if p.contains("/undo") => undo_handler(&state, p),
         _ => html! { p { "Not found" } },
     };
@@ -142,21 +158,6 @@ fn confidence_reason(pair: &TransferPairRow) -> &'static str {
     }
 }
 
-fn date_diff_days(a: &str, b: &str) -> i64 {
-    let parse = |s: &str| -> Option<i64> {
-        let parts: Vec<&str> = s.split('-').collect();
-        if parts.len() != 3 { return None; }
-        let y: i64 = parts[0].parse().ok()?;
-        let m: i64 = parts[1].parse().ok()?;
-        let d: i64 = parts[2].parse().ok()?;
-        Some(y * 365 + m * 30 + d)
-    };
-    match (parse(a), parse(b)) {
-        (Some(da), Some(db)) => (da - db).abs(),
-        _ => 0,
-    }
-}
-
 fn format_short_date(date: &str) -> String {
     let parts: Vec<&str> = date.split('-').collect();
     if parts.len() != 3 { return date.to_string(); }
@@ -201,13 +202,31 @@ fn get_prior_pairs(
         .unwrap_or_default()
 }
 
-fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_filter: &str) -> Vec<TransferPairRow> {
-    let pairs = transfer_pairs::get_pairs_by_status(conn, status_filter, 500).unwrap_or_default();
-    if conf_filter == "all" {
-        pairs
+fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Vec<TransferPairRow> {
+    let pairs = if status_filter == "all" || status_filter == "skipped" {
+        let mut all = Vec::new();
+        for s in &["pending", "confirmed", "rejected"] {
+            all.extend(transfer_pairs::get_pairs_by_status(conn, s, 500).unwrap_or_default());
+        }
+        all
     } else {
-        pairs.into_iter().filter(|p| p.confidence.as_str() == conf_filter).collect()
-    }
+        transfer_pairs::get_pairs_by_status(conn, status_filter, 500).unwrap_or_default()
+    };
+    pairs.into_iter()
+        .filter(|p| {
+            let key = (p.txn_id_a, p.txn_id_b);
+            if status_filter == "skipped" {
+                return decisions.get(&key) == Some(&Decision::Skip);
+            }
+            if status_filter == "pending" && decisions.get(&key) == Some(&Decision::Skip) {
+                return false;
+            }
+            if conf_filter != "all" && p.confidence.as_str() != conf_filter {
+                return false;
+            }
+            true
+        })
+        .collect()
 }
 
 fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, conf_filter: &str) -> Markup {
@@ -229,7 +248,7 @@ fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, c
             body {
                 div.layout {
                     div.queue-panel #queue {
-                        (render_queue(pairs, first.map(|p| p.txn_id_a), status_filter, conf_filter))
+                        (render_queue(pairs, first.map(|p| p.txn_id_a), status_filter, conf_filter, &state.decisions))
                     }
                     div.detail-panel #detail {
                         @if let Some(pair) = first {
@@ -250,24 +269,24 @@ fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, c
 
 fn page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all");
+    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all", &state.decisions);
     full_page(&state, &pairs, &state.filter, "all")
 }
 
 fn queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, conf_filter: &str) -> Markup {
     let mut state = state.lock().unwrap();
     state.filter = status_filter.to_string();
-    let pairs = get_filtered_pairs(&state.conn, status_filter, conf_filter);
+    let pairs = get_filtered_pairs(&state.conn, status_filter, conf_filter, &state.decisions);
     let first_id = pairs.first().map(|p| p.txn_id_a);
-    render_queue(&pairs, first_id, status_filter, conf_filter)
+    render_queue(&pairs, first_id, status_filter, conf_filter, &state.decisions)
 }
 
-fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter: &str, conf_filter: &str) -> Markup {
+fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
     html! {
         div.queue-header {
             h2 { (pairs.len()) " pairs" }
             div.filter-row {
-                @for f in &["pending", "confirmed", "rejected"] {
+                @for f in &["all", "pending", "confirmed", "rejected", "skipped"] {
                     button.filter-btn
                         .(if *f == status_filter { "active" } else { "" })
                         hx-get=(format!("/queue?filter={f}&conf={conf_filter}"))
@@ -285,24 +304,56 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter:
                         hx-swap="innerHTML"
                     { (f.to_uppercase()) }
                 }
+                @let num_skipped = decisions.values().filter(|v| **v == Decision::Skip).count();
+                @if num_skipped > 0 {
+                    button.filter-btn.clear-skipped-btn
+                        hx-post="/clear-all-skipped"
+                        hx-target="body"
+                    { "CLEAR SKIPPED (" (num_skipped) ")" }
+                }
             }
         }
         div.queue-list {
             @for pair in pairs {
                 @let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
                 @let is_selected = selected == Some(pair.txn_id_a);
+                @let decision = decisions.get(&(pair.txn_id_a, pair.txn_id_b)).copied();
                 div.queue-item
                     .(if is_selected { "selected" } else { "" })
                     .(confidence_class(&pair.confidence))
+                    .(decision.map(|d| d.css_class()).unwrap_or(""))
                     hx-get=(format!("/pair/{pair_id}"))
                     hx-target="#detail"
                     hx-swap="innerHTML"
                     data-pair-id=(pair_id)
                 {
-                    span.conf-badge { (pair.confidence.as_str().chars().next().unwrap_or('?').to_uppercase().to_string()) }
+                    @if let Some(Decision::Skip) = decision {
+                        span.status-indicator.skip-indicator
+                            hx-post=(format!("/pair/{pair_id}/unskip"))
+                            hx-target="body"
+                            title="Click to unskip"
+                            onclick="event.stopPropagation()"
+                        { "⊘" }
+                    } @else if let Some(Decision::Confirm) = decision {
+                        span.status-indicator.confirm-indicator
+                            hx-post=(format!("/pair/{pair_id}/undo"))
+                            hx-target="body"
+                            title="Click to undo"
+                            onclick="event.stopPropagation()"
+                        { "✓" }
+                    } @else if let Some(Decision::Reject) = decision {
+                        span.status-indicator.reject-indicator
+                            hx-post=(format!("/pair/{pair_id}/undo"))
+                            hx-target="body"
+                            title="Click to undo"
+                            onclick="event.stopPropagation()"
+                        { "✗" }
+                    } @else {
+                        span.conf-badge { (pair.confidence.as_str().chars().next().unwrap_or('?').to_uppercase().to_string()) }
+                    }
                     span.amount { (format_dollars(pair.amount_cents)) }
                     span.date { (format_short_date(&pair.date_a)) }
-                    span.gap { (date_diff_days(&pair.date_a, &pair.date_b)) "d" }
+                    span.gap { (transfers::date_diff_days(&pair.date_a, &pair.date_b)) "d" }
                 }
             }
         }
@@ -311,30 +362,18 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter:
 
 fn detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Markup {
     let state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all");
-    match pairs.iter().find(|p| p.txn_id_a == txn_a && p.txn_id_b == txn_b) {
-        Some(pair) => {
+    match transfer_pairs::get_pair_by_id(&state.conn, txn_a, txn_b) {
+        Ok(Some(pair)) => {
             let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
-            render_detail(pair, &prior)
+            render_detail(&pair, &prior)
         }
-        None => {
-            // Try all statuses in case it's from a different filter
-            for status in &["pending", "confirmed", "rejected"] {
-                let pairs = transfer_pairs::get_pairs_by_status(&state.conn, status, 500).unwrap_or_default();
-                if let Some(pair) = pairs.iter().find(|p| p.txn_id_a == txn_a && p.txn_id_b == txn_b) {
-                    let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
-                    return render_detail(pair, &prior);
-                }
-            }
-            html! { div.empty-state { p { "Pair not found" } } }
-        }
+        _ => html! { div.empty-state { p { "Pair not found" } } },
     }
 }
 
 fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Markup {
     let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
-    let days = date_diff_days(&pair.date_a, &pair.date_b);
-    let amounts_match = true; // by definition, pairs have matching abs amounts
+    let days = transfers::date_diff_days(&pair.date_a, &pair.date_b);
 
     html! {
         div.detail-header {
@@ -364,14 +403,15 @@ fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Mar
         div.comparison {
             div.comparison-meta {
                 div.meta-item {
-                    span.meta-label { "Date Δ" }
-                    span.meta-value { (days) "d" }
+                    span.meta-label { "DATE DIFF" }
+                    span.meta-value {
+                        (days) "d"
+                        @if days >= 2 { " ⚠️" }
+                    }
                 }
                 div.meta-item {
                     span.meta-label { "Amount" }
-                    span.meta-value {
-                        @if amounts_match { "✅" } @else { "⚠️" }
-                    }
+                    span.meta-value { "✅" }
                 }
             }
             div.txn-cards {
@@ -434,48 +474,53 @@ fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Mar
     }
 }
 
+fn refresh_page(state: &AppState) -> Markup {
+    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all", &state.decisions);
+    full_page(state, &pairs, &state.filter, "all")
+}
+
 fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
     let id = parse_pair_id(path, "/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
 
-        let pair_info: Option<(i64, String, String, usize)> = {
-            let pairs = transfer_pairs::get_pending_pairs(&state.conn, 500).unwrap_or_default();
-            pairs.iter()
-                .enumerate()
-                .find(|(_, p)| p.txn_id_a == a && p.txn_id_b == b)
-                .map(|(i, p)| (p.amount_cents, p.account_name_a.clone(), p.account_name_b.clone(), i))
+        let decision = match action {
+            "confirm" => Decision::Confirm,
+            "reject" => Decision::Reject,
+            "skip" => Decision::Skip,
+            _ => return html! { p { "Invalid action" } },
         };
 
-        match action {
-            "confirm" => {
-                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Confirmed);
-                state.confirmed += 1;
-            }
-            "reject" => {
-                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Rejected);
-                state.rejected += 1;
-            }
-            "skip" => {
-                state.skipped += 1;
-            }
-            _ => {}
-        }
+        let pair_info = transfer_pairs::get_pair_by_id(&state.conn, a, b)
+            .ok()
+            .flatten()
+            .map(|p| (p.amount_cents, p.account_name_a, p.account_name_b));
 
-        if let Some((amount, acct_a, acct_b, _)) = pair_info {
+        match decision {
+            Decision::Confirm => {
+                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Confirmed);
+            }
+            Decision::Reject => {
+                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Rejected);
+            }
+            Decision::Skip => {}
+        }
+        state.decisions.insert((a, b), decision);
+
+        if let Some((amount, acct_a, acct_b)) = pair_info {
             state.activity.push(ActivityEntry {
                 pair_id: (a, b),
-                action: action.to_string(),
+                decision,
                 amount_cents: amount,
                 account_a: acct_a,
                 account_b: acct_b,
             });
+            if state.activity.len() > 100 {
+                state.activity.remove(0);
+            }
         }
 
-        // After action, show next pending pair (skip advances too)
-        let pairs = get_filtered_pairs(&state.conn, "pending", "all");
-        state.filter = "pending".to_string();
-        return full_page(&state, &pairs, "pending", "all");
+        return refresh_page(&state);
     }
 
     html! { p { "Invalid request" } }
@@ -487,54 +532,70 @@ fn undo_handler(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
         let mut state = state.lock().unwrap();
         let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Pending);
         state.undone += 1;
-
-        if let Some(pos) = state.activity.iter().position(|e| e.pair_id == (a, b)) {
-            let removed = state.activity.remove(pos);
-            match removed.action.as_str() {
-                "confirm" => state.confirmed = state.confirmed.saturating_sub(1),
-                "reject" => state.rejected = state.rejected.saturating_sub(1),
-                "skip" => state.skipped = state.skipped.saturating_sub(1),
-                _ => {}
-            }
-        }
-
-        let filter = state.filter.clone();
-        let pairs = get_filtered_pairs(&state.conn, &filter, "all");
-        return full_page(&state, &pairs, &filter, "all");
+        state.decisions.remove(&(a, b));
+        state.activity.retain(|e| e.pair_id != (a, b));
+        return refresh_page(&state);
     }
 
     let state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all");
-    full_page(&state, &pairs, &state.filter, "all")
+    refresh_page(&state)
+}
+
+fn clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
+    let mut state = state.lock().unwrap();
+    state.activity.retain(|e| e.decision != Decision::Skip);
+    state.decisions.retain(|_, v| *v != Decision::Skip);
+    refresh_page(&state)
+}
+
+fn unskip_handler(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
+    let id = parse_pair_id(path, "/pair/");
+    if let Some((a, b)) = id {
+        let mut state = state.lock().unwrap();
+        state.decisions.remove(&(a, b));
+        state.activity.retain(|e| !(e.pair_id == (a, b) && e.decision == Decision::Skip));
+        return refresh_page(&state);
+    }
+    let state = state.lock().unwrap();
+    refresh_page(&state)
+}
+
+fn decision_count(state: &AppState, d: Decision) -> usize {
+    state.decisions.values().filter(|v| **v == d).count()
 }
 
 fn render_activity(state: &AppState) -> Markup {
     html! {
         div.activity-header {
-            span.stat { "Confirmed " span.count-confirmed { (state.confirmed) } }
-            span.stat { "Rejected " span.count-rejected { (state.rejected) } }
-            span.stat { "Skipped " span.count-skipped { (state.skipped) } }
+            span.stat { "Confirmed " span.count-confirmed { (decision_count(state, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (decision_count(state, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (decision_count(state, Decision::Skip)) } }
             span.stat { "Undone " span.count-undone { (state.undone) } }
         }
         div.activity-list {
             @for entry in state.activity.iter().rev().take(20) {
                 @let pair_id = format!("{}-{}", entry.pair_id.0, entry.pair_id.1);
                 div.activity-row {
-                    span.((match entry.action.as_str() {
-                        "confirm" => "status-confirmed",
-                        "reject" => "status-rejected",
-                        _ => "status-skipped",
+                    span.((match entry.decision {
+                        Decision::Confirm => "status-confirmed",
+                        Decision::Reject => "status-rejected",
+                        Decision::Skip => "status-skipped",
                     })) {
-                        @match entry.action.as_str() {
-                            "confirm" => { "✓ confirmed" },
-                            "reject" => { "✗ rejected" },
-                            _ => { "⊘ skipped" },
+                        @match entry.decision {
+                            Decision::Confirm => { "✓ confirmed" },
+                            Decision::Reject => { "✗ rejected" },
+                            Decision::Skip => { "⊘ skipped" },
                         }
                     }
                     span { "#" (entry.pair_id.0) }
                     span { (format_dollars(entry.amount_cents)) }
                     span { (&entry.account_a) " → " (&entry.account_b) }
-                    @if entry.action != "skip" {
+                    @if entry.decision == Decision::Skip {
+                        button.undo-btn
+                            hx-post=(format!("/pair/{pair_id}/unskip"))
+                            hx-target="body"
+                        { "unskip" }
+                    } @else {
                         button.undo-btn
                             hx-post=(format!("/pair/{pair_id}/undo"))
                             hx-target="body"
@@ -672,6 +733,28 @@ body {
 .queue-item .amount { color: var(--fg); text-align: right; }
 .queue-item .date { color: var(--fg-dim); }
 .queue-item .gap { color: var(--fg-dark); font-size: 11px; }
+
+.queue-item.decided-confirmed { background: rgba(158, 206, 106, 0.08); }
+.queue-item.decided-rejected { background: rgba(247, 118, 142, 0.08); }
+.queue-item.decided-skipped { opacity: 0.5; }
+.queue-item.decided-skipped .amount { text-decoration: line-through; }
+
+.status-indicator {
+    font-size: 12px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.status-indicator:hover { transform: scale(1.2); }
+.confirm-indicator { color: var(--green); background: rgba(158, 206, 106, 0.15); }
+.reject-indicator { color: var(--red); background: rgba(247, 118, 142, 0.15); }
+.skip-indicator { color: var(--fg-dim); background: var(--bg-highlight); }
+
+.clear-skipped-btn { color: var(--yellow) !important; border-color: var(--yellow) !important; margin-left: auto; }
 
 /* Detail panel */
 .detail-panel {
@@ -897,24 +980,62 @@ body {
 "#;
 
 const JS: &str = r#"
+function selectItem(item) {
+    document.querySelectorAll('.queue-item.selected').forEach(el => el.classList.remove('selected'));
+    item.classList.add('selected');
+    item.scrollIntoView({block: 'nearest'});
+}
+
+function getSelectedIndex() {
+    const items = document.querySelectorAll('.queue-item');
+    const selected = document.querySelector('.queue-item.selected');
+    return Array.from(items).indexOf(selected);
+}
+
+// Handle clicks on queue items — update selection immediately
+document.addEventListener('click', function(e) {
+    const item = e.target.closest('.queue-item');
+    if (item) selectItem(item);
+});
+
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+    // Arrow key navigation
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const items = document.querySelectorAll('.queue-item');
+        if (items.length === 0) return;
+        let idx = getSelectedIndex();
+        if (idx === -1) idx = 0;
+        if (e.key === 'ArrowDown') {
+            idx = Math.min(idx + 1, items.length - 1);
+        } else {
+            idx = Math.max(idx - 1, 0);
+        }
+        selectItem(items[idx]);
+        // Trigger the htmx fetch for detail
+        htmx.ajax('GET', '/pair/' + items[idx].dataset.pairId, {target: '#detail', swap: 'innerHTML'});
+        return;
+    }
+
+    // Action keys
     const actions = document.querySelector('.actions');
-    if (!actions) return;
-    const pairId = actions.dataset.pairId;
-    if (!pairId) return;
+    const pairId = actions ? actions.dataset.pairId : null;
 
     switch(e.key.toLowerCase()) {
         case 'y':
+            if (!pairId) return;
             e.preventDefault();
             htmx.ajax('POST', '/pair/' + pairId + '/confirm', {target: 'body'});
             break;
         case 'n':
+            if (!pairId) return;
             e.preventDefault();
             htmx.ajax('POST', '/pair/' + pairId + '/reject', {target: 'body'});
             break;
         case 's':
+            if (!pairId) return;
             e.preventDefault();
             htmx.ajax('POST', '/pair/' + pairId + '/skip', {target: 'body'});
             break;

@@ -242,7 +242,7 @@ fn confidence_rank(c: Confidence) -> u8 {
     }
 }
 
-fn date_diff_days(a: &str, b: &str) -> i64 {
+pub fn date_diff_days(a: &str, b: &str) -> i64 {
     // Dates are YYYY-MM-DD format; parse to days since epoch for comparison
     fn parse_days(s: &str) -> Option<i64> {
         let parts: Vec<&str> = s.split('-').collect();
