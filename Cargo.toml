@@ -32,6 +32,6 @@ path = "src/bin/normalise.rs"
 
 [[bin]]
 name = "serve"
-path = "src/bin/serve.rs"
+path = "src/bin/serve/main.rs"
 required-features = ["web"]
 
