@@ -93,6 +93,15 @@ mod tests {
     use crate::db::test_helpers::*;
     use crate::db::with_transaction_change_log;
 
+    fn history_count(conn: &Connection, transaction_id: i64) -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM _transactions_history WHERE transaction_id = ?1",
+            [transaction_id],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
     #[test]
     fn test_update_payee() {
         let conn = test_db();
@@ -119,14 +128,7 @@ mod tests {
         })
         .unwrap();
 
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 2); // insert + update
+        assert_eq!(history_count(&conn, 1), 2); // insert + update
     }
 
     #[test]
@@ -138,14 +140,7 @@ mod tests {
         })
         .unwrap();
 
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 1); // only the initial insert, no update row
+        assert_eq!(history_count(&conn, 1), 1); // only the initial insert, no update row
     }
 
     #[test]
@@ -317,7 +312,7 @@ mod tests {
 
         let (version, mask, payee): (i64, i64, String) = conn
             .query_row(
-                "SELECT _version, _mask, payee FROM _transactions_history WHERE _rowid = 1",
+                "SELECT _version, _mask, payee FROM _transactions_history WHERE transaction_id = 1",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -337,14 +332,7 @@ mod tests {
         })
         .unwrap();
 
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(history_count(&conn, 1), 1);
     }
 
     #[test]
@@ -356,24 +344,18 @@ mod tests {
         })
         .unwrap();
 
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 2);
+        assert_eq!(history_count(&conn, 1), 2);
 
-        let (mask, payee): (i64, String) = conn
+        let (mask, payee, old_payee): (i64, String, String) = conn
             .query_row(
-                "SELECT _mask, payee FROM _transactions_history WHERE _rowid = 1 ORDER BY rowid DESC LIMIT 1",
+                "SELECT _mask, payee, old_payee FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .unwrap();
         assert_eq!(mask, 1); // only payee bit
         assert_eq!(payee, "Store B");
+        assert_eq!(old_payee, "Store A");
     }
 
     #[test]
@@ -389,7 +371,7 @@ mod tests {
 
         let memo_is_null: bool = conn
             .query_row(
-                "SELECT memo IS NULL FROM _transactions_history WHERE _rowid = 1 ORDER BY rowid DESC LIMIT 1",
+                "SELECT memo IS NULL FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
                 |row| row.get(0),
             )
@@ -410,7 +392,7 @@ mod tests {
 
         let mask: i64 = conn
             .query_row(
-                "SELECT _mask FROM _transactions_history WHERE _rowid = 1 ORDER BY rowid DESC LIMIT 1",
+                "SELECT _mask FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
                 |row| row.get(0),
             )
@@ -430,7 +412,7 @@ mod tests {
             .query_row(
                 "SELECT l.reason FROM _transactions_history h
                  JOIN _transaction_change_log l ON h._version = l.version
-                 WHERE h._rowid = 1",
+                 WHERE h.transaction_id = 1",
                 [],
                 |row| row.get(0),
             )
@@ -451,7 +433,7 @@ mod tests {
         .unwrap();
 
         let versions: Vec<i64> = conn
-            .prepare("SELECT _version FROM _transactions_history WHERE _rowid = 1 ORDER BY rowid")
+            .prepare("SELECT _version FROM _transactions_history WHERE transaction_id = 1 ORDER BY id")
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()
@@ -467,33 +449,4 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_history_delete_creates_row() {
-        let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
-            upsert_transaction(conn, &make_transaction(1, "Store A"))?;
-            conn.execute("DELETE FROM transactions WHERE id = 1", [])?;
-            Ok(())
-        })
-        .unwrap();
-
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM _transactions_history WHERE _rowid = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 2);
-
-        let (mask, payee_is_null): (i64, bool) = conn
-            .query_row(
-                "SELECT _mask, payee IS NULL FROM _transactions_history WHERE _rowid = 1 ORDER BY rowid DESC LIMIT 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
-        assert_eq!(mask, 63);
-        assert!(payee_is_null);
-    }
 }

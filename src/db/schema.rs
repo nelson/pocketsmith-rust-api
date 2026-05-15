@@ -95,20 +95,27 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE TABLE IF NOT EXISTS _transactions_history (
-    _rowid       INTEGER NOT NULL,
-    payee        TEXT,
-    category_id  INTEGER,
-    note         TEXT,
-    labels       TEXT,
-    is_transfer  INTEGER,
-    memo         TEXT,
-    _version     INTEGER NOT NULL REFERENCES _transaction_change_log(version),
-    _updated     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    _mask        INTEGER NOT NULL DEFAULT 0
+    id              INTEGER PRIMARY KEY,
+    transaction_id  INTEGER NOT NULL REFERENCES transactions(id),
+    payee           TEXT,
+    category_id     INTEGER,
+    note            TEXT,
+    labels          TEXT,
+    is_transfer     INTEGER,
+    memo            TEXT,
+    old_payee       TEXT,
+    old_category_id INTEGER,
+    old_note        TEXT,
+    old_labels      TEXT,
+    old_is_transfer INTEGER,
+    old_memo        TEXT,
+    _version        INTEGER NOT NULL REFERENCES _transaction_change_log(version),
+    _updated        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    _mask           INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_transactions_history_rowid
-    ON _transactions_history(_rowid);
+CREATE INDEX IF NOT EXISTS idx_transactions_history_transaction_id
+    ON _transactions_history(transaction_id);
 
 CREATE TABLE IF NOT EXISTS transfer_pairs (
     txn_id_a    INTEGER NOT NULL REFERENCES transactions(id),
@@ -123,9 +130,9 @@ CREATE TABLE IF NOT EXISTS transfer_pairs (
 
 CREATE TRIGGER IF NOT EXISTS _transactions_history_insert
 AFTER INSERT ON transactions
-WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE _rowid = NEW.id)
+WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE transaction_id = NEW.id)
 BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
+    INSERT INTO _transactions_history (transaction_id, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
     VALUES (NEW.id, NEW.payee, NEW.category_id, NEW.note, NEW.labels, NEW.is_transfer, NEW.memo,
             (SELECT _version FROM _transaction_change_log_context), 63);
 END;
@@ -139,7 +146,12 @@ WHEN (OLD.payee IS NOT NEW.payee
    OR OLD.is_transfer IS NOT NEW.is_transfer
    OR OLD.memo IS NOT NEW.memo)
 BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
+    INSERT INTO _transactions_history (
+        transaction_id,
+        payee, category_id, note, labels, is_transfer, memo,
+        old_payee, old_category_id, old_note, old_labels, old_is_transfer, old_memo,
+        _version, _mask
+    )
     VALUES (
         NEW.id,
         CASE WHEN OLD.payee IS NOT NEW.payee THEN NEW.payee ELSE NULL END,
@@ -148,6 +160,12 @@ BEGIN
         CASE WHEN OLD.labels IS NOT NEW.labels THEN NEW.labels ELSE NULL END,
         CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN NEW.is_transfer ELSE NULL END,
         CASE WHEN OLD.memo IS NOT NEW.memo THEN NEW.memo ELSE NULL END,
+        CASE WHEN OLD.payee IS NOT NEW.payee THEN OLD.payee ELSE NULL END,
+        CASE WHEN OLD.category_id IS NOT NEW.category_id THEN OLD.category_id ELSE NULL END,
+        CASE WHEN OLD.note IS NOT NEW.note THEN OLD.note ELSE NULL END,
+        CASE WHEN OLD.labels IS NOT NEW.labels THEN OLD.labels ELSE NULL END,
+        CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN OLD.is_transfer ELSE NULL END,
+        CASE WHEN OLD.memo IS NOT NEW.memo THEN OLD.memo ELSE NULL END,
         (SELECT _version FROM _transaction_change_log_context),
         (CASE WHEN OLD.payee IS NOT NEW.payee THEN 1 ELSE 0 END)
         | (CASE WHEN OLD.category_id IS NOT NEW.category_id THEN 2 ELSE 0 END)
@@ -156,14 +174,5 @@ BEGIN
         | (CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN 16 ELSE 0 END)
         | (CASE WHEN OLD.memo IS NOT NEW.memo THEN 32 ELSE 0 END)
     );
-END;
-
-CREATE TRIGGER IF NOT EXISTS _transactions_history_delete
-AFTER DELETE ON transactions
-BEGIN
-    INSERT INTO _transactions_history (_rowid, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
-    VALUES (OLD.id, NULL, NULL, NULL, NULL, NULL, NULL,
-            (SELECT _version FROM _transaction_change_log_context),
-            63);
 END;
 ";
