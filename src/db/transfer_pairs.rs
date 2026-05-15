@@ -92,6 +92,18 @@ pub fn get_pairs_by_status(conn: &Connection, status: &str, limit: usize) -> Res
     Ok(rows)
 }
 
+pub fn get_all_pairs(conn: &Connection, limit: usize) -> Result<Vec<TransferPairRow>> {
+    let query = format!(
+        "{} ORDER BY ta.date DESC LIMIT ?1",
+        PAIR_ROW_QUERY
+    );
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt
+        .query_map(rusqlite::params![limit], |row| row_to_pair_row(row))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 pub fn get_pair_by_id(conn: &Connection, txn_id_a: i64, txn_id_b: i64) -> Result<Option<TransferPairRow>> {
     let query = format!(
         "{} WHERE tp.txn_id_a = ?1 AND tp.txn_id_b = ?2",
