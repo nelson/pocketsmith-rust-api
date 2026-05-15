@@ -38,8 +38,10 @@ struct AppState {
     conn: rusqlite::Connection,
     activity: Vec<ActivityEntry>,
     undone: usize,
-    filter: String,
+    status_filter: String,
+    confidence_filter: String,
     decisions: HashMap<(i64, i64), Decision>,
+    active_pair: Option<(i64, i64)>,
 }
 
 fn main() -> Result<()> {
@@ -55,8 +57,10 @@ fn main() -> Result<()> {
         conn,
         activity: Vec::new(),
         undone: 0,
-        filter: "all".to_string(),
+        status_filter: "all".to_string(),
+        confidence_filter: "all".to_string(),
         decisions: HashMap::new(),
+        active_pair: None,
     }));
 
     let addr = format!("127.0.0.1:{port}");
@@ -202,15 +206,21 @@ fn get_prior_pairs(
         .unwrap_or_default()
 }
 
+fn find_pair_index(pairs: &[TransferPairRow], id: (i64, i64)) -> Option<usize> {
+    pairs.iter().position(|p| (p.txn_id_a, p.txn_id_b) == id)
+}
+
+fn next_pair_after(pairs: &[TransferPairRow], current: (i64, i64)) -> Option<(i64, i64)> {
+    let idx = find_pair_index(pairs, current)?;
+    let next_idx = if idx + 1 < pairs.len() { idx + 1 } else { idx };
+    Some((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b))
+}
+
 fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Vec<TransferPairRow> {
     let pairs = if status_filter == "all" || status_filter == "skipped" {
-        let mut all = Vec::new();
-        for s in &["pending", "confirmed", "rejected"] {
-            all.extend(transfer_pairs::get_pairs_by_status(conn, s, 500).unwrap_or_default());
-        }
-        all
+        transfer_pairs::get_all_pairs(conn, 2000).unwrap_or_default()
     } else {
-        transfer_pairs::get_pairs_by_status(conn, status_filter, 500).unwrap_or_default()
+        transfer_pairs::get_pairs_by_status(conn, status_filter, 2000).unwrap_or_default()
     };
     pairs.into_iter()
         .filter(|p| {
@@ -230,8 +240,12 @@ fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, conf_fil
 }
 
 fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, conf_filter: &str) -> Markup {
-    let first = pairs.first();
-    let prior = first
+    let selected = state.active_pair
+        .and_then(|id| find_pair_index(pairs, id).map(|_| id))
+        .or_else(|| pairs.first().map(|p| (p.txn_id_a, p.txn_id_b)));
+
+    let active = selected.and_then(|id| find_pair_index(pairs, id)).map(|i| &pairs[i]);
+    let prior = active
         .map(|p| get_prior_pairs(&state.conn, &p.account_name_a, &p.account_name_b))
         .unwrap_or_default();
 
@@ -248,10 +262,10 @@ fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, c
             body {
                 div.layout {
                     div.queue-panel #queue {
-                        (render_queue(pairs, first.map(|p| p.txn_id_a), status_filter, conf_filter, &state.decisions))
+                        (render_queue(pairs, selected, status_filter, conf_filter, &state.decisions))
                     }
                     div.detail-panel #detail {
-                        @if let Some(pair) = first {
+                        @if let Some(pair) = active {
                             (render_detail(pair, &prior))
                         } @else {
                             div.empty-state { p { "No pairs to show" } }
@@ -268,20 +282,29 @@ fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, c
 }
 
 fn page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
-    let state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all", &state.decisions);
-    full_page(&state, &pairs, &state.filter, "all")
+    let mut state = state.lock().unwrap();
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+    if state.active_pair.is_none() {
+        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    }
+    full_page(&state, &pairs, &state.status_filter, &state.confidence_filter)
 }
 
 fn queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, conf_filter: &str) -> Markup {
     let mut state = state.lock().unwrap();
-    state.filter = status_filter.to_string();
+    state.status_filter = status_filter.to_string();
+    state.confidence_filter = conf_filter.to_string();
     let pairs = get_filtered_pairs(&state.conn, status_filter, conf_filter, &state.decisions);
-    let first_id = pairs.first().map(|p| p.txn_id_a);
-    render_queue(&pairs, first_id, status_filter, conf_filter, &state.decisions)
+    let current = state.active_pair;
+    let in_new_list = current.and_then(|id| find_pair_index(&pairs, id)).is_some();
+    if !in_new_list {
+        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    }
+    let selected = state.active_pair;
+    render_queue(&pairs, selected, status_filter, conf_filter, &state.decisions)
 }
 
-fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
+fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_filter: &str, conf_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
     html! {
         div.queue-header {
             h2 { (pairs.len()) " pairs" }
@@ -305,7 +328,7 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter:
                     { (f.to_uppercase()) }
                 }
                 @let num_skipped = decisions.values().filter(|v| **v == Decision::Skip).count();
-                @if num_skipped > 0 {
+                @if num_skipped > 0 && status_filter == "skipped" {
                     button.filter-btn.clear-skipped-btn
                         hx-post="/clear-all-skipped"
                         hx-target="body"
@@ -316,7 +339,7 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter:
         div.queue-list {
             @for pair in pairs {
                 @let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
-                @let is_selected = selected == Some(pair.txn_id_a);
+                @let is_selected = selected == Some((pair.txn_id_a, pair.txn_id_b));
                 @let decision = decisions.get(&(pair.txn_id_a, pair.txn_id_b)).copied();
                 div.queue-item
                     .(if is_selected { "selected" } else { "" })
@@ -361,7 +384,8 @@ fn render_queue(pairs: &[TransferPairRow], selected: Option<i64>, status_filter:
 }
 
 fn detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Markup {
-    let state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
+    state.active_pair = Some((txn_a, txn_b));
     match transfer_pairs::get_pair_by_id(&state.conn, txn_a, txn_b) {
         Ok(Some(pair)) => {
             let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
@@ -455,28 +479,26 @@ fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, String)]) -> Mar
                 }
             }
         }
-        @if pair.status == Status::Pending {
-            div.actions data-pair-id=(pair_id) {
-                button.btn.btn-confirm
-                    hx-post=(format!("/pair/{pair_id}/confirm"))
-                    hx-target="body"
-                { "[Y] Confirm" }
-                button.btn.btn-reject
-                    hx-post=(format!("/pair/{pair_id}/reject"))
-                    hx-target="body"
-                { "[N] Reject" }
-                button.btn.btn-skip
-                    hx-post=(format!("/pair/{pair_id}/skip"))
-                    hx-target="body"
-                { "[S] Skip" }
-            }
+        div.actions data-pair-id=(pair_id) {
+            button.btn.btn-confirm
+                hx-post=(format!("/pair/{pair_id}/confirm"))
+                hx-target="body"
+            { "[Y] Confirm" }
+            button.btn.btn-reject
+                hx-post=(format!("/pair/{pair_id}/reject"))
+                hx-target="body"
+            { "[N] Reject" }
+            button.btn.btn-skip
+                hx-post=(format!("/pair/{pair_id}/skip"))
+                hx-target="body"
+            { "[S] Skip" }
         }
     }
 }
 
 fn refresh_page(state: &AppState) -> Markup {
-    let pairs = get_filtered_pairs(&state.conn, &state.filter, "all", &state.decisions);
-    full_page(state, &pairs, &state.filter, "all")
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+    full_page(state, &pairs, &state.status_filter, &state.confidence_filter)
 }
 
 fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
@@ -490,6 +512,9 @@ fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Mar
             "skip" => Decision::Skip,
             _ => return html! { p { "Invalid action" } },
         };
+
+        let current_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+        let next = next_pair_after(&current_pairs, (a, b));
 
         let pair_info = transfer_pairs::get_pair_by_id(&state.conn, a, b)
             .ok()
@@ -518,6 +543,17 @@ fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Mar
             if state.activity.len() > 100 {
                 state.activity.remove(0);
             }
+        }
+
+        let new_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+        if let Some(next_id) = next {
+            if find_pair_index(&new_pairs, next_id).is_some() {
+                state.active_pair = Some(next_id);
+            } else {
+                state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+            }
+        } else {
+            state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
         }
 
         return refresh_page(&state);
@@ -641,7 +677,7 @@ body {
 
 .layout {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 360px 1fr;
     gap: 16px;
     flex: 1;
     min-height: 0;
@@ -980,6 +1016,9 @@ body {
 "#;
 
 const JS: &str = r#"
+if (!window._navInitialized) {
+window._navInitialized = true;
+
 function selectItem(item) {
     document.querySelectorAll('.queue-item.selected').forEach(el => el.classList.remove('selected'));
     item.classList.add('selected');
@@ -992,7 +1031,6 @@ function getSelectedIndex() {
     return Array.from(items).indexOf(selected);
 }
 
-// Handle clicks on queue items — update selection immediately
 document.addEventListener('click', function(e) {
     const item = e.target.closest('.queue-item');
     if (item) selectItem(item);
@@ -1001,7 +1039,6 @@ document.addEventListener('click', function(e) {
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    // Arrow key navigation
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const items = document.querySelectorAll('.queue-item');
@@ -1014,12 +1051,10 @@ document.addEventListener('keydown', function(e) {
             idx = Math.max(idx - 1, 0);
         }
         selectItem(items[idx]);
-        // Trigger the htmx fetch for detail
         htmx.ajax('GET', '/pair/' + items[idx].dataset.pairId, {target: '#detail', swap: 'innerHTML'});
         return;
     }
 
-    // Action keys
     const actions = document.querySelector('.actions');
     const pairId = actions ? actions.dataset.pairId : null;
 
@@ -1046,4 +1081,200 @@ document.addEventListener('keydown', function(e) {
             break;
     }
 });
+
+} // end _navInitialized guard
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_pair(id_a: i64, id_b: i64, status: Status, confidence: Confidence) -> TransferPairRow {
+        TransferPairRow {
+            txn_id_a: id_a,
+            txn_id_b: id_b,
+            amount_cents: 1000,
+            confidence,
+            status,
+            date_a: "2024-01-01".to_string(),
+            date_b: "2024-01-02".to_string(),
+            payee_a: "A".to_string(),
+            payee_b: "B".to_string(),
+            account_name_a: "Acc1".to_string(),
+            account_name_b: "Acc2".to_string(),
+        }
+    }
+
+    fn sample_pairs() -> Vec<TransferPairRow> {
+        vec![
+            make_pair(1, 2, Status::Pending, Confidence::High),
+            make_pair(3, 4, Status::Pending, Confidence::Medium),
+            make_pair(5, 6, Status::Pending, Confidence::Low),
+            make_pair(7, 8, Status::Pending, Confidence::High),
+            make_pair(9, 10, Status::Pending, Confidence::Medium),
+        ]
+    }
+
+    #[test]
+    fn find_pair_index_returns_correct_position() {
+        let pairs = sample_pairs();
+        assert_eq!(find_pair_index(&pairs, (1, 2)), Some(0));
+        assert_eq!(find_pair_index(&pairs, (5, 6)), Some(2));
+        assert_eq!(find_pair_index(&pairs, (9, 10)), Some(4));
+    }
+
+    #[test]
+    fn find_pair_index_returns_none_for_missing() {
+        let pairs = sample_pairs();
+        assert_eq!(find_pair_index(&pairs, (99, 100)), None);
+    }
+
+    #[test]
+    fn next_pair_after_returns_next_in_list() {
+        let pairs = sample_pairs();
+        assert_eq!(next_pair_after(&pairs, (1, 2)), Some((3, 4)));
+        assert_eq!(next_pair_after(&pairs, (3, 4)), Some((5, 6)));
+        assert_eq!(next_pair_after(&pairs, (7, 8)), Some((9, 10)));
+    }
+
+    #[test]
+    fn next_pair_after_last_stays_on_last() {
+        let pairs = sample_pairs();
+        assert_eq!(next_pair_after(&pairs, (9, 10)), Some((9, 10)));
+    }
+
+    #[test]
+    fn next_pair_after_missing_returns_none() {
+        let pairs = sample_pairs();
+        assert_eq!(next_pair_after(&pairs, (99, 100)), None);
+    }
+
+    #[test]
+    fn next_pair_after_single_item_stays() {
+        let pairs = vec![make_pair(1, 2, Status::Pending, Confidence::High)];
+        assert_eq!(next_pair_after(&pairs, (1, 2)), Some((1, 2)));
+    }
+
+    #[test]
+    fn next_pair_after_empty_list_returns_none() {
+        let pairs: Vec<TransferPairRow> = vec![];
+        assert_eq!(next_pair_after(&pairs, (1, 2)), None);
+    }
+
+    #[test]
+    fn action_advances_to_next_not_first() {
+        let pairs = sample_pairs();
+        let current = (5, 6);
+        let next = next_pair_after(&pairs, current);
+        assert_eq!(next, Some((7, 8)));
+    }
+
+    #[test]
+    fn filter_change_keeps_active_if_present() {
+        let pairs = sample_pairs();
+        let active = Some((5, 6));
+        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
+        assert!(in_list);
+    }
+
+    #[test]
+    fn filter_change_resets_to_first_if_active_absent() {
+        let pairs = sample_pairs();
+        let active = Some((99, 100));
+        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
+        assert!(!in_list);
+        let new_active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+        assert_eq!(new_active, Some((1, 2)));
+    }
+
+    #[test]
+    fn filter_change_empty_list_gives_none() {
+        let pairs: Vec<TransferPairRow> = vec![];
+        let active = Some((1, 2));
+        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
+        assert!(!in_list);
+        let new_active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+        assert_eq!(new_active, None);
+    }
+
+    #[test]
+    fn arrow_down_from_first_selects_second() {
+        let pairs = sample_pairs();
+        let current_idx = 0;
+        let next_idx = (current_idx + 1).min(pairs.len() - 1);
+        assert_eq!(next_idx, 1);
+        assert_eq!((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b), (3, 4));
+    }
+
+    #[test]
+    fn arrow_up_from_first_stays_at_first() {
+        let current_idx: usize = 0;
+        let next_idx = current_idx.saturating_sub(1);
+        assert_eq!(next_idx, 0);
+    }
+
+    #[test]
+    fn arrow_down_from_last_stays_at_last() {
+        let pairs = sample_pairs();
+        let current_idx = pairs.len() - 1;
+        let next_idx = (current_idx + 1).min(pairs.len() - 1);
+        assert_eq!(next_idx, 4);
+        assert_eq!((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b), (9, 10));
+    }
+
+    #[test]
+    fn click_sets_active_to_clicked_pair() {
+        let pairs = sample_pairs();
+        let clicked = (7, 8);
+        assert!(find_pair_index(&pairs, clicked).is_some());
+    }
+
+    #[test]
+    fn action_on_last_item_stays_on_last() {
+        let pairs = sample_pairs();
+        let current = (9, 10);
+        let next = next_pair_after(&pairs, current);
+        assert_eq!(next, Some((9, 10)));
+        // After item removed from new list, fall back to new last
+        let new_pairs = &pairs[..4];
+        let in_new = find_pair_index(new_pairs, next.unwrap()).is_some();
+        assert!(!in_new);
+        let fallback = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+        assert_eq!(fallback, Some((7, 8)));
+    }
+
+    #[test]
+    fn action_does_not_overflow_past_end() {
+        let pairs = vec![
+            make_pair(1, 2, Status::Pending, Confidence::High),
+            make_pair(3, 4, Status::Pending, Confidence::High),
+            make_pair(5, 6, Status::Pending, Confidence::High),
+        ];
+        let next = next_pair_after(&pairs, (5, 6));
+        assert_eq!(next, Some((5, 6)));
+    }
+
+    #[test]
+    fn action_does_not_loop_back() {
+        let pairs = sample_pairs();
+        let next = next_pair_after(&pairs, (9, 10));
+        assert_eq!(next, Some((9, 10)));
+        assert_ne!(next, Some((1, 2)));
+    }
+
+    #[test]
+    fn navigation_order_matches_sidebar_display_order() {
+        let pairs = sample_pairs();
+        let order: Vec<(i64, i64)> = pairs.iter().map(|p| (p.txn_id_a, p.txn_id_b)).collect();
+        assert_eq!(order, vec![(1, 2), (3, 4), (5, 6), (7, 8), (9, 10)]);
+
+        let mut current = order[0];
+        for expected in &order[1..] {
+            let next = next_pair_after(&pairs, current).unwrap();
+            assert_eq!(next, *expected);
+            current = next;
+        }
+        let next = next_pair_after(&pairs, current).unwrap();
+        assert_eq!(next, *order.last().unwrap());
+    }
+}
