@@ -1,19 +1,62 @@
+// Page layout and rendering functions for the transfer pair review UI.
+//
+// All render_* functions live here. Handlers (handlers.rs) mutate state, then
+// call into this module to produce HTML responses.
+//
+// ┌──────────────────────────────────────────────────────────────────────┐
+// │ render_page_shell  (GET /)                                           │
+// │   Locks state, selects first pair if needed, delegates to            │
+// │   render_full_page.                                                  │
+// │                                                                      │
+// │  ┌────────────────────────────────────────────────────────────────┐  │
+// │  │ render_full_page                                               │  │
+// │  │   Complete <html> document: <head>, CSS, body layout, JS.      │  │
+// │  │                                                                │  │
+// │  │ ┌───────────────────┐  ┌─────────────────────────────────────┐ │  │
+// │  │ │ render_queue      │  │ render_detail                       │ │  │
+// │  │ │   #queue          │  │   #detail                           │ │  │
+// │  │ │                   │  │                                     │ │  │
+// │  │ │ [filter buttons]  │  │ [confidence + amount header]        │ │  │
+// │  │ │ [conf filters]    │  │ [side-by-side txn cards A | B]      │ │  │
+// │  │ │ [scrollable       │  │ [prior transfer history]            │ │  │
+// │  │ │  pair list]       │  │ [Y confirm / N reject / S skip]     │ │  │
+// │  │ └───────────────────┘  └─────────────────────────────────────┘ │  │
+// │  │                                                                │  │
+// │  │ ┌────────────────────────────────────────────────────────────┐ │  │
+// │  │ │ render_activity                                            │ │  │
+// │  │ │   #activity                                                │ │  │
+// │  │ │ [confirmed/rejected/skipped/undone counts]                 │ │  │
+// │  │ │ [scrollable activity log with undo buttons]                │ │  │
+// │  │ └────────────────────────────────────────────────────────────┘ │  │
+// │  └────────────────────────────────────────────────────────────────┘  │
+// └──────────────────────────────────────────────────────────────────────┘
+//
+// HTMX fragment endpoints (partial page swaps, no full reload):
+//
+//   render_detail_fragment  (GET /pair/{id})   → swaps #detail only
+//   render_queue_fragment   (GET /queue?...)   → swaps #queue only
+//   render_current_page     (after mutations)  → full <body> replacement
+
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 
-use pocketsmith_sync::db::transfer_pairs::TransferPairRow;
+use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
 use pocketsmith_sync::transfers::{self, Status};
 
 use crate::css::CSS;
 use crate::helpers::{
-    confidence_class, confidence_reason, find_pair_index, format_dollars, format_short_date,
-    get_prior_pairs,
+    confidence_class, confidence_reason, count_decisions, find_pair_index, format_dollars,
+    format_short_date, get_filtered_pairs, get_prior_pairs,
 };
 use crate::js::JS;
 use crate::state::{AppState, Decision};
 
-pub fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
+// Renders the complete HTML page including <head>, queue sidebar, detail panel, activity bar, and <script>.
+// Called by: render_current_page, render_page_shell.
+// Calls: render_queue, render_detail, render_activity, find_pair_index, get_prior_pairs.
+pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
     let selected = state.active_pair
         .and_then(|id| find_pair_index(pairs, id).map(|_| id))
         .or_else(|| pairs.first().map(|p| (p.txn_id_a, p.txn_id_b)));
@@ -55,6 +98,9 @@ pub fn full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &st
     }
 }
 
+// Renders the queue sidebar: filter buttons (status + confidence) and the scrollable list of pair items.
+// Called by: render_full_page, render_queue_fragment.
+// Calls: confidence_class, format_dollars, format_short_date, transfers::date_diff_days.
 pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, status_filter: &str, confidence_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Markup {
     html! {
         div.queue-header {
@@ -134,6 +180,10 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
     }
 }
 
+// Renders the detail panel for a single transfer pair: header with confidence/amount, side-by-side
+// transaction cards, prior transfer history, and confirm/reject/skip action buttons.
+// Called by: render_full_page, render_detail_fragment.
+// Calls: confidence_class, confidence_reason, format_dollars, format_short_date, transfers::date_diff_days.
 pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) -> Markup {
     let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
     let days = transfers::date_diff_days(&pair.date_a, &pair.date_b);
@@ -235,16 +285,16 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
     }
 }
 
-pub fn decision_count(state: &AppState, d: Decision) -> usize {
-    state.decisions.values().filter(|v| **v == d).count()
-}
-
+// Renders the activity bar at the bottom: summary stats (confirmed/rejected/skipped/undone counts)
+// plus a scrollable list of the 20 most recent actions with undo/unskip buttons.
+// Called by: render_full_page.
+// Calls: count_decisions.
 pub fn render_activity(state: &AppState) -> Markup {
     html! {
         div.activity-header {
-            span.stat { "Confirmed " span.count-confirmed { (decision_count(state, Decision::Confirm)) } }
-            span.stat { "Rejected " span.count-rejected { (decision_count(state, Decision::Reject)) } }
-            span.stat { "Skipped " span.count-skipped { (decision_count(state, Decision::Skip)) } }
+            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.decisions, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.decisions, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.decisions, Decision::Skip)) } }
             span.stat { "Undone " span.count-undone { (state.undone) } }
         }
         div.activity-list {
@@ -280,4 +330,58 @@ pub fn render_activity(state: &AppState) -> Markup {
             }
         }
     }
+}
+
+// Re-fetches pairs with current filters and renders a full page replacement.
+// Called by: handle_action, handle_undo, handle_clear_all_skipped, handle_unskip (after every mutation).
+// Calls: get_filtered_pairs, render_full_page.
+pub fn render_current_page(state: &AppState) -> Markup {
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+    render_full_page(state, &pairs, &state.status_filter, &state.confidence_filter)
+}
+
+// Renders the initial full page on GET /. Locks state, selects first pair if none active.
+// Called by: main::handle_request (GET /).
+// Calls: get_filtered_pairs, render_full_page.
+pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
+    let mut state = state.lock().unwrap();
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+    if state.active_pair.is_none() {
+        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    }
+    render_full_page(&state, &pairs, &state.status_filter, &state.confidence_filter)
+}
+
+// Returns an HTMX fragment with the detail panel for a single pair (no full page).
+// Sets active_pair so subsequent full-page renders highlight this pair.
+// Called by: main::handle_request (GET /pair/{id}), also triggered by JS arrow-key navigation.
+// Calls: transfer_pairs::get_pair_by_id, get_prior_pairs, render_detail.
+pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Markup {
+    let mut state = state.lock().unwrap();
+    state.active_pair = Some((txn_a, txn_b));
+    match transfer_pairs::get_pair_by_id(&state.conn, txn_a, txn_b) {
+        Ok(Some(pair)) => {
+            let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
+            render_detail(&pair, &prior)
+        }
+        _ => html! { div.empty-state { p { "Pair not found" } } },
+    }
+}
+
+// Returns an HTMX fragment with just the queue sidebar after a filter change.
+// Persists the new filter values in state and resets active_pair if it's no longer visible.
+// Called by: main::handle_request (GET /queue?filter=X&conf=Y).
+// Calls: get_filtered_pairs, find_pair_index, render_queue.
+pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, confidence_filter: &str) -> Markup {
+    let mut state = state.lock().unwrap();
+    state.status_filter = status_filter.to_string();
+    state.confidence_filter = confidence_filter.to_string();
+    let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.decisions);
+    let current = state.active_pair;
+    let in_new_list = current.and_then(|id| find_pair_index(&pairs, id)).is_some();
+    if !in_new_list {
+        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    }
+    let selected = state.active_pair;
+    render_queue(&pairs, selected, status_filter, confidence_filter, &state.decisions)
 }

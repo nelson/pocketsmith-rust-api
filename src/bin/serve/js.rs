@@ -1,3 +1,23 @@
+// Client-side JavaScript for keyboard navigation and HTMX-driven actions.
+// Embedded as a string constant and injected into <script> by views::full_page.
+// Uses a _navInitialized guard so the listener isn't duplicated on HTMX body swaps.
+//
+// Functions:
+//   selectItem(item)    – highlights a .queue-item and scrolls it into view.
+//                         Called by: click handler, keydown ArrowUp/ArrowDown handler.
+//   getSelectedIndex()  – returns the index of the currently selected .queue-item.
+//                         Called by: keydown ArrowUp/ArrowDown handler.
+//
+// Event listeners:
+//   click on .queue-item – calls selectItem to mark clicked row as active.
+//   keydown:
+//     ArrowUp/ArrowDown – navigates the queue list, calls selectItem + htmx.ajax GET /pair/{id}
+//                         to load the detail panel for the newly selected pair.
+//     Y                 – POST /pair/{id}/confirm (calls handlers::action_handler via main router).
+//     N                 – POST /pair/{id}/reject  (calls handlers::action_handler via main router).
+//     S                 – POST /pair/{id}/skip    (calls handlers::action_handler via main router).
+//     U                 – clicks the .undo-btn if present (triggers handlers::undo_handler or
+//                         handlers::unskip_handler depending on the button's hx-post URL).
 pub const JS: &str = r#"
 if (!window._navInitialized) {
 window._navInitialized = true;
