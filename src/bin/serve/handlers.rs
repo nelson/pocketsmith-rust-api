@@ -6,17 +6,17 @@ use pocketsmith_sync::db::transfer_pairs;
 use pocketsmith_sync::transfers::Status;
 
 use crate::helpers::{
-    find_pair_index, get_filtered_pairs, get_prior_pairs, next_pair_after, parse_pair_id,
+    find_pair_index, get_filtered_pairs, next_pair_after, parse_pair_id,
 };
 use crate::state::{ActivityEntry, AppState, Decision};
-use crate::views::{full_page, render_detail};
+use crate::views::render_current_page;
 
-pub fn refresh_page(state: &AppState) -> Markup {
-    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
-    full_page(state, &pairs, &state.status_filter, &state.confidence_filter)
-}
-
-pub fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
+// Handles confirm/reject/skip actions on a pair. Parses pair ID from path, updates DB status
+// (for confirm/reject), records the decision in memory, logs activity, advances to next pair.
+// Called by: main::handle_request (POST /pair/{id}/confirm, /reject, /skip).
+// Calls: parse_pair_id, get_filtered_pairs, next_pair_after, find_pair_index,
+//        transfer_pairs::get_pair_by_id, transfer_pairs::update_status, render_current_page.
+pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
     let id = parse_pair_id(path, "/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
@@ -71,13 +71,17 @@ pub fn action_handler(state: &Arc<Mutex<AppState>>, path: &str, action: &str) ->
             state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
         }
 
-        return refresh_page(&state);
+        return render_current_page(&state);
     }
 
     html! { p { "Invalid request" } }
 }
 
-pub fn undo_handler(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
+// Reverts a confirm/reject/skip: resets DB status to Pending, removes the decision, and clears
+// the activity entry. Increments the undone counter.
+// Called by: main::handle_request (POST /pair/{id}/undo).
+// Calls: parse_pair_id, transfer_pairs::update_status, render_current_page.
+pub fn handle_undo(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
     let id = parse_pair_id(path, "/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
@@ -85,63 +89,34 @@ pub fn undo_handler(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
         state.undone += 1;
         state.decisions.remove(&(a, b));
         state.activity.retain(|e| e.pair_id != (a, b));
-        return refresh_page(&state);
+        return render_current_page(&state);
     }
 
     let state = state.lock().unwrap();
-    refresh_page(&state)
+    render_current_page(&state)
 }
 
-pub fn clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
+// Removes all skip decisions at once, clearing the skipped filter view.
+// Called by: main::handle_request (POST /clear-all-skipped).
+// Calls: render_current_page.
+pub fn handle_clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut state = state.lock().unwrap();
     state.activity.retain(|e| e.decision != Decision::Skip);
     state.decisions.retain(|_, v| *v != Decision::Skip);
-    refresh_page(&state)
+    render_current_page(&state)
 }
 
-pub fn unskip_handler(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
+// Removes a single skip decision (unlike handle_undo, does not touch DB status or undone counter).
+// Called by: main::handle_request (POST /pair/{id}/unskip).
+// Calls: parse_pair_id, render_current_page.
+pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
     let id = parse_pair_id(path, "/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
         state.decisions.remove(&(a, b));
         state.activity.retain(|e| !(e.pair_id == (a, b) && e.decision == Decision::Skip));
-        return refresh_page(&state);
+        return render_current_page(&state);
     }
     let state = state.lock().unwrap();
-    refresh_page(&state)
-}
-
-pub fn detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Markup {
-    let mut state = state.lock().unwrap();
-    state.active_pair = Some((txn_a, txn_b));
-    match transfer_pairs::get_pair_by_id(&state.conn, txn_a, txn_b) {
-        Ok(Some(pair)) => {
-            let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
-            render_detail(&pair, &prior)
-        }
-        _ => html! { div.empty-state { p { "Pair not found" } } },
-    }
-}
-
-pub fn queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, confidence_filter: &str) -> Markup {
-    let mut state = state.lock().unwrap();
-    state.status_filter = status_filter.to_string();
-    state.confidence_filter = confidence_filter.to_string();
-    let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.decisions);
-    let current = state.active_pair;
-    let in_new_list = current.and_then(|id| find_pair_index(&pairs, id)).is_some();
-    if !in_new_list {
-        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
-    }
-    let selected = state.active_pair;
-    crate::views::render_queue(&pairs, selected, status_filter, confidence_filter, &state.decisions)
-}
-
-pub fn page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
-    let mut state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
-    if state.active_pair.is_none() {
-        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
-    }
-    full_page(&state, &pairs, &state.status_filter, &state.confidence_filter)
+    render_current_page(&state)
 }
