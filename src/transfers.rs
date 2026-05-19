@@ -183,6 +183,15 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
                 "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
                 rusqlite::params![transfer_category_id, pair.txn_id_b],
             )?;
+            // Invariant: a confirmed pair is removed once its transactions
+            // carry the transfer marker. This keeps `transfer_pairs` as the
+            // set of "pairs still pending an outcome" (pending) or "pairs we
+            // remembered we don't want to re-detect" (rejected). Rejected
+            // pairs intentionally stay in the table.
+            conn.execute(
+                "DELETE FROM transfer_pairs WHERE txn_id_a = ?1 AND txn_id_b = ?2",
+                rusqlite::params![pair.txn_id_a, pair.txn_id_b],
+            )?;
         }
         Ok(())
     })?;
@@ -357,6 +366,87 @@ pub fn date_diff_days(a: &str, b: &str) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_apply_confirmed_deletes_confirmed_pairs_keeps_others() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_category, upsert_transaction, upsert_transaction_account, with_operation};
+
+        let conn = test_db();
+        let mut transfer_cat = make_category(999, "_Transfer");
+        transfer_cat.is_transfer = Some(true);
+        upsert_category(&conn, &transfer_cat).unwrap();
+
+        upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(300, "Credit")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(400, "Loan")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(500, "Mortgage")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(600, "Offset")).unwrap();
+
+        // 6 transactions, 3 pairs: confirmed / rejected / pending.
+        with_operation(&conn, "test", |conn| {
+            for (id, amt, acct) in [
+                (1,  500.0, 100),
+                (2, -500.0, 200),
+                (3,  300.0, 300),
+                (4, -300.0, 400),
+                (5,  700.0, 500),
+                (6, -700.0, 600),
+            ] {
+                let mut t = make_transaction(id, "some payee");
+                t.amount = Some(amt);
+                t.transaction_account = Some(make_transaction_account(acct, "x"));
+                upsert_transaction(conn, &t)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+
+        let mk_pair = |a: i64, b: i64, status: Status| TransferPair {
+            txn_id_a: a, txn_id_b: b, amount_cents: 50000,
+            confidence: Confidence::High, status,
+        };
+        crate::db::transfer_pairs::insert_pair(&conn, &mk_pair(1, 2, Status::Confirmed)).unwrap();
+        crate::db::transfer_pairs::insert_pair(&conn, &mk_pair(3, 4, Status::Rejected)).unwrap();
+        crate::db::transfer_pairs::insert_pair(&conn, &mk_pair(5, 6, Status::Pending)).unwrap();
+
+        apply_confirmed(&conn).unwrap();
+
+        // Confirmed pair is gone.
+        let count_confirmed: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transfer_pairs WHERE txn_id_a = 1 AND txn_id_b = 2",
+                [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count_confirmed, 0, "confirmed pair should be deleted after apply");
+
+        // Rejected pair stays (and is still status=Rejected).
+        let status_rejected: i64 = conn
+            .query_row(
+                "SELECT status FROM transfer_pairs WHERE txn_id_a = 3 AND txn_id_b = 4",
+                [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(status_rejected, 2, "rejected pair should remain with status=2");
+
+        // Pending pair stays.
+        let count_pending: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transfer_pairs WHERE txn_id_a = 5 AND txn_id_b = 6",
+                [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count_pending, 1, "pending pair should remain");
+
+        // Rejected/pending txns NOT tagged.
+        let cat3: Option<i64> = conn
+            .query_row("SELECT category_id FROM transactions WHERE id = 3", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cat3, None, "rejected pair's txn should not be category-tagged");
+        let cat5: Option<i64> = conn
+            .query_row("SELECT category_id FROM transactions WHERE id = 5", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cat5, None, "pending pair's txn should not be category-tagged");
+    }
 
     #[test]
     fn test_apply_confirmed_returns_stats_and_updates_transactions() {
