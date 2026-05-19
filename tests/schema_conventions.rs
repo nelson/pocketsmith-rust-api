@@ -35,3 +35,23 @@ fn statuses_lookup_seeded() {
         ]
     );
 }
+
+#[test]
+fn confidences_lookup_seeded() {
+    let conn = open();
+    let rows: Vec<(i64, String)> = conn
+        .prepare("SELECT id, name FROM confidences ORDER BY id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (0, "low".to_string()),
+            (1, "medium".to_string()),
+            (2, "high".to_string()),
+        ]
+    );
+}
