@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS _operations (
     transactions_updated INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS _transaction_change_log_context (
-    _version INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS _current_operation (
+    id INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -198,7 +198,7 @@ WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE transaction_id = NEW.
 BEGIN
     INSERT INTO _transactions_history (transaction_id, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
     VALUES (NEW.id, NEW.payee, NEW.category_id, NEW.note, NEW.labels, NEW.is_transfer, NEW.memo,
-            (SELECT _version FROM _transaction_change_log_context), 63);
+            (SELECT id FROM _current_operation), 63);
 END;
 
 CREATE TRIGGER IF NOT EXISTS _transactions_history_update
@@ -230,7 +230,7 @@ BEGIN
         CASE WHEN OLD.labels IS NOT NEW.labels THEN OLD.labels ELSE NULL END,
         CASE WHEN OLD.is_transfer IS NOT NEW.is_transfer THEN OLD.is_transfer ELSE NULL END,
         CASE WHEN OLD.memo IS NOT NEW.memo THEN OLD.memo ELSE NULL END,
-        (SELECT _version FROM _transaction_change_log_context),
+        (SELECT id FROM _current_operation),
         (CASE WHEN OLD.payee IS NOT NEW.payee THEN 1 ELSE 0 END)
         | (CASE WHEN OLD.category_id IS NOT NEW.category_id THEN 2 ELSE 0 END)
         | (CASE WHEN OLD.note IS NOT NEW.note THEN 4 ELSE 0 END)

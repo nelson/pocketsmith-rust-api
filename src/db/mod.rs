@@ -48,9 +48,9 @@ where
     )?;
     let version = conn.last_insert_rowid();
 
-    conn.execute("DELETE FROM _transaction_change_log_context", [])?;
+    conn.execute("DELETE FROM _current_operation", [])?;
     conn.execute(
-        "INSERT INTO _transaction_change_log_context (_version) VALUES (?1)",
+        "INSERT INTO _current_operation (id) VALUES (?1)",
         [version],
     )?;
 
@@ -66,7 +66,7 @@ where
         rusqlite::params![count, version],
     )?;
 
-    conn.execute("DELETE FROM _transaction_change_log_context", [])?;
+    conn.execute("DELETE FROM _current_operation", [])?;
 
     result
 }

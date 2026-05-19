@@ -136,6 +136,15 @@ fn operations_table_exists_with_autoincrement_id() {
 }
 
 #[test]
+fn current_operation_table_exists() {
+    let conn = open();
+    // Smoke test: column rename `_version` -> `id`. The table is internal but
+    // we can still SELECT from it (empty result is fine -- structure is what
+    // we are testing).
+    conn.prepare("SELECT id FROM _current_operation").unwrap();
+}
+
+#[test]
 fn operations_table_has_expected_columns() {
     let conn = open();
     // Smoke test: SELECT all expected columns; failure means a missing column.
