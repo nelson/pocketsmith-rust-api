@@ -57,7 +57,7 @@ where
     let result = f(conn);
 
     let count: i64 = conn.query_row(
-        "SELECT COUNT(DISTINCT transaction_id) FROM _transactions_history WHERE _version = ?1",
+        "SELECT COUNT(DISTINCT transaction_id) FROM _transaction_changes WHERE operation_id = ?1",
         [version],
         |row| row.get(0),
     )?;

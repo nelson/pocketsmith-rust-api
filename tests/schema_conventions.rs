@@ -136,6 +136,59 @@ fn operations_table_exists_with_autoincrement_id() {
 }
 
 #[test]
+fn transaction_changes_table_exists_with_renamed_columns() {
+    let conn = open();
+    // Smoke test: SELECT all expected columns from the renamed table.
+    // - _version -> operation_id
+    // - _updated -> updated_at
+    // - _mask    -> mask
+    conn.prepare(
+        "SELECT id, transaction_id, operation_id, updated_at, mask, \
+         payee, category_id, note, labels, is_transfer, memo, \
+         old_payee, old_category_id, old_note, old_labels, old_is_transfer, old_memo \
+         FROM _transaction_changes",
+    )
+    .unwrap();
+}
+
+#[test]
+fn transaction_changes_id_autoincrement_after_delete() {
+    let conn = open();
+    seed_txn(&conn, 20);
+    // Seeding a txn fires the INSERT trigger, creating a _transaction_changes
+    // row with mask = 63. Grab its id.
+    let id_a: i64 = conn
+        .query_row(
+            "SELECT id FROM _transaction_changes WHERE transaction_id = 20",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    // Delete that row, then trigger another by updating the txn under an op.
+    conn.execute("DELETE FROM _transaction_changes WHERE id = ?1", [id_a])
+        .unwrap();
+    db::with_transaction_change_log(&conn, "test", |conn| {
+        conn.execute(
+            "UPDATE transactions SET payee = 'updated' WHERE id = 20",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let id_b: i64 = conn
+        .query_row(
+            "SELECT id FROM _transaction_changes WHERE transaction_id = 20",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(
+        id_b > id_a,
+        "AUTOINCREMENT should not reuse id {id_a}, got {id_b}"
+    );
+}
+
+#[test]
 fn current_operation_table_exists() {
     let conn = open();
     // Smoke test: column rename `_version` -> `id`. The table is internal but
