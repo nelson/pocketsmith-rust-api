@@ -96,7 +96,7 @@ fn field_masks_lookup_seeded() {
 // ---- Helpers for FK tests ----
 
 /// Create a single transactions row so transfer_pairs FK can attach to it.
-/// Wrapped in an operation so the _transactions_history INSERT trigger
+/// Wrapped in an operation so the _transaction_changes INSERT trigger
 /// finds a current operation id.
 fn seed_txn(conn: &Connection, id: i64) {
     db::with_operation(conn, "test-seed", |conn| {
