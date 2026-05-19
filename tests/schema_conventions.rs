@@ -145,6 +145,36 @@ fn transfer_pairs_confidence_fk_rejects_invalid() {
 // ---- transfer_pairs.updated_at ----
 
 #[test]
+fn transfer_pairs_updated_at_refreshes_on_update() {
+    let conn = open();
+    seed_txn(&conn, 12);
+    seed_txn(&conn, 13);
+    conn.execute(
+        "INSERT INTO transfer_pairs (txn_id_a, txn_id_b, amount_cents, confidence, status, created_at, updated_at) \
+         VALUES (12, 13, 100, 2, 0, '2020-01-01T00:00:00.000Z', '2020-01-01T00:00:00.000Z')",
+        [],
+    )
+    .unwrap();
+    // Status change should bump updated_at to a later value.
+    conn.execute(
+        "UPDATE transfer_pairs SET status = 1 WHERE txn_id_a = 12",
+        [],
+    )
+    .unwrap();
+    let updated_at: String = conn
+        .query_row(
+            "SELECT updated_at FROM transfer_pairs WHERE txn_id_a = 12",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(
+        updated_at.as_str() > "2020-01-01T00:00:00.000Z",
+        "updated_at should be refreshed on UPDATE, was {updated_at}"
+    );
+}
+
+#[test]
 fn transfer_pairs_has_updated_at_with_default() {
     let conn = open();
     seed_txn(&conn, 10);
