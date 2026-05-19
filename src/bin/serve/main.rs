@@ -15,7 +15,8 @@ use tiny_http::{Header, Method, Request, Response, Server};
 use pocketsmith_sync::db;
 
 use crate::handlers::{
-    handle_action, handle_bulk_action, handle_clear_all_skipped, handle_undo, handle_unskip,
+    handle_action, handle_apply, handle_bulk_action, handle_clear_all_skipped, handle_undo,
+    handle_unskip,
 };
 use crate::helpers::{extract_param, parse_pair_id};
 use crate::state::AppState;
@@ -37,6 +38,7 @@ fn main() -> Result<()> {
         conn,
         activity: Vec::new(),
         undone: 0,
+        applied: 0,
         status_filter: "all".to_string(),
         confidence_filter: "all".to_string(),
         decisions: HashMap::new(),
@@ -84,6 +86,7 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
         (Method::Post, p) if p.contains("/skip") => handle_action(&state, p, "skip"),
         (Method::Post, "/bulk-confirm") => handle_bulk_action(&state, "confirm"),
         (Method::Post, "/bulk-reject") => handle_bulk_action(&state, "reject"),
+        (Method::Post, "/apply") => handle_apply(&state),
         (Method::Post, "/clear-all-skipped") => handle_clear_all_skipped(&state),
         (Method::Post, p) if p.contains("/unskip") => handle_unskip(&state, p),
         (Method::Post, p) if p.contains("/undo") => handle_undo(&state, p),

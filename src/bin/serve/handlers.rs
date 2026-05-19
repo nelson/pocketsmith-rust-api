@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup};
 
 use pocketsmith_sync::db::transfer_pairs;
-use pocketsmith_sync::transfers::Status;
+use pocketsmith_sync::transfers::{self, Status};
 
 use crate::helpers::{
     find_pair_index, get_filtered_pairs, next_pair_after, pairs_eligible_for_bulk, parse_pair_id,
@@ -176,4 +176,217 @@ pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
     }
     let state = state.lock().unwrap();
     render_current_page(&state)
+}
+
+// Apply all confirmed pairs by calling transfers::apply_confirmed (which tags
+// transactions with the _Transfer category and deletes the pair rows). Then:
+//   - Bump state.applied by the number of pairs processed.
+//   - Clear in-memory Confirm decisions for pairs that are no longer in
+//     transfer_pairs (so the "Confirmed N" stat in the activity header stays
+//     truthful after apply).
+//   - Reset active_pair to whatever's still visible (or None).
+//
+// Errors from apply_confirmed (e.g. missing _Transfer category) are silently
+// swallowed for now; surfacing them in the UI is a future improvement.
+//
+// Called by: main::handle_request (POST /apply).
+// Calls: transfers::apply_confirmed, get_filtered_pairs, render_current_page.
+pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
+    let mut state = state.lock().unwrap();
+    let stats = match transfers::apply_confirmed(&state.conn) {
+        Ok(s) => s,
+        Err(_) => {
+            // Surface errors in the UI in a later iteration; for now no-op.
+            return render_current_page(&state);
+        }
+    };
+    state.applied += stats.pairs_applied;
+
+    // After apply, confirmed pairs are deleted from transfer_pairs. Clear any
+    // in-memory Confirm decisions for pair-ids that no longer exist so the
+    // activity header counts reflect reality. Two-step to satisfy the borrow
+    // checker: collect ids first while holding only &state.conn, then mutate
+    // state.decisions.
+    let stale_confirms: Vec<(i64, i64)> = state
+        .decisions
+        .iter()
+        .filter(|(_, d)| **d == Decision::Confirm)
+        .map(|(k, _)| *k)
+        .filter(|(a, b)| {
+            let exists: i64 = state
+                .conn
+                .query_row(
+                    "SELECT COUNT(*) FROM transfer_pairs WHERE txn_id_a = ?1 AND txn_id_b = ?2",
+                    rusqlite::params![a, b],
+                    |r| r.get(0),
+                )
+                .unwrap_or(0);
+            exists == 0
+        })
+        .collect();
+    for id in stale_confirms {
+        state.decisions.remove(&id);
+    }
+
+    let new_pairs = get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.decisions,
+    );
+    state.active_pair = new_pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+
+    render_current_page(&state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pocketsmith_sync::db::{
+        initialize_in_memory, transfer_pairs as tp, upsert_category, upsert_transaction,
+        upsert_transaction_account, with_operation,
+    };
+    use pocketsmith_sync::models::{Category, Transaction, TransactionAccount};
+    use pocketsmith_sync::transfers::{Confidence, TransferPair};
+    use std::collections::HashMap;
+
+    fn mk_account(id: i64, name: &str) -> TransactionAccount {
+        TransactionAccount {
+            id,
+            name: Some(name.to_string()),
+            number: None,
+            currency_code: None,
+            account_type: None,
+            current_balance: None,
+            current_balance_date: None,
+            current_balance_in_base_currency: None,
+            current_balance_exchange_rate: None,
+            safe_balance: None,
+            safe_balance_in_base_currency: None,
+            starting_balance: None,
+            starting_balance_date: None,
+            created_at: None,
+            updated_at: None,
+        }
+    }
+
+    fn mk_txn(id: i64, acct: TransactionAccount, amount: f64) -> Transaction {
+        Transaction {
+            id,
+            transaction_type: None,
+            payee: Some("p".into()),
+            amount: Some(amount),
+            amount_in_base_currency: None,
+            date: Some("2026-03-01".into()),
+            cheque_number: None,
+            memo: None,
+            is_transfer: Some(false),
+            category: None,
+            note: None,
+            labels: None,
+            original_payee: Some("p".into()),
+            upload_source: None,
+            closing_balance: None,
+            transaction_account: Some(acct),
+            status: None,
+            needs_review: None,
+            created_at: None,
+            updated_at: None,
+        }
+    }
+
+    fn fixture_with_confirmed_pair() -> Arc<Mutex<AppState>> {
+        let conn = initialize_in_memory().unwrap();
+
+        let transfer_cat = Category {
+            id: 999,
+            title: Some("_Transfer".into()),
+            colour: None,
+            children: None,
+            parent_id: None,
+            is_transfer: Some(true),
+            is_bill: Some(false),
+            roll_up: Some(false),
+            refund_behaviour: None,
+            created_at: None,
+            updated_at: None,
+        };
+        upsert_category(&conn, &transfer_cat).unwrap();
+
+        let acct1 = mk_account(100, "Savings");
+        let acct2 = mk_account(200, "Everyday");
+        upsert_transaction_account(&conn, &acct1).unwrap();
+        upsert_transaction_account(&conn, &acct2).unwrap();
+
+        with_operation(&conn, "test", |conn| {
+            upsert_transaction(conn, &mk_txn(1, acct1.clone(), 500.0))?;
+            upsert_transaction(conn, &mk_txn(2, acct2.clone(), -500.0))?;
+            Ok(())
+        })
+        .unwrap();
+
+        tp::insert_pair(
+            &conn,
+            &TransferPair {
+                txn_id_a: 1,
+                txn_id_b: 2,
+                amount_cents: 50000,
+                confidence: Confidence::High,
+                status: pocketsmith_sync::transfers::Status::Confirmed,
+            },
+        )
+        .unwrap();
+
+        let mut decisions = HashMap::new();
+        decisions.insert((1, 2), Decision::Confirm);
+
+        Arc::new(Mutex::new(AppState {
+            conn,
+            activity: Vec::new(),
+            undone: 0,
+            applied: 0,
+            status_filter: "all".to_string(),
+            confidence_filter: "all".to_string(),
+            decisions,
+            active_pair: None,
+        }))
+    }
+
+    #[test]
+    fn handle_apply_deletes_confirmed_pair_and_bumps_counter() {
+        let state = fixture_with_confirmed_pair();
+        let _ = handle_apply(&state);
+        let s = state.lock().unwrap();
+        assert_eq!(s.applied, 1, "applied counter should be 1 after applying 1 pair");
+        assert!(
+            !s.decisions.contains_key(&(1, 2)),
+            "in-memory Confirm for applied pair should be cleared"
+        );
+        let count: i64 = s.conn
+            .query_row(
+                "SELECT COUNT(*) FROM transfer_pairs WHERE txn_id_a = 1 AND txn_id_b = 2",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn handle_apply_with_nothing_to_apply_is_noop() {
+        let conn = initialize_in_memory().unwrap();
+        let state = Arc::new(Mutex::new(AppState {
+            conn,
+            activity: Vec::new(),
+            undone: 0,
+            applied: 0,
+            status_filter: "all".to_string(),
+            confidence_filter: "all".to_string(),
+            decisions: HashMap::new(),
+            active_pair: None,
+        }));
+        let _ = handle_apply(&state);
+        let s = state.lock().unwrap();
+        assert_eq!(s.applied, 0);
+    }
 }

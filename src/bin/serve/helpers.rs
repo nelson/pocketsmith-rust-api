@@ -134,6 +134,19 @@ pub fn count_decisions(decisions: &HashMap<(i64, i64), Decision>, d: Decision) -
     decisions.values().filter(|v| **v == d).count()
 }
 
+/// Count of rows in `transfer_pairs` with status = Confirmed. This is the
+/// number of pairs that an "Apply all changes" click would touch, because
+/// apply_confirmed reads from the DB (not from in-memory decisions). Used
+/// by the activity bar to label/disable the Apply button.
+pub fn count_confirmed_in_db(conn: &rusqlite::Connection) -> usize {
+    conn.query_row(
+        "SELECT COUNT(*) FROM transfer_pairs WHERE status = ?1",
+        rusqlite::params![Status::Confirmed.to_i32()],
+        |r| r.get::<_, i64>(0).map(|n| n as usize),
+    )
+    .unwrap_or(0)
+}
+
 /// Return the (a,b) ids of pairs in `pairs` that a bulk confirm/reject action
 /// should touch. Excludes pairs the user has explicitly skipped this session
 /// (Skip is the user's "don't act on this for now" signal). Pairs that already
