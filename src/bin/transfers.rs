@@ -153,7 +153,7 @@ fn apply_mode() -> Result<()> {
         .map_err(|_| anyhow::anyhow!("No '_Transfer' category found in categories table"))?;
 
     let count = pairs.len();
-    db::with_transaction_change_log(&conn, "transfers", |conn| {
+    db::with_operation(&conn, "transfers", |conn| {
         for pair in &pairs {
             conn.execute(
                 "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
@@ -325,7 +325,7 @@ mod tests {
     fn test_apply_updates_transactions() {
         use pocketsmith_sync::db::{
             upsert_category, upsert_transaction, upsert_transaction_account,
-            with_transaction_change_log,
+            with_operation,
         };
         use pocketsmith_sync::models::{Category, Transaction, TransactionAccount};
 
@@ -368,7 +368,7 @@ mod tests {
         upsert_transaction_account(&conn, &acct1).unwrap();
         upsert_transaction_account(&conn, &acct2).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let t1 = Transaction {
                 id: 1,
                 transaction_type: None,
@@ -432,7 +432,7 @@ mod tests {
         let pairs = transfer_pairs::get_confirmed_pairs(&conn).unwrap();
         assert_eq!(pairs.len(), 1);
 
-        with_transaction_change_log(&conn, "transfers", |conn| {
+        with_operation(&conn, "transfers", |conn| {
             for pair in &pairs {
                 conn.execute(
                     "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",

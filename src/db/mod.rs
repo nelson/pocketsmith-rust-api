@@ -85,7 +85,7 @@ pub fn get_last_change(conn: &Connection, reason: &str) -> Result<Option<(i64, S
     Ok(stmt.query_row([reason], |row| Ok((row.get(0)?, row.get(1)?))).ok())
 }
 
-pub fn with_transaction_change_log<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
+pub fn with_operation<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
 {
@@ -230,9 +230,9 @@ mod tests {
     }
 
     #[test]
-    fn test_with_transaction_change_log_creates_entry() {
+    fn test_with_operation_creates_entry() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "pocketsmith", |_| Ok(())).unwrap();
+        with_operation(&conn, "pocketsmith", |_| Ok(())).unwrap();
         let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
         assert_eq!(version, 1);
     }
@@ -240,8 +240,8 @@ mod tests {
     #[test]
     fn test_get_last_change_filters_by_reason() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "pocketsmith", |_| Ok(())).unwrap();
-        with_transaction_change_log(&conn, "rules", |_| Ok(())).unwrap();
+        with_operation(&conn, "pocketsmith", |_| Ok(())).unwrap();
+        with_operation(&conn, "rules", |_| Ok(())).unwrap();
         let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
         assert_eq!(version, 1);
         let (version, _) = get_last_change(&conn, "rules").unwrap().unwrap();
@@ -249,19 +249,19 @@ mod tests {
     }
 
     #[test]
-    fn test_with_transaction_change_log_increments_version() {
+    fn test_with_operation_increments_version() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
-        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
-        with_transaction_change_log(&conn, "test", |_| Ok(())).unwrap();
+        with_operation(&conn, "test", |_| Ok(())).unwrap();
+        with_operation(&conn, "test", |_| Ok(())).unwrap();
+        with_operation(&conn, "test", |_| Ok(())).unwrap();
         let (version, _) = get_last_change(&conn, "test").unwrap().unwrap();
         assert_eq!(version, 3);
     }
 
     #[test]
-    fn test_with_transaction_change_log_counts_transactions() {
+    fn test_with_operation_counts_transactions() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "A"))?;
             upsert_transaction(conn, &make_transaction(2, "B"))?;
             Ok(())

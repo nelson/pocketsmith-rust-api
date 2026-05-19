@@ -382,13 +382,13 @@ mod tests {
     #[test]
     fn test_find_pairs_basic() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
         upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(1000.0);
             t1.date = Some("2026-03-01".into());
@@ -417,13 +417,13 @@ mod tests {
     #[test]
     fn test_find_pairs_respects_2_day_window() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
         upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(500.0);
             t1.date = Some("2026-03-01".into());
@@ -448,12 +448,12 @@ mod tests {
     #[test]
     fn test_find_pairs_skips_same_account() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(500.0);
             t1.date = Some("2026-03-01".into());
@@ -476,13 +476,13 @@ mod tests {
     #[test]
     fn test_find_pairs_no_double_matching() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
         upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             // Three transactions with same amount — only one pair should form
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(500.0);
@@ -517,13 +517,13 @@ mod tests {
     #[test]
     fn test_find_pairs_confidence_levels() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
         upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             // Low confidence pair (neither payee is transfer-like)
             let mut t1 = make_transaction(1, "Woolworths");
             t1.amount = Some(200.0);
@@ -570,14 +570,14 @@ mod tests {
     #[test]
     fn test_find_pairs_skips_already_paired() {
         use crate::db::test_helpers::*;
-        use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
         use crate::db::transfer_pairs::insert_pair;
 
         let conn = test_db();
         upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
         upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
 
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(500.0);
             t1.date = Some("2026-03-01".into());
