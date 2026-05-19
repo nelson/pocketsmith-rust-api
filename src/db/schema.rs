@@ -52,8 +52,8 @@ INSERT OR IGNORE INTO field_masks (mask, name) VALUES
     (32, 'memo'),
     (63, 'create');
 
-CREATE TABLE IF NOT EXISTS _transaction_change_log (
-    version              INTEGER PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS _operations (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
     reason               TEXT NOT NULL,
     created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     transactions_updated INTEGER NOT NULL DEFAULT 0
@@ -162,7 +162,7 @@ CREATE TABLE IF NOT EXISTS _transactions_history (
     old_labels      TEXT,
     old_is_transfer INTEGER,
     old_memo        TEXT,
-    _version        INTEGER NOT NULL REFERENCES _transaction_change_log(version),
+    _version        INTEGER NOT NULL REFERENCES _operations(id),
     _updated        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     _mask           INTEGER NOT NULL DEFAULT 0
 );
