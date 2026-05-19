@@ -98,6 +98,57 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
     }
 }
 
+// Bulk-action buttons that sit under the filter rows. When idle, two buttons:
+// "Confirm all" and "Reject all". Clicking either swaps the bar to an inline
+// confirmation prompt (no modal) via HTMX -- the user has to confirm a second
+// time before any DB writes happen. The prompt's "Cancel" swaps back here.
+//
+// The count shows what's currently visible; the bulk action then targets the
+// same set (minus session-skipped) when executed.
+//
+// Called by: render_queue, render_bulk_buttons_fragment (GET /bulk-buttons).
+pub fn render_bulk_actions(visible_count: usize) -> Markup {
+    html! {
+        button.bulk-btn.bulk-confirm-btn
+            hx-get="/bulk-prompt?action=confirm"
+            hx-target="#bulk-actions"
+            hx-swap="innerHTML"
+            disabled[visible_count == 0]
+        { "Confirm all (" (visible_count) ")" }
+        button.bulk-btn.bulk-reject-btn
+            hx-get="/bulk-prompt?action=reject"
+            hx-target="#bulk-actions"
+            hx-swap="innerHTML"
+            disabled[visible_count == 0]
+        { "Reject all (" (visible_count) ")" }
+    }
+}
+
+// The inline confirmation form shown after "Confirm all" / "Reject all" is
+// clicked. Two buttons: a destructive "Yes, confirm/reject all" that hits the
+// real /bulk-{action} endpoint, and a "Cancel" that swaps the bar back to
+// render_bulk_actions via GET /bulk-buttons.
+//
+// Called by: render_bulk_prompt_fragment (GET /bulk-prompt?action=X).
+pub fn render_bulk_prompt(action: &str, visible_count: usize) -> Markup {
+    let verb = match action { "reject" => "reject", _ => "confirm" };
+    let yes_label = format!("Yes, {verb} {visible_count}");
+    let post_url = format!("/bulk-{verb}");
+    let yes_class = if verb == "reject" { "bulk-yes bulk-reject-btn" } else { "bulk-yes bulk-confirm-btn" };
+    html! {
+        span.bulk-prompt-text { "Apply to " (visible_count) " visible pair" @if visible_count != 1 { "s" } "?" }
+        button.bulk-btn.(yes_class)
+            hx-post=(post_url)
+            hx-target="body"
+        { (yes_label) }
+        button.bulk-btn.bulk-cancel-btn
+            hx-get="/bulk-buttons"
+            hx-target="#bulk-actions"
+            hx-swap="innerHTML"
+        { "Cancel" }
+    }
+}
+
 // Renders the queue sidebar: filter buttons (status + confidence) and the scrollable list of pair items.
 // Called by: render_full_page, render_queue_fragment.
 // Calls: confidence_class, format_dollars, format_short_date, transfers::date_diff_days.
@@ -131,6 +182,10 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                         hx-target="body"
                     { "CLEAR SKIPPED (" (num_skipped) ")" }
                 }
+            }
+            div.bulk-actions #bulk-actions {
+                @let eligible_count = crate::helpers::pairs_eligible_for_bulk(pairs, decisions).len();
+                (render_bulk_actions(eligible_count))
             }
         }
         div.queue-list {
@@ -384,4 +439,36 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, 
     }
     let selected = state.active_pair;
     render_queue(&pairs, selected, status_filter, confidence_filter, &state.decisions)
+}
+
+// Returns the inline confirmation prompt for a bulk action. The visible-count
+// in the prompt reflects exactly what /bulk-{action} would touch (minus
+// session-skipped pairs); the user sees the same number twice (filter row +
+// prompt) so the action is unambiguous.
+// Called by: main::handle_request (GET /bulk-prompt?action=X).
+pub fn render_bulk_prompt_fragment(state: &Arc<Mutex<AppState>>, action: &str) -> Markup {
+    let state = state.lock().unwrap();
+    let pairs = get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.decisions,
+    );
+    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.decisions);
+    render_bulk_prompt(action, eligible.len())
+}
+
+// Returns the default "Confirm all / Reject all" buttons. Used by the Cancel
+// button in the inline prompt to swap back to the idle state.
+// Called by: main::handle_request (GET /bulk-buttons).
+pub fn render_bulk_buttons_fragment(state: &Arc<Mutex<AppState>>) -> Markup {
+    let state = state.lock().unwrap();
+    let pairs = get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.decisions,
+    );
+    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.decisions);
+    render_bulk_actions(eligible.len())
 }

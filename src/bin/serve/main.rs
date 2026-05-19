@@ -15,11 +15,14 @@ use tiny_http::{Header, Method, Request, Response, Server};
 use pocketsmith_sync::db;
 
 use crate::handlers::{
-    handle_action, handle_clear_all_skipped, handle_undo, handle_unskip,
+    handle_action, handle_bulk_action, handle_clear_all_skipped, handle_undo, handle_unskip,
 };
 use crate::helpers::{extract_param, parse_pair_id};
 use crate::state::AppState;
-use crate::views::{render_detail_fragment, render_page_shell, render_queue_fragment};
+use crate::views::{
+    render_bulk_buttons_fragment, render_bulk_prompt_fragment, render_detail_fragment,
+    render_page_shell, render_queue_fragment,
+};
 
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -70,9 +73,17 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             render_queue_fragment(&state, &filter, &conf)
         }
         (Method::Get, "/queue") => render_queue_fragment(&state, "all", "all"),
+        (Method::Get, p) if p.starts_with("/bulk-prompt?") => {
+            let params = p.strip_prefix("/bulk-prompt?").unwrap_or("");
+            let action = extract_param(params, "action").unwrap_or("confirm".to_string());
+            render_bulk_prompt_fragment(&state, &action)
+        }
+        (Method::Get, "/bulk-buttons") => render_bulk_buttons_fragment(&state),
         (Method::Post, p) if p.contains("/confirm") => handle_action(&state, p, "confirm"),
         (Method::Post, p) if p.contains("/reject") => handle_action(&state, p, "reject"),
         (Method::Post, p) if p.contains("/skip") => handle_action(&state, p, "skip"),
+        (Method::Post, "/bulk-confirm") => handle_bulk_action(&state, "confirm"),
+        (Method::Post, "/bulk-reject") => handle_bulk_action(&state, "reject"),
         (Method::Post, "/clear-all-skipped") => handle_clear_all_skipped(&state),
         (Method::Post, p) if p.contains("/unskip") => handle_unskip(&state, p),
         (Method::Post, p) if p.contains("/undo") => handle_undo(&state, p),
