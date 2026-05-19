@@ -368,6 +368,23 @@ body {
 .count-rejected { color: var(--red); font-weight: 600; }
 .count-skipped { color: var(--fg-dim); font-weight: 600; }
 .count-undone { color: var(--yellow); font-weight: 600; }
+.count-applied { color: var(--accent); font-weight: 600; }
+
+.apply-btn {
+    margin-left: auto;
+    background: rgba(122, 162, 247, 0.15);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.apply-btn:hover:not(:disabled) { background: rgba(122, 162, 247, 0.3); }
+.apply-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .activity-row {
     display: flex;

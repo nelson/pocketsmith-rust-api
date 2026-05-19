@@ -47,8 +47,8 @@ use pocketsmith_sync::transfers::{self, Status};
 
 use crate::css::CSS;
 use crate::helpers::{
-    confidence_class, confidence_reason, count_decisions, derive_decision, find_pair_index,
-    format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
+    confidence_class, confidence_reason, count_confirmed_in_db, count_decisions, derive_decision,
+    find_pair_index, format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
 };
 use crate::js::JS;
 use crate::state::{AppState, Decision};
@@ -351,6 +351,14 @@ pub fn render_activity(state: &AppState) -> Markup {
             span.stat { "Rejected " span.count-rejected { (count_decisions(&state.decisions, Decision::Reject)) } }
             span.stat { "Skipped " span.count-skipped { (count_decisions(&state.decisions, Decision::Skip)) } }
             span.stat { "Undone " span.count-undone { (state.undone) } }
+            span.stat { "Applied " span.count-applied { (state.applied) } }
+            @let confirmed_in_db = count_confirmed_in_db(&state.conn);
+            button.apply-btn
+                hx-post="/apply"
+                hx-target="body"
+                disabled[confirmed_in_db == 0]
+                title=(if confirmed_in_db == 0 { "No confirmed pairs to apply" } else { "Tag both transactions of every confirmed pair as _Transfer and remove the pair row" })
+            { "Apply all changes (" (confirmed_in_db) ")" }
         }
         div.activity-list {
             @for entry in state.activity.iter().rev().take(20) {

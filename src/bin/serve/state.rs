@@ -29,6 +29,9 @@ pub struct AppState {
     pub conn: rusqlite::Connection,
     pub activity: Vec<ActivityEntry>,
     pub undone: usize,
+    /// Cumulative count of pairs applied this session via the "Apply all
+    /// changes" button. Shown in the activity header.
+    pub applied: usize,
     pub status_filter: String,
     pub confidence_filter: String,
     pub decisions: HashMap<(i64, i64), Decision>,
