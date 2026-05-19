@@ -20,6 +20,7 @@ pub fn initialize(path: &str) -> Result<Connection> {
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
+    drop_legacy_artifacts(&conn)?;
     seed_field_masks(&conn)?;
 
     Ok(conn)
@@ -29,8 +30,27 @@ pub fn initialize_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA)?;
+    drop_legacy_artifacts(&conn)?;
     seed_field_masks(&conn)?;
     Ok(conn)
+}
+
+/// Drop artifacts left behind by older schema versions. The legacy
+/// `_transactions_history` table and its triggers were replaced by
+/// `_transaction_changes` + `_transaction_change_log`; leaving the old
+/// triggers in place causes any INSERT/UPDATE on `transactions` to fail with
+/// a NOT NULL constraint on `_transactions_history._version` (because the
+/// companion `_transaction_change_log_context` row is never populated).
+fn drop_legacy_artifacts(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "DROP TRIGGER IF EXISTS _transactions_history_insert;
+         DROP TRIGGER IF EXISTS _transactions_history_update;
+         DROP INDEX   IF EXISTS idx_transactions_history_transaction_id;
+         DROP TABLE   IF EXISTS _transactions_history;
+         DROP TABLE   IF EXISTS _transaction_change_log_context;
+         DROP TABLE   IF EXISTS _transaction_change_log;",
+    )?;
+    Ok(())
 }
 
 /// Field bits in ascending order. Index = bit position; value = field name.
@@ -89,33 +109,42 @@ pub fn with_operation<F, T>(conn: &Connection, reason: &str, f: F) -> Result<T>
 where
     F: FnOnce(&Connection) -> Result<T>,
 {
-    conn.execute(
+    // The whole operation runs inside a single SQLite transaction so that, on
+    // failure, both the inner work AND the `_operations` high-water-mark row
+    // are rolled back together. Previously the INSERT into `_operations`
+    // happened outside any transaction, so a failure inside `f` would leave
+    // the high-water mark advanced even though nothing was actually saved
+    // (causing subsequent incremental syncs to skip the unsaved range).
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
         "INSERT INTO _operations (reason) VALUES (?1)",
         [reason],
     )?;
-    let version = conn.last_insert_rowid();
+    let version = tx.last_insert_rowid();
 
-    conn.execute("DELETE FROM _current_operation", [])?;
-    conn.execute(
+    tx.execute("DELETE FROM _current_operation", [])?;
+    tx.execute(
         "INSERT INTO _current_operation (id) VALUES (?1)",
         [version],
     )?;
 
-    let result = f(conn);
+    let result = f(conn)?;
 
-    let count: i64 = conn.query_row(
+    let count: i64 = tx.query_row(
         "SELECT COUNT(DISTINCT transaction_id) FROM _transaction_changes WHERE operation_id = ?1",
         [version],
         |row| row.get(0),
     )?;
-    conn.execute(
+    tx.execute(
         "UPDATE _operations SET transactions_updated = ?1 WHERE id = ?2",
         rusqlite::params![count, version],
     )?;
 
-    conn.execute("DELETE FROM _current_operation", [])?;
+    tx.execute("DELETE FROM _current_operation", [])?;
 
-    result
+    tx.commit()?;
+    Ok(result)
 }
 
 #[cfg(test)]
