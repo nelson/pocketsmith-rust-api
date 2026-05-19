@@ -182,6 +182,16 @@ CREATE TABLE IF NOT EXISTS transfer_pairs (
     UNIQUE(txn_id_b)
 );
 
+CREATE TRIGGER IF NOT EXISTS transfer_pairs_updated_at
+AFTER UPDATE ON transfer_pairs
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at  -- guard against trigger recursion
+BEGIN
+    UPDATE transfer_pairs
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE txn_id_a = NEW.txn_id_a AND txn_id_b = NEW.txn_id_b;
+END;
+
 CREATE TRIGGER IF NOT EXISTS _transactions_history_insert
 AFTER INSERT ON transactions
 WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE transaction_id = NEW.id)
