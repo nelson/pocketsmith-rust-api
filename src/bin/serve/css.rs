@@ -147,6 +147,39 @@ body {
 
 .clear-skipped-btn { color: var(--yellow) !important; border-color: var(--yellow) !important; margin-left: auto; }
 
+/* Bulk actions bar (sits under the filter rows in the queue header) */
+.bulk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+}
+.bulk-btn {
+    background: var(--bg-surface);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.bulk-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.bulk-btn:hover:not(:disabled) { border-color: var(--accent); }
+.bulk-confirm-btn { color: var(--green); border-color: rgba(158, 206, 106, 0.4); }
+.bulk-confirm-btn:hover:not(:disabled) { background: rgba(158, 206, 106, 0.15); border-color: var(--green); }
+.bulk-reject-btn { color: var(--red); border-color: rgba(247, 118, 142, 0.4); }
+.bulk-reject-btn:hover:not(:disabled) { background: rgba(247, 118, 142, 0.15); border-color: var(--red); }
+.bulk-cancel-btn { color: var(--fg-dim); }
+.bulk-yes { font-weight: 700; }
+.bulk-prompt-text { color: var(--fg-dim); font-size: 11px; margin-right: 4px; }
+
 /* Detail panel */
 .detail-panel {
     background: var(--bg-surface);

@@ -134,6 +134,35 @@ pub fn count_decisions(decisions: &HashMap<(i64, i64), Decision>, d: Decision) -
     decisions.values().filter(|v| **v == d).count()
 }
 
+/// Return the (a,b) ids of pairs in `pairs` that a bulk confirm/reject action
+/// should touch. Excludes pairs the user has explicitly skipped this session
+/// (Skip is the user's "don't act on this for now" signal). Pairs that already
+/// have a Confirm or Reject decision are included -- bulk operations are
+/// idempotent at the DB level and the user has chosen this view deliberately.
+///
+/// Inputs:
+///   pairs     -- already filtered by status_filter + confidence_filter
+///                (i.e. exactly what the queue shows)
+///   decisions -- the in-memory session decisions HashMap
+///
+/// Output order matches input order so callers can iterate predictably for
+/// progress reporting.
+pub fn pairs_eligible_for_bulk(
+    pairs: &[TransferPairRow],
+    decisions: &HashMap<(i64, i64), Decision>,
+) -> Vec<(i64, i64)> {
+    pairs
+        .iter()
+        .filter_map(|p| {
+            let id = (p.txn_id_a, p.txn_id_b);
+            if decisions.get(&id) == Some(&Decision::Skip) {
+                return None;
+            }
+            Some(id)
+        })
+        .collect()
+}
+
 /// Derive the effective decision for a pair, combining in-memory session
 /// decisions with the DB-persisted status.
 ///
@@ -616,6 +645,43 @@ mod tests {
         let decisions = HashMap::new();
         let result = get_filtered_pairs(&conn, "nonexistent", "all", &decisions);
         assert!(result.is_empty());
+    }
+
+    // --- pairs_eligible_for_bulk tests ---
+
+    #[test]
+    fn pairs_eligible_for_bulk_excludes_session_skipped() {
+        let pairs = sample_pairs();
+        let mut decisions = HashMap::new();
+        decisions.insert((3, 4), Decision::Skip);
+        let eligible = pairs_eligible_for_bulk(&pairs, &decisions);
+        assert_eq!(eligible, vec![(1, 2), (5, 6), (7, 8), (9, 10)]);
+    }
+
+    #[test]
+    fn pairs_eligible_for_bulk_includes_already_confirmed() {
+        // A bulk action over a filter that includes confirmed pairs should
+        // still return them -- the operation is idempotent (re-confirming a
+        // confirmed pair is a no-op write), and the user has selected this
+        // view deliberately.
+        let pairs = vec![
+            make_pair(1, 2, Status::Pending, Confidence::High),
+            make_pair(3, 4, Status::Confirmed, Confidence::High),
+        ];
+        let decisions = HashMap::new();
+        let eligible = pairs_eligible_for_bulk(&pairs, &decisions);
+        assert_eq!(eligible, vec![(1, 2), (3, 4)]);
+    }
+
+    #[test]
+    fn pairs_eligible_for_bulk_empty_when_all_skipped() {
+        let pairs = sample_pairs();
+        let mut decisions = HashMap::new();
+        for p in &pairs {
+            decisions.insert((p.txn_id_a, p.txn_id_b), Decision::Skip);
+        }
+        let eligible = pairs_eligible_for_bulk(&pairs, &decisions);
+        assert!(eligible.is_empty());
     }
 
     // --- derive_decision tests ---

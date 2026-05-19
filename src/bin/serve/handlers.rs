@@ -6,7 +6,7 @@ use pocketsmith_sync::db::transfer_pairs;
 use pocketsmith_sync::transfers::Status;
 
 use crate::helpers::{
-    find_pair_index, get_filtered_pairs, next_pair_after, parse_pair_id,
+    find_pair_index, get_filtered_pairs, next_pair_after, pairs_eligible_for_bulk, parse_pair_id,
 };
 use crate::state::{ActivityEntry, AppState, Decision};
 use crate::views::render_current_page;
@@ -103,6 +103,63 @@ pub fn handle_clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut state = state.lock().unwrap();
     state.activity.retain(|e| e.decision != Decision::Skip);
     state.decisions.retain(|_, v| *v != Decision::Skip);
+    render_current_page(&state)
+}
+
+// Apply confirm or reject to every pair currently visible in the queue, except
+// session-skipped ones. The current filters (status + confidence) come from
+// AppState so this matches exactly what the user sees on screen. Each affected
+// pair gets a DB write, an in-memory decision, and an activity entry. Active
+// pair advances to the last remaining visible pair (or None if none).
+//
+// Called by: main::handle_request (POST /bulk-confirm, POST /bulk-reject).
+// Calls: get_filtered_pairs, pairs_eligible_for_bulk, transfer_pairs::update_status,
+//        transfer_pairs::get_pair_by_id, render_current_page.
+pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup {
+    let (decision, status) = match action {
+        "confirm" => (Decision::Confirm, Status::Confirmed),
+        "reject" => (Decision::Reject, Status::Rejected),
+        _ => return html! { p { "Invalid bulk action" } },
+    };
+
+    let mut state = state.lock().unwrap();
+    let pairs = get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.decisions,
+    );
+    let eligible = pairs_eligible_for_bulk(&pairs, &state.decisions);
+
+    for (a, b) in &eligible {
+        let pair_info = transfer_pairs::get_pair_by_id(&state.conn, *a, *b)
+            .ok()
+            .flatten()
+            .map(|p| (p.amount_cents, p.account_name_a, p.account_name_b));
+        let _ = transfer_pairs::update_status(&state.conn, *a, *b, status);
+        state.decisions.insert((*a, *b), decision);
+        if let Some((amount, acct_a, acct_b)) = pair_info {
+            state.activity.push(ActivityEntry {
+                pair_id: (*a, *b),
+                decision,
+                amount_cents: amount,
+                account_a: acct_a,
+                account_b: acct_b,
+            });
+        }
+    }
+    while state.activity.len() > 100 {
+        state.activity.remove(0);
+    }
+
+    let new_pairs = get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.decisions,
+    );
+    state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+
     render_current_page(&state)
 }
 
