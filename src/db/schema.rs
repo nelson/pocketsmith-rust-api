@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS statuses (
 );
 INSERT OR IGNORE INTO statuses (id, name) VALUES (0,'pending'), (1,'confirmed'), (2,'rejected');
 
+CREATE TABLE IF NOT EXISTS confidences (
+    id    INTEGER PRIMARY KEY,
+    name  TEXT NOT NULL UNIQUE
+);
+INSERT OR IGNORE INTO confidences (id, name) VALUES (0,'low'), (1,'medium'), (2,'high');
+
 CREATE TABLE IF NOT EXISTS _transaction_change_log (
     version              INTEGER PRIMARY KEY,
     reason               TEXT NOT NULL,
