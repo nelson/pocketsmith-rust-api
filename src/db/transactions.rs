@@ -95,7 +95,7 @@ mod tests {
 
     fn history_count(conn: &Connection, transaction_id: i64) -> i64 {
         conn.query_row(
-            "SELECT COUNT(*) FROM _transactions_history WHERE transaction_id = ?1",
+            "SELECT COUNT(*) FROM _transaction_changes WHERE transaction_id = ?1",
             [transaction_id],
             |row| row.get(0),
         )
@@ -312,7 +312,7 @@ mod tests {
 
         let (version, mask, payee): (i64, i64, String) = conn
             .query_row(
-                "SELECT _version, _mask, payee FROM _transactions_history WHERE transaction_id = 1",
+                "SELECT operation_id, mask, payee FROM _transaction_changes WHERE transaction_id = 1",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -348,7 +348,7 @@ mod tests {
 
         let (mask, payee, old_payee): (i64, String, String) = conn
             .query_row(
-                "SELECT _mask, payee, old_payee FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
+                "SELECT mask, payee, old_payee FROM _transaction_changes WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -371,7 +371,7 @@ mod tests {
 
         let memo_is_null: bool = conn
             .query_row(
-                "SELECT memo IS NULL FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
+                "SELECT memo IS NULL FROM _transaction_changes WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
                 |row| row.get(0),
             )
@@ -392,7 +392,7 @@ mod tests {
 
         let mask: i64 = conn
             .query_row(
-                "SELECT _mask FROM _transactions_history WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
+                "SELECT mask FROM _transaction_changes WHERE transaction_id = 1 ORDER BY id DESC LIMIT 1",
                 [],
                 |row| row.get(0),
             )
@@ -410,8 +410,8 @@ mod tests {
 
         let reason: String = conn
             .query_row(
-                "SELECT l.reason FROM _transactions_history h
-                 JOIN _operations l ON h._version = l.id
+                "SELECT l.reason FROM _transaction_changes h
+                 JOIN _operations l ON h.operation_id = l.id
                  WHERE h.transaction_id = 1",
                 [],
                 |row| row.get(0),
@@ -433,7 +433,7 @@ mod tests {
         .unwrap();
 
         let versions: Vec<i64> = conn
-            .prepare("SELECT _version FROM _transactions_history WHERE transaction_id = 1 ORDER BY id")
+            .prepare("SELECT operation_id FROM _transaction_changes WHERE transaction_id = 1 ORDER BY id")
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()

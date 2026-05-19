@@ -147,8 +147,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (transaction_account_id) REFERENCES transaction_accounts(id)
 );
 
-CREATE TABLE IF NOT EXISTS _transactions_history (
-    id              INTEGER PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS _transaction_changes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     transaction_id  INTEGER NOT NULL REFERENCES transactions(id),
     payee           TEXT,
     category_id     INTEGER,
@@ -162,13 +162,13 @@ CREATE TABLE IF NOT EXISTS _transactions_history (
     old_labels      TEXT,
     old_is_transfer INTEGER,
     old_memo        TEXT,
-    _version        INTEGER NOT NULL REFERENCES _operations(id),
-    _updated        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    _mask           INTEGER NOT NULL DEFAULT 0
+    operation_id    INTEGER NOT NULL REFERENCES _operations(id),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    mask            INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_transactions_history_transaction_id
-    ON _transactions_history(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_changes_transaction_id
+    ON _transaction_changes(transaction_id);
 
 CREATE TABLE IF NOT EXISTS transfer_pairs (
     txn_id_a    INTEGER NOT NULL REFERENCES transactions(id),
@@ -192,16 +192,16 @@ BEGIN
     WHERE txn_id_a = NEW.txn_id_a AND txn_id_b = NEW.txn_id_b;
 END;
 
-CREATE TRIGGER IF NOT EXISTS _transactions_history_insert
+CREATE TRIGGER IF NOT EXISTS _transaction_changes_insert
 AFTER INSERT ON transactions
-WHEN NOT EXISTS (SELECT 1 FROM _transactions_history WHERE transaction_id = NEW.id)
+WHEN NOT EXISTS (SELECT 1 FROM _transaction_changes WHERE transaction_id = NEW.id)
 BEGIN
-    INSERT INTO _transactions_history (transaction_id, payee, category_id, note, labels, is_transfer, memo, _version, _mask)
+    INSERT INTO _transaction_changes (transaction_id, payee, category_id, note, labels, is_transfer, memo, operation_id, mask)
     VALUES (NEW.id, NEW.payee, NEW.category_id, NEW.note, NEW.labels, NEW.is_transfer, NEW.memo,
             (SELECT id FROM _current_operation), 63);
 END;
 
-CREATE TRIGGER IF NOT EXISTS _transactions_history_update
+CREATE TRIGGER IF NOT EXISTS _transaction_changes_update
 AFTER UPDATE ON transactions
 WHEN (OLD.payee IS NOT NEW.payee
    OR OLD.category_id IS NOT NEW.category_id
@@ -210,11 +210,11 @@ WHEN (OLD.payee IS NOT NEW.payee
    OR OLD.is_transfer IS NOT NEW.is_transfer
    OR OLD.memo IS NOT NEW.memo)
 BEGIN
-    INSERT INTO _transactions_history (
+    INSERT INTO _transaction_changes (
         transaction_id,
         payee, category_id, note, labels, is_transfer, memo,
         old_payee, old_category_id, old_note, old_labels, old_is_transfer, old_memo,
-        _version, _mask
+        operation_id, mask
     )
     VALUES (
         NEW.id,
