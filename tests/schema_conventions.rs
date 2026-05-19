@@ -59,30 +59,38 @@ fn confidences_lookup_seeded() {
 #[test]
 fn field_masks_lookup_seeded() {
     let conn = open();
-    let rows: Vec<(i64, String)> = conn
-        .prepare("SELECT mask, name FROM field_masks ORDER BY mask")
-        .unwrap()
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
-        .unwrap()
-        .collect::<rusqlite::Result<_>>()
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM field_masks", [], |r| r.get(0))
         .unwrap();
-    // Seed only the 9 masks actually produced today (Option A).
-    // FK on _transaction_changes.mask will fail loudly if a new code path
-    // emits an un-enumerated combination -- that is the intended alarm.
-    assert_eq!(
-        rows,
-        vec![
-            (0, "none".to_string()),
-            (1, "payee".to_string()),
-            (2, "category_id".to_string()),
-            (4, "note".to_string()),
-            (8, "labels".to_string()),
-            (16, "is_transfer".to_string()),
-            (18, "category_id, is_transfer".to_string()),
-            (32, "memo".to_string()),
-            (63, "create".to_string()),
-        ]
-    );
+    // All 64 valid mask values (0..63) are seeded so the FK on
+    // _transaction_changes.mask acts as a 0..63 range check while still
+    // providing joinable human-readable names for ad-hoc SQL.
+    assert_eq!(count, 64);
+
+    // Spot-check the special cases.
+    let name_for = |mask: i64| -> String {
+        conn.query_row(
+            "SELECT name FROM field_masks WHERE mask = ?1",
+            [mask],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(name_for(0), "none");
+    assert_eq!(name_for(63), "create");
+
+    // Single-bit names.
+    assert_eq!(name_for(1), "payee");
+    assert_eq!(name_for(2), "category_id");
+    assert_eq!(name_for(4), "note");
+    assert_eq!(name_for(8), "labels");
+    assert_eq!(name_for(16), "is_transfer");
+    assert_eq!(name_for(32), "memo");
+
+    // Multi-bit combinations: comma-joined in ascending bit order.
+    assert_eq!(name_for(18), "category_id, is_transfer");
+    assert_eq!(name_for(33), "payee, memo");
+    assert_eq!(name_for(5), "payee, note");
 }
 
 // ---- Helpers for FK tests ----
@@ -132,6 +140,27 @@ fn operations_table_exists_with_autoincrement_id() {
     assert!(
         id3 > id2,
         "AUTOINCREMENT should not reuse id {id2}, got {id3}"
+    );
+}
+
+#[test]
+fn transaction_changes_mask_fk_rejects_out_of_range() {
+    let conn = open();
+    seed_txn(&conn, 30);
+    // Masks > 63 are not seeded (only 0..63 exist). The FK should reject.
+    let err = db::with_transaction_change_log(&conn, "test", |conn| {
+        conn.execute(
+            "INSERT INTO _transaction_changes (transaction_id, operation_id, mask) \
+             VALUES (30, (SELECT id FROM _current_operation), 64)",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap_err();
+    let msg = format!("{err}");
+    assert!(
+        msg.to_lowercase().contains("foreign key"),
+        "expected FK violation, got: {msg}"
     );
 }
 
