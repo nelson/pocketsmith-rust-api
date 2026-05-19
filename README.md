@@ -38,28 +38,9 @@ Use `--no-auto` to insert all pairs as `pending` (no auto-confirm):
 cargo run --bin transfers -- --no-auto
 ```
 
-### Review
-
-Interactively review pending pairs. Presents each pair with payee, account, date, and confidence level:
-
-```
-cargo run --bin transfers -- --review 10
-```
-
-Prompt format:
-
-```
-[1/10] $1,000.00 (2026-03-03 -> 2026-03-03) HIGH
-  A: Transfer to xx8005 CommBank app          (acct: Savings)
-  B: Transfer from xx8820 CommBank app        (acct: Everyday)
-  [y]es [n]o [s]kip [q]uit >
-```
-
-Pairs are sorted by confidence (high first), then by amount descending.
-
 ### Review (web UI)
 
-For a richer review experience, run the local web server (feature-gated behind `web`):
+To review pending pairs, run the local web server (feature-gated behind `web`):
 
 ```
 cargo run --bin serve --features web
@@ -75,7 +56,7 @@ The page is a single HTMX-driven view:
 
 Confirm and Reject write straight to the `transfer_pairs.status` column in `pocketsmith.db`. Skip is in-memory only (not persisted) and is forgotten when the server restarts. The web UI does **not** apply confirmed pairs to the `transactions` table — run `cargo run --bin transfers -- --apply` for that step.
 
-This is a graphical alternative to `cargo run --bin transfers -- --review` and the `/review-transfers` skill.
+This is a graphical alternative to the now-removed `--review` CLI flag.
 
 ### Apply
 
@@ -171,16 +152,6 @@ Runs the normalise binary in dry-run mode, presents coverage metrics, then walks
 ```
 
 This is a review-only skill - it does not modify source files or the database.
-
-### `/review-transfers` - Batch review transfer pairs
-
-Presents pending transfer pairs 16 at a time for interactive confirmation in the terminal. Each pair shows the amount, dates, payees, and accounts. You confirm (yes), reject (no), or skip each one, then the decisions are applied in bulk:
-
-```
-/review-transfers
-```
-
-Loops automatically until all pending pairs are reviewed or you choose to stop. For a graphical alternative with a queue, activity log, and undo, use `cargo run --bin serve` (see [Review (web UI)](#review-web-ui)).
 
 ## Testing
 

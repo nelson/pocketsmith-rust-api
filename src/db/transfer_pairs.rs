@@ -64,22 +64,6 @@ const PAIR_ROW_QUERY: &str = "
     LEFT JOIN transaction_accounts ab ON ab.id = tb.transaction_account_id
 ";
 
-pub fn get_pending_pairs(conn: &Connection, limit: usize) -> Result<Vec<TransferPairRow>> {
-    let query = format!(
-        "{} WHERE tp.status = 0 ORDER BY
-            ta.date DESC,
-            tp.confidence ASC,
-            tp.amount_cents DESC
-         LIMIT ?1",
-        PAIR_ROW_QUERY
-    );
-    let mut stmt = conn.prepare(&query)?;
-    let rows = stmt
-        .query_map([limit], |row| row_to_pair_row(row))?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(rows)
-}
-
 pub fn get_pairs_by_status(conn: &Connection, status: Status, limit: usize) -> Result<Vec<TransferPairRow>> {
     let query = format!(
         "{} WHERE tp.status = ?1 ORDER BY ta.date DESC LIMIT ?2",
@@ -214,7 +198,7 @@ mod tests {
         };
         insert_pair(&conn, &pair).unwrap();
 
-        let pending = get_pending_pairs(&conn, 10).unwrap();
+        let pending = get_pairs_by_status(&conn, Status::Pending, 10).unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].txn_id_a, 1);
         assert_eq!(pending[0].txn_id_b, 2);
@@ -241,7 +225,7 @@ mod tests {
         let confirmed = get_confirmed_pairs(&conn).unwrap();
         assert_eq!(confirmed.len(), 1);
 
-        let pending = get_pending_pairs(&conn, 10).unwrap();
+        let pending = get_pairs_by_status(&conn, Status::Pending, 10).unwrap();
         assert_eq!(pending.len(), 0);
     }
 
@@ -301,7 +285,7 @@ mod tests {
 
         let confirmed = get_confirmed_pairs(&conn).unwrap();
         assert_eq!(confirmed.len(), 1);
-        let pending = get_pending_pairs(&conn, 10).unwrap();
+        let pending = get_pairs_by_status(&conn, Status::Pending, 10).unwrap();
         assert_eq!(pending.len(), 0);
     }
 
@@ -320,7 +304,7 @@ mod tests {
         insert_pair(&conn, &pair).unwrap();
         update_status(&conn, 1, 2, Status::Rejected).unwrap();
 
-        let pending = get_pending_pairs(&conn, 10).unwrap();
+        let pending = get_pairs_by_status(&conn, Status::Pending, 10).unwrap();
         assert_eq!(pending.len(), 0);
         let confirmed = get_confirmed_pairs(&conn).unwrap();
         assert_eq!(confirmed.len(), 0);
