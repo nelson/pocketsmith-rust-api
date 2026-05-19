@@ -79,7 +79,7 @@ This is a graphical alternative to `cargo run --bin transfers -- --review` and t
 
 ### Apply
 
-Applies all confirmed pairs - sets `category_id` to `_Transfer` and `is_transfer = 1` on both transactions. Changes are tracked via `_transaction_change_log` with reason `"transfers"`:
+Applies all confirmed pairs - sets `category_id` to `_Transfer` and `is_transfer = 1` on both transactions. Changes are tracked via `_operations` with reason `"transfers"`:
 
 ```
 cargo run --bin transfers -- --apply
@@ -145,7 +145,7 @@ Total transactions: 21353
 
 ### Apply
 
-Run the pipeline and write normalised payee strings to `transactions.payee`. All changes are tracked via `_transaction_change_log` with reason `"normalisation"`. Only rows where the payee actually changes are written (unchanged values are skipped to avoid polluting the history table):
+Run the pipeline and write normalised payee strings to `transactions.payee`. All changes are tracked via `_operations` with reason `"normalisation"`. Only rows where the payee actually changes are written (unchanged values are skipped to avoid polluting the history table):
 
 ```
 cargo run --bin normalise

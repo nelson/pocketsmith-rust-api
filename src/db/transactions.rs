@@ -401,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn test_history_reason_via_change_log() {
+    fn test_change_records_reason_via_operations() {
         let conn = test_db();
         with_operation(&conn, "pocketsmith", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn test_history_version_references_change_log() {
+    fn test_change_record_operation_id_references_operations() {
         let conn = test_db();
         with_operation(&conn, "sync1", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
