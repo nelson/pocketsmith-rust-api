@@ -1,6 +1,8 @@
 # pocketsmith-sync
 
-Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis.
+Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Includes CLI binaries for sync/normalisation/transfer detection and a local web UI for reviewing transfer pairs.
+
+All data — including review decisions (confirm/reject) — is stored locally in `pocketsmith.db`. Nothing is written back to PocketSmith.
 
 ## Setup
 
@@ -54,6 +56,26 @@ Prompt format:
 ```
 
 Pairs are sorted by confidence (high first), then by amount descending.
+
+### Review (web UI)
+
+For a richer review experience, run the local web server (feature-gated behind `web`):
+
+```
+cargo run --bin serve --features web
+```
+
+Then open <http://127.0.0.1:3141>. Override the port with `SERVE_PORT=4000 cargo run --bin serve --features web`.
+
+The page is a single HTMX-driven view:
+
+- **Queue (left)** — filterable list of pairs (status: all / pending / confirmed / rejected / skipped, plus confidence: all / high / medium / low). Click a pair to load it.
+- **Detail (right)** — side-by-side transaction cards for the selected pair, prior transfer history for the two accounts, and **Y confirm / N reject / S skip** action buttons (also bound to keyboard shortcuts).
+- **Activity (bottom)** — running log of decisions made this session with per-row undo, plus confirmed/rejected/skipped/undone counts and a "clear all skipped" action.
+
+Confirm and Reject write straight to the `transfer_pairs.status` column in `pocketsmith.db`. Skip is in-memory only (not persisted) and is forgotten when the server restarts. The web UI does **not** apply confirmed pairs to the `transactions` table — run `cargo run --bin transfers -- --apply` for that step.
+
+This is a graphical alternative to `cargo run --bin transfers -- --review` and the `/review-transfers` skill.
 
 ### Apply
 
@@ -152,13 +174,13 @@ This is a review-only skill - it does not modify source files or the database.
 
 ### `/review-transfers` - Batch review transfer pairs
 
-Presents pending transfer pairs 16 at a time for interactive confirmation. Each pair shows the amount, dates, payees, and accounts. You confirm (yes), reject (no), or skip each one, then the decisions are applied in bulk:
+Presents pending transfer pairs 16 at a time for interactive confirmation in the terminal. Each pair shows the amount, dates, payees, and accounts. You confirm (yes), reject (no), or skip each one, then the decisions are applied in bulk:
 
 ```
 /review-transfers
 ```
 
-Loops automatically until all pending pairs are reviewed or you choose to stop.
+Loops automatically until all pending pairs are reviewed or you choose to stop. For a graphical alternative with a queue, activity log, and undo, use `cargo run --bin serve` (see [Review (web UI)](#review-web-ui)).
 
 ## Testing
 
