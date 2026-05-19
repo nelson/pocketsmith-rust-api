@@ -38,19 +38,11 @@ CREATE TABLE IF NOT EXISTS field_masks (
     mask  INTEGER PRIMARY KEY,
     name  TEXT NOT NULL UNIQUE
 );
--- Seed only the masks the current codebase produces (Option A, enumerated).
--- The FK from _transaction_changes.mask -> field_masks.mask will reject any
--- new combination, prompting a deliberate addition here.
-INSERT OR IGNORE INTO field_masks (mask, name) VALUES
-    ( 0, 'none'),
-    ( 1, 'payee'),
-    ( 2, 'category_id'),
-    ( 4, 'note'),
-    ( 8, 'labels'),
-    (16, 'is_transfer'),
-    (18, 'category_id, is_transfer'),
-    (32, 'memo'),
-    (63, 'create');
+-- All 64 valid mask values (0..63) are seeded by `db::seed_field_masks()`
+-- at initialise time. With every value present, the FK from
+-- `_transaction_changes.mask -> field_masks(mask)` acts as a 0..63 range
+-- check while still providing joinable human-readable names for ad-hoc SQL.
+-- See `src/db/mod.rs::seed_field_masks` for the naming rules.
 
 CREATE TABLE IF NOT EXISTS _operations (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,7 +156,7 @@ CREATE TABLE IF NOT EXISTS _transaction_changes (
     old_memo        TEXT,
     operation_id    INTEGER NOT NULL REFERENCES _operations(id),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    mask            INTEGER NOT NULL DEFAULT 0
+    mask            INTEGER NOT NULL DEFAULT 0 REFERENCES field_masks(mask)
 );
 
 CREATE INDEX IF NOT EXISTS idx_transaction_changes_transaction_id

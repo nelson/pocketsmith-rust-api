@@ -20,6 +20,7 @@ pub fn initialize(path: &str) -> Result<Connection> {
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
+    seed_field_masks(&conn)?;
 
     Ok(conn)
 }
@@ -28,7 +29,53 @@ pub fn initialize_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA)?;
+    seed_field_masks(&conn)?;
     Ok(conn)
+}
+
+/// Field bits in ascending order. Index = bit position; value = field name.
+/// The bit for each field is `1 << index`. Total bits must be <= 6 (mask is
+/// stored as INTEGER and the `_transaction_changes.mask` FK ranges over 0..63).
+const FIELD_BITS: [&str; 6] = [
+    "payee",        // bit 0 = 1
+    "category_id",  // bit 1 = 2
+    "note",         // bit 2 = 4
+    "labels",       // bit 3 = 8
+    "is_transfer",  // bit 4 = 16
+    "memo",         // bit 5 = 32
+];
+
+/// Compute the canonical name for a mask value. Special cases:
+///   0  -> "none"
+///   63 -> "create"          (every bit set, as emitted by the INSERT trigger)
+/// Otherwise: comma-joined field names in ascending bit order, e.g.
+///   18 -> "category_id, is_transfer".
+fn mask_name(mask: u8) -> String {
+    match mask {
+        0 => "none".to_string(),
+        63 => "create".to_string(),
+        m => FIELD_BITS
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| m & (1 << i) != 0)
+            .map(|(_, name)| *name)
+            .collect::<Vec<_>>()
+            .join(", "),
+    }
+}
+
+/// Seed `field_masks` with all 64 valid mask values (0..63) and their derived
+/// names. Idempotent: re-running on an existing DB is a no-op thanks to
+/// `INSERT OR IGNORE`. Called from both `initialize` and `initialize_in_memory`
+/// so every connection sees a fully-populated lookup before the FK on
+/// `_transaction_changes.mask` is exercised.
+fn seed_field_masks(conn: &Connection) -> Result<()> {
+    let mut stmt =
+        conn.prepare("INSERT OR IGNORE INTO field_masks (mask, name) VALUES (?1, ?2)")?;
+    for mask in 0u8..64 {
+        stmt.execute(rusqlite::params![mask, mask_name(mask)])?;
+    }
+    Ok(())
 }
 
 pub fn get_last_change(conn: &Connection, reason: &str) -> Result<Option<(i64, String)>> {
