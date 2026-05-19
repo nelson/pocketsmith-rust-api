@@ -227,7 +227,8 @@ pub fn find_pairs(conn: &Connection) -> Result<Vec<TransferPair>> {
     let mut stmt = conn.prepare(
         "SELECT id, amount, date, COALESCE(original_payee, payee, ''), transaction_account_id
          FROM transactions
-         WHERE amount IS NOT NULL AND date IS NOT NULL AND transaction_account_id IS NOT NULL",
+         WHERE amount IS NOT NULL AND date IS NOT NULL AND transaction_account_id IS NOT NULL
+           AND (is_transfer IS NULL OR is_transfer = 0)",
     )?;
     let txns: Vec<TxnRow> = stmt
         .query_map([], |row| {
@@ -858,5 +859,45 @@ mod tests {
 
         let pairs = find_pairs(&conn).unwrap();
         assert_eq!(pairs.len(), 0);
+    }
+
+    #[test]
+    fn test_find_pairs_excludes_already_tagged_is_transfer() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
+
+        let conn = test_db();
+        upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
+
+        // Both txns ALREADY tagged is_transfer=1 (as if apply_confirmed had
+        // previously run and then the pair row was deleted per the new
+        // invariant). find_pairs must not re-detect them.
+        with_operation(&conn, "test", |conn| {
+            let mut t1 = make_transaction(1, "Transfer to xx8005");
+            t1.amount = Some(500.0);
+            t1.date = Some("2026-03-01".into());
+            t1.original_payee = Some("Transfer to xx8005".into());
+            t1.transaction_account = Some(make_transaction_account(100, "Savings"));
+            t1.is_transfer = Some(true);
+            upsert_transaction(conn, &t1)?;
+
+            let mut t2 = make_transaction(2, "Transfer from xx8820");
+            t2.amount = Some(-500.0);
+            t2.date = Some("2026-03-01".into());
+            t2.original_payee = Some("Transfer from xx8820".into());
+            t2.transaction_account = Some(make_transaction_account(200, "Everyday"));
+            t2.is_transfer = Some(true);
+            upsert_transaction(conn, &t2)?;
+            Ok(())
+        })
+        .unwrap();
+
+        let pairs = find_pairs(&conn).unwrap();
+        assert_eq!(
+            pairs.len(),
+            0,
+            "transactions already tagged is_transfer=1 must not be re-paired"
+        );
     }
 }
