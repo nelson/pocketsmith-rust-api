@@ -34,6 +34,24 @@ CREATE TABLE IF NOT EXISTS confidences (
 );
 INSERT OR IGNORE INTO confidences (id, name) VALUES (0,'low'), (1,'medium'), (2,'high');
 
+CREATE TABLE IF NOT EXISTS field_masks (
+    mask  INTEGER PRIMARY KEY,
+    name  TEXT NOT NULL UNIQUE
+);
+-- Seed only the masks the current codebase produces (Option A, enumerated).
+-- The FK from _transaction_changes.mask -> field_masks.mask will reject any
+-- new combination, prompting a deliberate addition here.
+INSERT OR IGNORE INTO field_masks (mask, name) VALUES
+    ( 0, 'none'),
+    ( 1, 'payee'),
+    ( 2, 'category_id'),
+    ( 4, 'note'),
+    ( 8, 'labels'),
+    (16, 'is_transfer'),
+    (18, 'category_id, is_transfer'),
+    (32, 'memo'),
+    (63, 'create');
+
 CREATE TABLE IF NOT EXISTS _transaction_change_log (
     version              INTEGER PRIMARY KEY,
     reason               TEXT NOT NULL,
