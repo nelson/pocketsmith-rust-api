@@ -52,7 +52,7 @@ fn main() -> Result<()> {
 
     // Write to DB (unless dry-run) — one UPDATE per unique payee
     if !dry_run {
-        db::with_transaction_change_log(&conn, "normalisation", |conn| {
+        db::with_operation(&conn, "normalisation", |conn| {
             for (_, payee, _, ids) in &formatted {
                 if ids.is_empty() {
                     continue;

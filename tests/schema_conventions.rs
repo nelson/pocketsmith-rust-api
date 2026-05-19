@@ -99,7 +99,7 @@ fn field_masks_lookup_seeded() {
 /// Wrapped in an operation so the _transactions_history INSERT trigger
 /// finds a current operation id.
 fn seed_txn(conn: &Connection, id: i64) {
-    db::with_transaction_change_log(conn, "test-seed", |conn| {
+    db::with_operation(conn, "test-seed", |conn| {
         conn.execute(
             "INSERT INTO transactions (id, amount, date, transaction_account_id) VALUES (?1, 100.0, '2026-01-01', NULL)",
             rusqlite::params![id],
@@ -148,7 +148,7 @@ fn transaction_changes_mask_fk_rejects_out_of_range() {
     let conn = open();
     seed_txn(&conn, 30);
     // Masks > 63 are not seeded (only 0..63 exist). The FK should reject.
-    let err = db::with_transaction_change_log(&conn, "test", |conn| {
+    let err = db::with_operation(&conn, "test", |conn| {
         conn.execute(
             "INSERT INTO _transaction_changes (transaction_id, operation_id, mask) \
              VALUES (30, (SELECT id FROM _current_operation), 64)",
@@ -196,7 +196,7 @@ fn transaction_changes_id_autoincrement_after_delete() {
     // Delete that row, then trigger another by updating the txn under an op.
     conn.execute("DELETE FROM _transaction_changes WHERE id = ?1", [id_a])
         .unwrap();
-    db::with_transaction_change_log(&conn, "test", |conn| {
+    db::with_operation(&conn, "test", |conn| {
         conn.execute(
             "UPDATE transactions SET payee = 'updated' WHERE id = 20",
             [],
@@ -215,6 +215,21 @@ fn transaction_changes_id_autoincrement_after_delete() {
         id_b > id_a,
         "AUTOINCREMENT should not reuse id {id_a}, got {id_b}"
     );
+}
+
+#[test]
+fn with_operation_function_exists_and_creates_operation() {
+    // Behaviour test: calling the renamed function inserts an _operations row.
+    let conn = open();
+    db::with_operation(&conn, "test-rename", |_| Ok(())).unwrap();
+    let reason: String = conn
+        .query_row(
+            "SELECT reason FROM _operations ORDER BY id DESC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(reason, "test-rename");
 }
 
 #[test]

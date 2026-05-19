@@ -91,7 +91,7 @@ pub fn upsert_transaction(conn: &Connection, t: &Transaction) -> Result<()> {
 mod tests {
     use super::*;
     use crate::db::test_helpers::*;
-    use crate::db::with_transaction_change_log;
+    use crate::db::with_operation;
 
     fn history_count(conn: &Connection, transaction_id: i64) -> i64 {
         conn.query_row(
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_update_payee() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Raw Payee"))?;
             update_payee(conn, 1, "Clean Payee")
         })
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_update_payee_creates_history() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "normalisation", |conn| {
+        with_operation(&conn, "normalisation", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Raw Payee"))?;
             update_payee(conn, 1, "Clean Payee")
         })
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_update_payee_unchanged_skips_history() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Same Payee"))?;
             update_payee(conn, 1, "Same Payee")
         })
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_upsert_transaction_simple() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Supermarket"))
         })
         .unwrap();
@@ -164,7 +164,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Supermarket");
         txn.category = Some(make_category(10, "Food"));
-        with_transaction_change_log(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
+        with_operation(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let cat_title: String = conn
             .query_row("SELECT title FROM categories WHERE id = 10", [], |row| {
@@ -188,7 +188,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Supermarket");
         txn.transaction_account = Some(make_transaction_account(300, "Daily"));
-        with_transaction_change_log(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
+        with_operation(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let ta_name: String = conn
             .query_row(
@@ -214,7 +214,7 @@ mod tests {
         let conn = test_db();
         let mut txn = make_transaction(1, "Store");
         txn.labels = Some(vec!["food".into(), "weekly".into()]);
-        with_transaction_change_log(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
+        with_operation(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let labels: String = conn
             .query_row("SELECT labels FROM transactions WHERE id = 1", [], |row| {
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_upsert_transaction_replace() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))?;
             upsert_transaction(conn, &make_transaction(1, "Store B"))
         })
@@ -258,7 +258,7 @@ mod tests {
         txn.labels = Some(vec!["groceries".into()]);
         txn.note = Some("Weekly shop".into());
 
-        with_transaction_change_log(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
+        with_operation(&conn, "test", |conn| upsert_transaction(conn, &txn)).unwrap();
 
         let cat_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn test_batch_upsert_transactions() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let txns: Vec<Transaction> = (1..=100)
                 .map(|i| make_transaction(i, &format!("Store {}", i)))
                 .collect();
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_history_initial_insert() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
         })
         .unwrap();
@@ -326,7 +326,7 @@ mod tests {
     fn test_history_no_change_no_new_row() {
         let conn = test_db();
         let txn = make_transaction(1, "Store A");
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &txn)?;
             upsert_transaction(conn, &txn)
         })
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_history_tracked_field_change() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))?;
             upsert_transaction(conn, &make_transaction(1, "Store B"))
         })
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_history_only_changed_fields_populated() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))?;
             let mut txn = make_transaction(1, "Store B");
             txn.note = Some("a note".into());
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_history_multiple_field_changes_mask() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))?;
             let mut txn = make_transaction(1, "Store B"); // payee bit 0 = 1
             txn.memo = Some("new memo".into()); // memo bit 5 = 32
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn test_history_reason_via_change_log() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "pocketsmith", |conn| {
+        with_operation(&conn, "pocketsmith", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
         })
         .unwrap();
@@ -423,11 +423,11 @@ mod tests {
     #[test]
     fn test_history_version_references_change_log() {
         let conn = test_db();
-        with_transaction_change_log(&conn, "sync1", |conn| {
+        with_operation(&conn, "sync1", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
         })
         .unwrap();
-        with_transaction_change_log(&conn, "sync2", |conn| {
+        with_operation(&conn, "sync2", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store B"))
         })
         .unwrap();

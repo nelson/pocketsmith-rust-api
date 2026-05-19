@@ -167,7 +167,7 @@ pub fn clear_all(conn: &Connection) -> Result<()> {
 mod tests {
     use super::*;
     use crate::db::test_helpers::*;
-    use crate::db::{upsert_transaction, upsert_transaction_account, with_transaction_change_log};
+    use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
 
     fn setup_pair(conn: &Connection) {
         let acct1 = make_transaction_account(100, "Savings");
@@ -175,7 +175,7 @@ mod tests {
         upsert_transaction_account(conn, &acct1).unwrap();
         upsert_transaction_account(conn, &acct2).unwrap();
 
-        with_transaction_change_log(conn, "test", |conn| {
+        with_operation(conn, "test", |conn| {
             let mut t1 = make_transaction(1, "Transfer to xx8005");
             t1.amount = Some(1000.0);
             t1.date = Some("2026-03-01".into());
@@ -251,7 +251,7 @@ mod tests {
         setup_pair(&conn);
 
         // Add a third transaction for the second pair attempt
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t3 = make_transaction(3, "Another transfer");
             t3.amount = Some(-1000.0);
             t3.date = Some("2026-03-01".into());
@@ -332,7 +332,7 @@ mod tests {
         setup_pair(&conn);
 
         // Add more transactions for multiple pairs
-        with_transaction_change_log(&conn, "test", |conn| {
+        with_operation(&conn, "test", |conn| {
             let mut t3 = make_transaction(3, "Transfer to xx1234");
             t3.amount = Some(500.0);
             t3.date = Some("2026-03-02".into());
