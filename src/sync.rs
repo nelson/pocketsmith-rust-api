@@ -36,11 +36,9 @@ pub fn pull(client: &PocketSmithClient, conn: &Connection) -> Result<()> {
     println!("{} transactions fetched", transactions.len());
 
     db::with_operation(conn, "pocketsmith", |conn| {
-        let tx = conn.unchecked_transaction()?;
         for txn in &transactions {
-            db::upsert_transaction(&tx, txn)?;
+            db::upsert_transaction(conn, txn)?;
         }
-        tx.commit()?;
         Ok(())
     })?;
 
