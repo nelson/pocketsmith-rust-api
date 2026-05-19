@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS transfer_pairs (
     confidence  INTEGER NOT NULL REFERENCES confidences(id),
     status      INTEGER NOT NULL DEFAULT 0 REFERENCES statuses(id),
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     UNIQUE(txn_id_a),
     UNIQUE(txn_id_b)
 );

@@ -142,6 +142,36 @@ fn transfer_pairs_confidence_fk_rejects_invalid() {
     );
 }
 
+// ---- transfer_pairs.updated_at ----
+
+#[test]
+fn transfer_pairs_has_updated_at_with_default() {
+    let conn = open();
+    seed_txn(&conn, 10);
+    seed_txn(&conn, 11);
+    conn.execute(
+        "INSERT INTO transfer_pairs (txn_id_a, txn_id_b, amount_cents, confidence, status) \
+         VALUES (10, 11, 100, 2, 0)",
+        [],
+    )
+    .unwrap();
+    let (created_at, updated_at): (String, String) = conn
+        .query_row(
+            "SELECT created_at, updated_at FROM transfer_pairs WHERE txn_id_a = 10",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    // Default is the same `strftime(...,'now')` as created_at -- they should
+    // be either identical or within a millisecond of each other.
+    assert!(!updated_at.is_empty(), "updated_at should default to a timestamp");
+    assert_eq!(
+        &created_at[..10],
+        &updated_at[..10],
+        "created_at and updated_at should share the date prefix on insert"
+    );
+}
+
 #[test]
 fn transfer_pairs_status_fk_accepts_valid() {
     let conn = open();
