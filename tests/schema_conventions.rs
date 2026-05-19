@@ -55,3 +55,32 @@ fn confidences_lookup_seeded() {
         ]
     );
 }
+
+#[test]
+fn field_masks_lookup_seeded() {
+    let conn = open();
+    let rows: Vec<(i64, String)> = conn
+        .prepare("SELECT mask, name FROM field_masks ORDER BY mask")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    // Seed only the 9 masks actually produced today (Option A).
+    // FK on _transaction_changes.mask will fail loudly if a new code path
+    // emits an un-enumerated combination -- that is the intended alarm.
+    assert_eq!(
+        rows,
+        vec![
+            (0, "none".to_string()),
+            (1, "payee".to_string()),
+            (2, "category_id".to_string()),
+            (4, "note".to_string()),
+            (8, "labels".to_string()),
+            (16, "is_transfer".to_string()),
+            (18, "category_id, is_transfer".to_string()),
+            (32, "memo".to_string()),
+            (63, "create".to_string()),
+        ]
+    );
+}
