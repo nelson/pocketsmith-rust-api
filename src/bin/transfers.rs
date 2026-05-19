@@ -136,38 +136,15 @@ fn review_mode(args: &[String]) -> Result<()> {
 
 fn apply_mode() -> Result<()> {
     let conn = db::initialize("pocketsmith.db")?;
-
-    let pairs = transfer_pairs::get_confirmed_pairs(&conn)?;
-    if pairs.is_empty() {
+    let stats = transfers::apply_confirmed(&conn)?;
+    if stats.pairs_applied == 0 {
         println!("No confirmed pairs to apply.");
-        return Ok(());
+    } else {
+        println!(
+            "Applied {} pairs ({} transactions updated).",
+            stats.pairs_applied, stats.transactions_updated
+        );
     }
-
-    // Look up _Transfer category
-    let transfer_category_id: i64 = conn
-        .query_row(
-            "SELECT id FROM categories WHERE title = '_Transfer' LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|_| anyhow::anyhow!("No '_Transfer' category found in categories table"))?;
-
-    let count = pairs.len();
-    db::with_operation(&conn, "transfers", |conn| {
-        for pair in &pairs {
-            conn.execute(
-                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
-                rusqlite::params![transfer_category_id, pair.txn_id_a],
-            )?;
-            conn.execute(
-                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
-                rusqlite::params![transfer_category_id, pair.txn_id_b],
-            )?;
-        }
-        Ok(())
-    })?;
-
-    println!("Applied {count} pairs ({} transactions updated).", count * 2);
     print_status_summary(&conn)?;
     Ok(())
 }

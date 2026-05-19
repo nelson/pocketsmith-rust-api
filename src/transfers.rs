@@ -136,6 +136,63 @@ pub fn is_transfer_like(payee: &str) -> bool {
     transfer_patterns().is_match(payee)
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ApplyStats {
+    pub pairs_applied: usize,
+    pub transactions_updated: usize,
+}
+
+/// Apply all confirmed transfer pairs. For each pair:
+///   - Tag both transactions with the `_Transfer` category and `is_transfer = 1`.
+///   - Delete the pair from `transfer_pairs` (it is no longer pending action;
+///     the transactions themselves carry the transfer marker).
+///
+/// All writes happen inside a single `db::with_operation("transfers", ...)` so
+/// the resulting `_transaction_changes` rows are attributable.
+///
+/// Rejected and pending pairs are untouched. They stay in `transfer_pairs` so
+/// future `find_pairs()` runs continue to skip the involved transactions.
+///
+/// Errors with a descriptive message if no `_Transfer` category exists.
+pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
+    use crate::db::{transfer_pairs, with_operation};
+
+    let pairs = transfer_pairs::get_confirmed_pairs(conn)?;
+    if pairs.is_empty() {
+        return Ok(ApplyStats::default());
+    }
+
+    let transfer_category_id: i64 = conn
+        .query_row(
+            "SELECT id FROM categories WHERE title = '_Transfer' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|_| anyhow::anyhow!("No '_Transfer' category found in categories table"))?;
+
+    let pairs_applied = pairs.len();
+    let transactions_updated = pairs_applied * 2;
+
+    with_operation(conn, "transfers", |conn| {
+        for pair in &pairs {
+            conn.execute(
+                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
+                rusqlite::params![transfer_category_id, pair.txn_id_a],
+            )?;
+            conn.execute(
+                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
+                rusqlite::params![transfer_category_id, pair.txn_id_b],
+            )?;
+        }
+        Ok(())
+    })?;
+
+    Ok(ApplyStats {
+        pairs_applied,
+        transactions_updated,
+    })
+}
+
 fn amount_to_cents(amount: f64) -> i64 {
     (amount * 100.0).round() as i64
 }
@@ -300,6 +357,107 @@ pub fn date_diff_days(a: &str, b: &str) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_apply_confirmed_returns_stats_and_updates_transactions() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_category, upsert_transaction, upsert_transaction_account, with_operation};
+
+        let conn = test_db();
+        // _Transfer category required by apply_confirmed.
+        let mut transfer_cat = make_category(999, "_Transfer");
+        transfer_cat.is_transfer = Some(true);
+        upsert_category(&conn, &transfer_cat).unwrap();
+
+        upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
+
+        with_operation(&conn, "test", |conn| {
+            let mut t1 = make_transaction(1, "Transfer to xx8005");
+            t1.amount = Some(500.0);
+            t1.transaction_account = Some(make_transaction_account(100, "Savings"));
+            upsert_transaction(conn, &t1)?;
+            let mut t2 = make_transaction(2, "Transfer from xx8820");
+            t2.amount = Some(-500.0);
+            t2.transaction_account = Some(make_transaction_account(200, "Everyday"));
+            upsert_transaction(conn, &t2)?;
+            Ok(())
+        })
+        .unwrap();
+
+        crate::db::transfer_pairs::insert_pair(
+            &conn,
+            &TransferPair {
+                txn_id_a: 1,
+                txn_id_b: 2,
+                amount_cents: 50000,
+                confidence: Confidence::High,
+                status: Status::Confirmed,
+            },
+        )
+        .unwrap();
+
+        let stats = apply_confirmed(&conn).unwrap();
+        assert_eq!(stats.pairs_applied, 1);
+        assert_eq!(stats.transactions_updated, 2);
+
+        // Transactions tagged.
+        let (cat_id, is_transfer): (i64, bool) = conn
+            .query_row(
+                "SELECT category_id, is_transfer FROM transactions WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(cat_id, 999);
+        assert!(is_transfer);
+    }
+
+    #[test]
+    fn test_apply_confirmed_errors_when_no_transfer_category() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_transaction, upsert_transaction_account, with_operation};
+        let conn = test_db();
+        upsert_transaction_account(&conn, &make_transaction_account(100, "Savings")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "Everyday")).unwrap();
+        // Seed a confirmed pair so apply_confirmed has something to attempt.
+        with_operation(&conn, "test", |conn| {
+            let mut t1 = make_transaction(1, "a");
+            t1.amount = Some(100.0);
+            t1.transaction_account = Some(make_transaction_account(100, "Savings"));
+            upsert_transaction(conn, &t1)?;
+            let mut t2 = make_transaction(2, "b");
+            t2.amount = Some(-100.0);
+            t2.transaction_account = Some(make_transaction_account(200, "Everyday"));
+            upsert_transaction(conn, &t2)?;
+            Ok(())
+        })
+        .unwrap();
+        crate::db::transfer_pairs::insert_pair(
+            &conn,
+            &TransferPair {
+                txn_id_a: 1,
+                txn_id_b: 2,
+                amount_cents: 10000,
+                confidence: Confidence::High,
+                status: Status::Confirmed,
+            },
+        )
+        .unwrap();
+        let err = apply_confirmed(&conn).unwrap_err();
+        assert!(
+            err.to_string().contains("_Transfer"),
+            "expected error to mention _Transfer category, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_apply_confirmed_empty_returns_zero_stats() {
+        let conn = crate::db::test_helpers::test_db();
+        let stats = apply_confirmed(&conn).unwrap();
+        assert_eq!(stats.pairs_applied, 0);
+        assert_eq!(stats.transactions_updated, 0);
+    }
 
     #[test]
     fn test_confidence_roundtrip() {
