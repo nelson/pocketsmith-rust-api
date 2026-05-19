@@ -473,7 +473,7 @@ mod tests {
                 .unwrap();
         let history_count: i64 = conn
             .query_row(
-                "SELECT transactions_updated FROM _transaction_change_log WHERE version = ?1",
+                "SELECT transactions_updated FROM _operations WHERE id = ?1",
                 [version],
                 |row| row.get(0),
             )

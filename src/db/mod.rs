@@ -33,7 +33,7 @@ pub fn initialize_in_memory() -> Result<Connection> {
 
 pub fn get_last_change(conn: &Connection, reason: &str) -> Result<Option<(i64, String)>> {
     let mut stmt = conn.prepare(
-        "SELECT version, created_at FROM _transaction_change_log WHERE reason = ?1 ORDER BY version DESC LIMIT 1",
+        "SELECT id, created_at FROM _operations WHERE reason = ?1 ORDER BY id DESC LIMIT 1",
     )?;
     Ok(stmt.query_row([reason], |row| Ok((row.get(0)?, row.get(1)?))).ok())
 }
@@ -43,7 +43,7 @@ where
     F: FnOnce(&Connection) -> Result<T>,
 {
     conn.execute(
-        "INSERT INTO _transaction_change_log (reason) VALUES (?1)",
+        "INSERT INTO _operations (reason) VALUES (?1)",
         [reason],
     )?;
     let version = conn.last_insert_rowid();
@@ -62,7 +62,7 @@ where
         |row| row.get(0),
     )?;
     conn.execute(
-        "UPDATE _transaction_change_log SET transactions_updated = ?1 WHERE version = ?2",
+        "UPDATE _operations SET transactions_updated = ?1 WHERE id = ?2",
         rusqlite::params![count, version],
     )?;
 
@@ -220,7 +220,7 @@ mod tests {
             Ok(())
         }).unwrap();
         let count: i64 = conn.query_row(
-            "SELECT transactions_updated FROM _transaction_change_log WHERE version = 1",
+            "SELECT transactions_updated FROM _operations WHERE id = 1",
             [], |row| row.get(0),
         ).unwrap();
         assert_eq!(count, 2);

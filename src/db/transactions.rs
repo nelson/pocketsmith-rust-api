@@ -411,7 +411,7 @@ mod tests {
         let reason: String = conn
             .query_row(
                 "SELECT l.reason FROM _transactions_history h
-                 JOIN _transaction_change_log l ON h._version = l.version
+                 JOIN _operations l ON h._version = l.id
                  WHERE h.transaction_id = 1",
                 [],
                 |row| row.get(0),

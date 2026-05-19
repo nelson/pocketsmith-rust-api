@@ -103,6 +103,46 @@ fn seed_txn(conn: &Connection, id: i64) {
 
 // ---- FK enforcement on transfer_pairs ----
 
+// ---- Operation framework renames ----
+
+#[test]
+fn operations_table_exists_with_autoincrement_id() {
+    let conn = open();
+    // Insert two operations, delete the second, insert a third.
+    // With AUTOINCREMENT the third must NOT reuse id 2.
+    conn.execute(
+        "INSERT INTO _operations (reason) VALUES ('test1')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO _operations (reason) VALUES ('test2')",
+        [],
+    )
+    .unwrap();
+    let id2 = conn.last_insert_rowid();
+    conn.execute("DELETE FROM _operations WHERE id = ?1", [id2])
+        .unwrap();
+    conn.execute(
+        "INSERT INTO _operations (reason) VALUES ('test3')",
+        [],
+    )
+    .unwrap();
+    let id3 = conn.last_insert_rowid();
+    assert!(
+        id3 > id2,
+        "AUTOINCREMENT should not reuse id {id2}, got {id3}"
+    );
+}
+
+#[test]
+fn operations_table_has_expected_columns() {
+    let conn = open();
+    // Smoke test: SELECT all expected columns; failure means a missing column.
+    conn.prepare("SELECT id, reason, created_at, transactions_updated FROM _operations")
+        .unwrap();
+}
+
 #[test]
 fn transfer_pairs_status_fk_rejects_invalid() {
     let conn = open();
