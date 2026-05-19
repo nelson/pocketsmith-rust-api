@@ -1,4 +1,33 @@
+// =============================================================================
+// Schema conventions (Convention C)
+// =============================================================================
+//
+// 1. Underscore prefix marks tables and columns that are managed by triggers
+//    or the operation framework, not directly by application logic.
+//    Examples: `_operations`, `_current_operation`, `_transaction_changes`.
+//
+// 2. Application-readable, application-writable tables have NO prefix --
+//    whether locally sourced (e.g. `transfer_pairs`, `push_log`) or remotely
+//    sourced (e.g. `transactions`, `categories`, `users`).
+//
+// 3. Lookup / reference tables have NO prefix (e.g. `statuses`, `confidences`,
+//    `field_masks`). They are seeded at init time with `INSERT OR IGNORE`.
+//
+// 4. Timestamp columns use `created_at` / `updated_at` (no underscore prefix),
+//    on both prefixed and non-prefixed tables.
+//
+// 5. Surrogate primary keys on framework tables use `AUTOINCREMENT` so ids are
+//    never reused after a delete (rows are referenced elsewhere by id).
+// =============================================================================
+
 pub(crate) const SCHEMA: &str = "
+-- Reference / lookup tables (Convention C: no underscore prefix)
+CREATE TABLE IF NOT EXISTS statuses (
+    id    INTEGER PRIMARY KEY,
+    name  TEXT NOT NULL UNIQUE
+);
+INSERT OR IGNORE INTO statuses (id, name) VALUES (0,'pending'), (1,'confirmed'), (2,'rejected');
+
 CREATE TABLE IF NOT EXISTS _transaction_change_log (
     version              INTEGER PRIMARY KEY,
     reason               TEXT NOT NULL,

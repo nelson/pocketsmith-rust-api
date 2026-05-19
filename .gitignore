@@ -16,6 +16,9 @@ target
 # Environment variables
 .env
 
+# pi local sandbox config
+.pi/
+
 # SQLite database
 *.db
 *.db-wal
