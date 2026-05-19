@@ -47,8 +47,8 @@ use pocketsmith_sync::transfers::{self, Status};
 
 use crate::css::CSS;
 use crate::helpers::{
-    confidence_class, confidence_reason, count_decisions, find_pair_index, format_dollars,
-    format_short_date, get_filtered_pairs, get_prior_pairs,
+    confidence_class, confidence_reason, count_decisions, derive_decision, find_pair_index,
+    format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
 };
 use crate::js::JS;
 use crate::state::{AppState, Decision};
@@ -137,7 +137,7 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
             @for pair in pairs {
                 @let pair_id = format!("{}-{}", pair.txn_id_a, pair.txn_id_b);
                 @let is_selected = selected == Some((pair.txn_id_a, pair.txn_id_b));
-                @let decision = decisions.get(&(pair.txn_id_a, pair.txn_id_b)).copied();
+                @let decision = derive_decision(pair, decisions);
                 div.queue-item
                     .(if is_selected { "selected" } else { "" })
                     .(confidence_class(&pair.confidence))
