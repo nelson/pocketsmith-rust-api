@@ -84,3 +84,81 @@ fn field_masks_lookup_seeded() {
         ]
     );
 }
+
+// ---- Helpers for FK tests ----
+
+/// Create a single transactions row so transfer_pairs FK can attach to it.
+/// Wrapped in an operation so the _transactions_history INSERT trigger
+/// finds a current operation id.
+fn seed_txn(conn: &Connection, id: i64) {
+    db::with_transaction_change_log(conn, "test-seed", |conn| {
+        conn.execute(
+            "INSERT INTO transactions (id, amount, date, transaction_account_id) VALUES (?1, 100.0, '2026-01-01', NULL)",
+            rusqlite::params![id],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+// ---- FK enforcement on transfer_pairs ----
+
+#[test]
+fn transfer_pairs_status_fk_rejects_invalid() {
+    let conn = open();
+    seed_txn(&conn, 1);
+    seed_txn(&conn, 2);
+    // status = 99 must be rejected by FK to statuses(id)
+    let err = conn
+        .execute(
+            "INSERT INTO transfer_pairs (txn_id_a, txn_id_b, amount_cents, confidence, status) \
+             VALUES (1, 2, 100, 2, 99)",
+            [],
+        )
+        .unwrap_err();
+    let msg = format!("{err}");
+    assert!(
+        msg.to_lowercase().contains("foreign key"),
+        "expected FK violation, got: {msg}"
+    );
+}
+
+#[test]
+fn transfer_pairs_confidence_fk_rejects_invalid() {
+    let conn = open();
+    seed_txn(&conn, 3);
+    seed_txn(&conn, 4);
+    let err = conn
+        .execute(
+            "INSERT INTO transfer_pairs (txn_id_a, txn_id_b, amount_cents, confidence, status) \
+             VALUES (3, 4, 100, 99, 0)",
+            [],
+        )
+        .unwrap_err();
+    let msg = format!("{err}");
+    assert!(
+        msg.to_lowercase().contains("foreign key"),
+        "expected FK violation, got: {msg}"
+    );
+}
+
+#[test]
+fn transfer_pairs_status_fk_accepts_valid() {
+    let conn = open();
+    seed_txn(&conn, 5);
+    seed_txn(&conn, 6);
+    // All three statuses (0/1/2) and confidences (0/1/2) must be accepted.
+    for (status, confidence) in [(0i64, 0i64), (1, 1), (2, 2)] {
+        conn.execute(
+            "DELETE FROM transfer_pairs WHERE txn_id_a = 5 AND txn_id_b = 6",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transfer_pairs (txn_id_a, txn_id_b, amount_cents, confidence, status) \
+             VALUES (5, 6, 100, ?1, ?2)",
+            rusqlite::params![confidence, status],
+        )
+        .unwrap();
+    }
+}
