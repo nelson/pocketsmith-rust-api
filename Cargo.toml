@@ -14,7 +14,6 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 anyhow = "1"
 dotenvy = "0.15"
 regex = "1"
-libc = "0.2"
 tiny_http = { version = "0.12", optional = true }
 maud = { version = "0.26", optional = true }
 
