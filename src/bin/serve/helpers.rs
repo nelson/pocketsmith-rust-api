@@ -134,6 +134,33 @@ pub fn count_decisions(decisions: &HashMap<(i64, i64), Decision>, d: Decision) -
     decisions.values().filter(|v| **v == d).count()
 }
 
+/// Derive the effective decision for a pair, combining in-memory session
+/// decisions with the DB-persisted status.
+///
+/// - In-memory decision wins (it's the user's current intent for this session,
+///   including Skip which has no DB representation).
+/// - Falls back to DB status: Confirmed -> Some(Confirm), Rejected -> Some(Reject),
+///   Pending -> None.
+///
+/// This is what lets the queue UI show ticks on pairs that were confirmed in a
+/// previous run (or auto-confirmed by `transfers detect`) without needing a
+/// matching in-memory entry. The same code path makes undo work uniformly:
+/// the undo button is shown whenever derive_decision returns Confirm/Reject,
+/// regardless of which source produced it.
+pub fn derive_decision(
+    pair: &TransferPairRow,
+    decisions: &HashMap<(i64, i64), Decision>,
+) -> Option<Decision> {
+    if let Some(d) = decisions.get(&(pair.txn_id_a, pair.txn_id_b)) {
+        return Some(*d);
+    }
+    match pair.status {
+        Status::Confirmed => Some(Decision::Confirm),
+        Status::Rejected => Some(Decision::Reject),
+        Status::Pending => None,
+    }
+}
+
 pub fn parse_pair_id(path: &str, prefix: &str) -> Option<(i64, i64)> {
     let rest = path.strip_prefix(prefix)?;
     let id_part = rest.split('/').next()?;
@@ -590,6 +617,49 @@ mod tests {
         let result = get_filtered_pairs(&conn, "nonexistent", "all", &decisions);
         assert!(result.is_empty());
     }
+
+    // --- derive_decision tests ---
+
+    #[test]
+    fn derive_decision_uses_in_memory_when_present() {
+        let pair = make_pair(1, 2, Status::Pending, Confidence::High);
+        let mut decisions = HashMap::new();
+        decisions.insert((1, 2), Decision::Skip);
+        assert_eq!(derive_decision(&pair, &decisions), Some(Decision::Skip));
+    }
+
+    #[test]
+    fn derive_decision_uses_in_memory_even_if_db_disagrees() {
+        // DB-confirmed pair with an in-memory skip should still show as Skip.
+        // (The in-memory decision is the user's current intent for this session.)
+        let pair = make_pair(1, 2, Status::Confirmed, Confidence::High);
+        let mut decisions = HashMap::new();
+        decisions.insert((1, 2), Decision::Skip);
+        assert_eq!(derive_decision(&pair, &decisions), Some(Decision::Skip));
+    }
+
+    #[test]
+    fn derive_decision_falls_back_to_db_confirmed() {
+        let pair = make_pair(1, 2, Status::Confirmed, Confidence::High);
+        let decisions = HashMap::new();
+        assert_eq!(derive_decision(&pair, &decisions), Some(Decision::Confirm));
+    }
+
+    #[test]
+    fn derive_decision_falls_back_to_db_rejected() {
+        let pair = make_pair(1, 2, Status::Rejected, Confidence::High);
+        let decisions = HashMap::new();
+        assert_eq!(derive_decision(&pair, &decisions), Some(Decision::Reject));
+    }
+
+    #[test]
+    fn derive_decision_pending_no_session_decision_returns_none() {
+        let pair = make_pair(1, 2, Status::Pending, Confidence::High);
+        let decisions = HashMap::new();
+        assert_eq!(derive_decision(&pair, &decisions), None);
+    }
+
+    // --- count_decisions tests ---
 
     #[test]
     fn count_decisions_variants() {
