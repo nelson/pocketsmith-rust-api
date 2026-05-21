@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn test_change_records_reason_via_operations() {
         let conn = test_db();
-        with_operation(&conn, "pocketsmith", |conn| {
+        with_operation(&conn, "sync", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
         })
         .unwrap();
@@ -417,7 +417,7 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(reason, "pocketsmith");
+        assert_eq!(reason, "sync");
     }
 
     #[test]
