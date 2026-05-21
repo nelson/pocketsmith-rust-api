@@ -10,6 +10,16 @@ Most data — including review decisions (confirm/reject) — lives locally in `
 cp .env.example .env  # add your POCKETSMITH_API_KEY
 ```
 
+### Cargo location
+
+`cargo` may not be on `PATH` in every shell. On this machine (NixOS / nix-darwin) it can live in any of:
+
+- `/run/current-system/sw/bin/cargo`
+- `/etc/profiles/per-user/nelson/bin/cargo`
+- `/nix/store/*-cargo-*/bin/cargo`
+
+If `cargo` isn't found, locate it with e.g. `find /nix/store -maxdepth 3 -name cargo -type f` and invoke it by full path.
+
 ## Sync
 
 Pull all transactions, accounts, and categories from PocketSmith into `pocketsmith.db`:
@@ -100,9 +110,14 @@ Each transaction can appear in at most one pair (enforced by unique constraints 
 
 ## Push to PocketSmith
 
-Pushes the result of `transfers --apply` back to PocketSmith: for each confirmed transfer pair, a single PUT sets `is_transfer=true`, `category_id=<_Transfer>`, and the `[paired:<other_id>]` memo on each of the two transactions. Driven entirely from local DB state — no manual ids.
+Pushes locally-edited transaction fields back to PocketSmith. Currently driven by two local writers:
 
-This is the Stage 1 + early-Stage-3 push surface (transfer pairs only, including memo). Out of scope until later stages: other writers' fields like `payee` from `normalise` (rest of Stage 3), per-field conflict detection (Stage 4), conflict review UX (Stage 5). See `.claude/plans/push-overview.md` for the stage table and rationale.
+- `transfers --apply` / `--annotate-existing` — sets `is_transfer`, `category_id`, and the `[paired:<other_id>]` memo on each leg of a confirmed transfer pair.
+- `normalise` — cleans `payee` (and any of `note` / `labels` / `memo` it touches in future).
+
+One PUT per transaction. If a transaction has unpushed edits from multiple writers (e.g. one normalisation + one transfers row), they are folded into a single PUT carrying every dirty field's current local value. Everything is driven from local DB state — no manual ids.
+
+This is the Stage 3 push surface (all six locally-mutated fields: `payee`, `category_id`, `note`, `labels`, `is_transfer`, `memo`). Out of scope until later stages: per-field conflict detection (Stage 4), conflict review UX (Stage 5). See `.claude/plans/push-overview.md` for the stage table and rationale.
 
 ### Dry-run
 
@@ -138,7 +153,7 @@ SELECT outcome, COUNT(*) FROM push_log GROUP BY outcome;
 SELECT * FROM push_log WHERE outcome = 'failed' OR outcome = 'skipped_changed_upstream';
 ```
 
-Successful pushes also stamp `_transaction_changes.pushed_at` on every change row whose `mask` includes a Stage-1 bit (`category_id` or `is_transfer`) **and** whose `operation_id` came from `transfers --apply` (reason `'transfers'`). Re-running `push` is a no-op once `pushed_at` is set — the pending query filters those out.
+Successful pushes also stamp `_transaction_changes.pushed_at` on every change row for the transaction whose `operation_id` came from a local writer (`reason NOT IN ('sync','push')` — currently `transfers` and `normalisation`). Re-running `push` is a no-op once `pushed_at` is set — the pending query filters those out.
 
 ### Architectural invariant: push does not write to `transactions`
 

@@ -1,33 +1,49 @@
-//! Stage 1+ push — push `is_transfer` + `category_id` + `memo` for confirmed
-//! transfer pairs that `transfers --apply` (or `transfers --annotate-existing`)
-//! has already written locally.
+//! Stage 3 push — generalised to every locally-mutated field.
+//!
+//! Picks up any `_transaction_changes` row whose `operation.reason` is
+//! neither `sync` nor `push`, unions the dirty bits across all unpushed
+//! rows for a transaction, and PUTs the *current* `transactions.*` values
+//! for every dirty field. The Stage 1 timestamp guard, `pushed_at`
+//! marking, and one-`push_log`-row-per-attempt safety still apply.
 //!
 //! See [`.claude/plans/push-stage-1-transfer-pair-mvp.md`] for the original
-//! design rationale and [`.claude/plans/push-stage-3-expand-fields.md`] for
-//! the broader generalisation. This module is still scoped to the transfers
-//! reason — normalise / other writers are deferred to a later Stage-3 pass.
+//! Stage 1 design and [`.claude/plans/push-stage-3-expand-fields.md`] for
+//! the generalisation rationale. The Stage 2 observation debrief at
+//! [`.claude/plans/push-stage-2-debrief.md`] gates this stage.
 //!
 //! Out of scope here (documented so reviewers don't add them):
 //! - per-field conflict detection / table     → Stage 4.
 //! - conflict review UX                       → Stage 5.
-//! - rate limiting / 429 retry                → not yet needed for the volumes
-//!                                              transfer pushes produce.
-//! - settle window                            → not needed for transfer pairs.
+//! - rate limiting / 429 retry                → not yet needed.
+//! - settle window                            → not yet needed; `normalise`
+//!                                              edits are bulk-automated, but
+//!                                              we have no observed regrets.
+//! - clearing a field to NULL                 → if `transactions.<field>`
+//!                                              is NULL when its bit is dirty,
+//!                                              the PUT omits the field
+//!                                              rather than sending null. No
+//!                                              current writer produces this
+//!                                              shape; revisit if needed.
 //!
 //! Algorithm (per txn):
 //!   1. GET /transactions/{id} (timestamp guard).
 //!   2. If remote.updated_at != local.updated_at → record
 //!      `skipped_changed_upstream`, do not PUT.
-//!   3. If dry-run → record `would_push`, do not PUT.
-//!   4. PUT { is_transfer, category_id, memo } only.
-//!   5. Stamp `pushed_at` on every `_transaction_changes` row for this txn
-//!      whose mask intersects bits 2|16|32 (category_id, is_transfer, memo)
-//!      and which is still `pushed_at IS NULL`, scoped to operations whose
-//!      reason='transfers'.
+//!   3. Compute the union mask across all unpushed `_transaction_changes`
+//!      rows for the txn whose `reason NOT IN ('sync','push')`. Build a
+//!      `TransactionUpdate` from the current `transactions.*` values for
+//!      every dirty bit.
+//!   4. If dry-run → record `would_push`, do not PUT.
+//!   5. PUT the `TransactionUpdate`.
+//!   6. Stamp `pushed_at` on every `_transaction_changes` row for this txn
+//!      with `pushed_at IS NULL` and `reason NOT IN ('sync','push')`. We do
+//!      NOT filter by mask intersection: any local-writer row covered by
+//!      this PUT is settled, even if its specific bits weren't touched
+//!      (e.g. an empty mask=0 row, which shouldn't exist but harmless).
 //!
-//! A 404 from the GET is recorded as `deleted_upstream` (the txn was removed
-//! on the server). Any other error path records `failed` with the error
-//! message; the loop never short-circuits — one batch yields one report.
+//! A 404 from the GET is recorded as `deleted_upstream`. Any other error
+//! records `failed`; the loop never short-circuits — one batch yields one
+//! report.
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -36,9 +52,14 @@ use crate::client::PocketSmithClient;
 use crate::db;
 use crate::models::{Transaction, TransactionUpdate};
 
-/// Bits we touch for transfer pushes: `category_id` (1<<1 = 2) | `is_transfer`
-/// (1<<4 = 16) | `memo` (1<<5 = 32) = 50.
-const TRANSFERS_PUSH_MASK: i64 = 50;
+// `_transaction_changes.mask` bit layout — kept in sync with the trigger
+// in `db::schema::SCHEMA` and the `field_masks` lookup table.
+const MASK_PAYEE: i64 = 1;
+const MASK_CATEGORY_ID: i64 = 2;
+const MASK_NOTE: i64 = 4;
+const MASK_LABELS: i64 = 8;
+const MASK_IS_TRANSFER: i64 = 16;
+const MASK_MEMO: i64 = 32;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PushOpts {
@@ -127,18 +148,18 @@ pub fn push<A: PushApi>(api: &A, conn: &Connection, opts: &PushOpts) -> Result<P
     Ok(stats)
 }
 
-/// Pending query — transfer-side edits awaiting push. Picks up any
-/// `reason='transfers'` change row whose mask intersects any of
-/// `(category_id | is_transfer | memo)` and which hasn't yet been stamped
-/// `pushed_at`. The memo bit is what lets `annotate_existing_pairs` produce
-/// a memo-only change that still gets caught here.
+/// Pending query — any local edit awaiting push. A change row qualifies if:
+/// it has at least one dirty bit (`mask != 0`), its operation came from a
+/// local writer (`reason NOT IN ('sync','push')` — currently `transfers`,
+/// `normalisation`, plus any future writer), it hasn't been stamped
+/// `pushed_at`, and the underlying transaction still exists locally.
 fn pending_txn_ids(conn: &Connection, limit: Option<usize>) -> Result<Vec<i64>> {
     let sql = "
         SELECT DISTINCT c.transaction_id
         FROM _transaction_changes c
         JOIN _operations o ON c.operation_id = o.id
-        WHERE (c.mask & 50) != 0
-          AND o.reason = 'transfers'
+        WHERE c.mask != 0
+          AND o.reason NOT IN ('sync','push')
           AND c.pushed_at IS NULL
           AND EXISTS (SELECT 1 FROM transactions t WHERE t.id = c.transaction_id)
         ORDER BY c.transaction_id";
@@ -153,26 +174,90 @@ fn pending_txn_ids(conn: &Connection, limit: Option<usize>) -> Result<Vec<i64>> 
 }
 
 struct LocalSnapshot {
-    is_transfer: i64,
+    payee: Option<String>,
     category_id: Option<i64>,
+    note: Option<String>,
+    labels: Option<String>,
+    is_transfer: i64,
     memo: Option<String>,
     updated_at: Option<String>,
 }
 
 fn load_local(conn: &Connection, txn_id: i64) -> Result<LocalSnapshot> {
     conn.query_row(
-        "SELECT is_transfer, category_id, memo, updated_at FROM transactions WHERE id = ?1",
+        "SELECT payee, category_id, note, labels, is_transfer, memo, updated_at
+           FROM transactions WHERE id = ?1",
         [txn_id],
         |row| {
             Ok(LocalSnapshot {
-                is_transfer: row.get::<_, Option<i64>>(0)?.unwrap_or(0),
+                payee: row.get(0)?,
                 category_id: row.get(1)?,
-                memo: row.get(2)?,
-                updated_at: row.get(3)?,
+                note: row.get(2)?,
+                labels: row.get(3)?,
+                is_transfer: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
+                memo: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         },
     )
     .with_context(|| format!("local row missing for txn {txn_id}"))
+}
+
+/// Union of dirty bits across every unpushed `_transaction_changes` row for
+/// `txn_id` whose operation came from a local writer. Returns 0 only if
+/// nothing is pending — the pending query already filters that case out, so
+/// callers can treat 0 as a logic error.
+fn union_dirty_mask(conn: &Connection, txn_id: i64) -> Result<i64> {
+    let mut stmt = conn.prepare(
+        "SELECT c.mask
+           FROM _transaction_changes c
+           JOIN _operations o ON c.operation_id = o.id
+          WHERE c.transaction_id = ?1
+            AND c.pushed_at IS NULL
+            AND o.reason NOT IN ('sync','push')",
+    )?;
+    let mut mask: i64 = 0;
+    for row in stmt.query_map([txn_id], |r| r.get::<_, i64>(0))? {
+        mask |= row?;
+    }
+    Ok(mask)
+}
+
+/// Convert a stored `labels` JSON array (e.g. `["food","weekly"]`) into the
+/// CSV form that the PocketSmith PUT endpoint accepts. `None` and empty
+/// arrays both serialise to `Some("")` so the bit being dirty always sends
+/// *something* — but see the module-level note about clearing fields.
+/// Falls back to passing the raw string through if it isn't valid JSON.
+fn labels_for_put(stored: Option<&str>) -> Option<String> {
+    let s = stored?;
+    match serde_json::from_str::<Vec<String>>(s) {
+        Ok(items) => Some(items.join(",")),
+        Err(_) => Some(s.to_string()),
+    }
+}
+
+/// Build a `TransactionUpdate` from `local` for every dirty bit in `mask`.
+fn build_update(local: &LocalSnapshot, mask: i64) -> TransactionUpdate {
+    let mut put = TransactionUpdate::default();
+    if mask & MASK_PAYEE != 0 {
+        put.payee = local.payee.clone();
+    }
+    if mask & MASK_CATEGORY_ID != 0 {
+        put.category_id = local.category_id;
+    }
+    if mask & MASK_NOTE != 0 {
+        put.note = local.note.clone();
+    }
+    if mask & MASK_LABELS != 0 {
+        put.labels = labels_for_put(local.labels.as_deref());
+    }
+    if mask & MASK_IS_TRANSFER != 0 {
+        put.is_transfer = Some(local.is_transfer != 0);
+    }
+    if mask & MASK_MEMO != 0 {
+        put.memo = local.memo.clone();
+    }
+    put
 }
 
 fn run_one_txn<A: PushApi>(
@@ -231,12 +316,8 @@ fn run_one_txn<A: PushApi>(
         return Ok(Outcome::SkippedChangedUpstream);
     }
 
-    let put = TransactionUpdate {
-        is_transfer: Some(local.is_transfer != 0),
-        category_id: local.category_id,
-        memo: local.memo.clone(),
-        ..Default::default()
-    };
+    let dirty_mask = union_dirty_mask(conn, txn_id)?;
+    let put = build_update(&local, dirty_mask);
 
     if opts.dry_run {
         let request_body = serde_json::to_string(&put).ok();
@@ -279,22 +360,21 @@ fn run_one_txn<A: PushApi>(
     // `sync` will pull the bumped `updated_at` naturally. The server's
     // returned timestamp is preserved in `push_log.response_body` for audit.
     //
-    // Stamp every still-unpushed Stage-1 change row for this txn whose
-    // operation came from `transfers --apply`. The reason filter is the bug
-    // fix: without it, the mask=63 row that the INSERT trigger emits during
-    // sync (which intersects bits 2|16) would also be stamped, which is
-    // semantically wrong — that row represents incoming remote state, not a
-    // local change waiting to be propagated.
+    // Stamp every still-unpushed local-writer change row for this txn. We
+    // exclude `sync` and `push` so the mask=63 sync-create marker and any
+    // future push-side bookkeeping rows aren't mistakenly recorded as
+    // "already pushed". A multi-reason batch (e.g. one normalisation row +
+    // one transfers row on the same txn) is settled in one shot.
     conn.execute(
         "UPDATE _transaction_changes
             SET pushed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
           WHERE transaction_id = ?1
-            AND (mask & ?2) != 0
             AND pushed_at IS NULL
             AND operation_id IN (
-                SELECT id FROM _operations WHERE reason = 'transfers'
+                SELECT id FROM _operations
+                 WHERE reason NOT IN ('sync','push')
             )",
-        params![txn_id, TRANSFERS_PUSH_MASK],
+        params![txn_id],
     )?;
 
     let response_body = serde_json::to_string(&resp).ok();
