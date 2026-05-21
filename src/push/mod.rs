@@ -113,6 +113,15 @@ pub fn push<A: PushApi>(api: &A, conn: &Connection, opts: &PushOpts) -> Result<P
                 }
             }
         }
+        // Record how many txns this push actually wrote to Pocketsmith.
+        // `with_operation`'s default count is derived from
+        // `_transaction_changes` rows, but push doesn't write to
+        // `transactions` (and therefore doesn't fire the change trigger), so
+        // without this override `_operations.transactions_updated` for push
+        // would always be 0. Semantics: "upstream writes successfully
+        // performed" — the next sync should see roughly the same number of
+        // transaction updates, modulo unrelated remote changes.
+        db::record_operation_writes(conn, stats.pushed as i64)?;
         Ok(())
     })?;
 
@@ -257,25 +266,28 @@ fn run_one_txn<A: PushApi>(
         }
     };
 
-    // Refresh local `updated_at` to match the server's post-PUT value, so the
-    // next push run's timestamp guard doesn't trip on our own write. This
-    // UPDATE fires the `_transaction_changes_update` trigger, producing a
-    // row with mask=0 (none of the tracked fields changed) — harmless and
-    // ignored by the pending query.
-    if let Some(ref ts) = resp.updated_at {
-        conn.execute(
-            "UPDATE transactions SET updated_at = ?1 WHERE id = ?2",
-            params![ts, txn_id],
-        )?;
-    }
-
-    // Stamp every still-unpushed Stage-1 change row for this txn.
+    // We deliberately do NOT bump `transactions.updated_at` to the server's
+    // post-PUT value. Architectural invariant: `transactions` is the local
+    // mirror of remote state (managed by `sync`) overlaid with un-pushed
+    // local edits; push is neither, so it must not write here. The next
+    // `sync` will pull the bumped `updated_at` naturally. The server's
+    // returned timestamp is preserved in `push_log.response_body` for audit.
+    //
+    // Stamp every still-unpushed Stage-1 change row for this txn whose
+    // operation came from `transfers --apply`. The reason filter is the bug
+    // fix: without it, the mask=63 row that the INSERT trigger emits during
+    // sync (which intersects bits 2|16) would also be stamped, which is
+    // semantically wrong — that row represents incoming remote state, not a
+    // local change waiting to be propagated.
     conn.execute(
         "UPDATE _transaction_changes
             SET pushed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
           WHERE transaction_id = ?1
             AND (mask & ?2) != 0
-            AND pushed_at IS NULL",
+            AND pushed_at IS NULL
+            AND operation_id IN (
+                SELECT id FROM _operations WHERE reason = 'transfers'
+            )",
         params![txn_id, STAGE1_MASK],
     )?;
 
@@ -471,13 +483,13 @@ mod tests {
 
     // ----- Fixture helpers --------------------------------------------------
 
-    /// Insert a category, account, transaction (under reason "pocketsmith"),
+    /// Insert a category, account, transaction (under reason "sync"),
     /// then re-run `transfers --apply`-style write to mark is_transfer=1 +
     /// category_id=99 (under reason "transfers"). Returns the txn id.
     fn fixture_confirmed_transfer(conn: &Connection, id: i64) -> i64 {
         // Ensure the _Transfer category exists (FK target) and a baseline pull
-        // exists with is_transfer=0 / category_id=NULL — both reason='pocketsmith'.
-        with_operation(conn, "pocketsmith", |conn| {
+        // exists with is_transfer=0 / category_id=NULL — both reason='sync'.
+        with_operation(conn, "sync", |conn| {
             crate::db::upsert_category(conn, &make_category(99, "_Transfer"))?;
             let mut t = make_transaction(id, "Internal Transfer");
             t.category = None;
@@ -523,9 +535,9 @@ mod tests {
     }
 
     #[test]
-    fn pending_query_empty_when_only_pocketsmith_writes() {
+    fn pending_query_empty_when_only_sync_writes() {
         let conn = test_db();
-        with_operation(&conn, "pocketsmith", |conn| {
+        with_operation(&conn, "sync", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Anything"))
         })
         .unwrap();
@@ -570,9 +582,11 @@ mod tests {
             .unwrap();
         assert!(stamped >= 1, "expected at least one stamped row");
 
-        // local updated_at refreshed.
+        // Confirm push did NOT touch transactions.updated_at — push must not
+        // write to the transactions table (Stage 1 invariant). The local row
+        // still reflects the last sync's timestamp.
         let ts = local_updated_at(&conn, 1).unwrap();
-        assert_eq!(ts.as_deref(), Some("2024-07-01T12:00:00Z"));
+        assert_eq!(ts.as_deref(), Some("2024-06-15T00:00:00Z"));
     }
 
     #[test]
@@ -682,10 +696,10 @@ mod tests {
         let first = push(&api, &conn, &PushOpts::default()).unwrap();
         assert_eq!(first.pushed, 1);
 
-        // Second remote echo must match the new local updated_at to satisfy
-        // the timestamp guard on a hypothetical second pass — but pending
-        // query should now be empty, so it doesn't matter.
-        api.set_remote(remote_matching(1, "2024-07-01T12:00:00Z"));
+        // No further setup needed: the pending query filters out anything
+        // with pushed_at IS NOT NULL, so the second run never even calls the
+        // API. (The 2024-07-01 timestamp from next_updated_at lives only in
+        // push_log.response_body.)
         let second = push(&api, &conn, &PushOpts::default()).unwrap();
         assert_eq!(second.pushed, 0);
         assert_eq!(second.would_push, 0);
@@ -831,6 +845,336 @@ mod tests {
 
         // Sanity on stats from the second run.
         assert!(stats.pushed + stats.failed + stats.skipped_changed_upstream + stats.deleted_upstream >= 4);
+    }
+
+    /// Regression test for the marking bug: the `_transaction_changes` row
+    /// created by the INSERT trigger on a sync upsert has mask=63 (every bit
+    /// set, the framework's "create" marker). Bit 16 (is_transfer) and bit 2
+    /// (category_id) are part of that 63, so the naive mark-as-pushed UPDATE
+    /// `mask & 18 != 0 AND pushed_at IS NULL` would stamp the sync-insert row
+    /// as if push had written it. It should not: the sync row reflects
+    /// incoming remote state, not a local edit waiting to be propagated.
+    /// The fix filters by reason='transfers' on the marking step too.
+    #[test]
+    fn push_does_not_stamp_mask63_sync_row() {
+        let conn = test_db();
+        fixture_confirmed_transfer(&conn, 1);
+        let api = StubApi::new();
+        api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+
+        // Sanity: before push there's a mask=63 row from the sync insert AND
+        // a mask=18 row from the transfers apply. The mask=18 row has
+        // reason='transfers'; the mask=63 row has reason='sync'.
+        let rows: Vec<(i64, i64, String, Option<String>)> = conn
+            .prepare(
+                "SELECT c.id, c.mask, o.reason, c.pushed_at
+                   FROM _transaction_changes c
+                   JOIN _operations o ON c.operation_id = o.id
+                  WHERE c.transaction_id = 1 ORDER BY c.id",
+            )
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert!(
+            rows.iter().any(|(_, m, r, _)| *m == 63 && r == "sync"),
+            "missing sync mask=63 row in fixture: {rows:?}"
+        );
+        assert!(
+            rows.iter().any(|(_, m, r, _)| *m == 18 && r == "transfers"),
+            "missing transfers mask=18 row in fixture: {rows:?}"
+        );
+
+        let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+        assert_eq!(stats.pushed, 1);
+
+        // After push: ONLY the transfers row should be stamped. The sync
+        // mask=63 row stays pushed_at IS NULL.
+        let stamped_sync: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _transaction_changes c
+                   JOIN _operations o ON c.operation_id = o.id
+                  WHERE c.transaction_id = 1 AND o.reason = 'sync'
+                    AND c.pushed_at IS NOT NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            stamped_sync, 0,
+            "sync rows (incl. the mask=63 create marker) must never be stamped pushed_at"
+        );
+
+        let stamped_transfers: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _transaction_changes c
+                   JOIN _operations o ON c.operation_id = o.id
+                  WHERE c.transaction_id = 1 AND o.reason = 'transfers'
+                    AND c.pushed_at IS NOT NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(stamped_transfers, 1, "the transfers row should be stamped");
+    }
+
+    /// Push must not write to the `transactions` table at all (Stage 1
+    /// invariant: `transactions` is owned by `sync` + un-pushed local edits;
+    /// push is neither). Verifies by snapshotting every column before and
+    /// after a successful push.
+    #[test]
+    fn push_does_not_modify_transactions_table() {
+        let conn = test_db();
+        fixture_confirmed_transfer(&conn, 1);
+        let api = StubApi::new();
+        api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+        // Server would normally bump updated_at; make sure we'd notice if we
+        // copied it onto the local row.
+        *api.next_updated_at.borrow_mut() = "2099-12-31T23:59:59Z".into();
+
+        let before: Vec<(String, Option<String>)> = conn
+            .prepare("SELECT name, '' FROM pragma_table_info('transactions')")
+            .unwrap()
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        let cols: Vec<String> = before.into_iter().map(|(c, _)| c).collect();
+        let sql = format!(
+            "SELECT {} FROM transactions WHERE id = 1",
+            cols.iter()
+                .map(|c| format!("COALESCE(CAST({c} AS TEXT), '<null>')"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let snap_before: Vec<String> = conn
+            .query_row(&sql, [], |row| {
+                (0..cols.len())
+                    .map(|i| row.get::<_, String>(i))
+                    .collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .unwrap();
+
+        let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+        assert_eq!(stats.pushed, 1);
+
+        let snap_after: Vec<String> = conn
+            .query_row(&sql, [], |row| {
+                (0..cols.len())
+                    .map(|i| row.get::<_, String>(i))
+                    .collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .unwrap();
+
+        assert_eq!(
+            snap_before, snap_after,
+            "push must not modify any column of the transactions row"
+        );
+    }
+
+    /// Push records its successful PUTs in `_operations.transactions_updated`
+    /// via `db::record_operation_writes`, since the default counter (which
+    /// derives from `_transaction_changes` trigger rows) would always be 0
+    /// for push.
+    #[test]
+    fn push_records_explicit_writes_on_operations_row() {
+        let conn = test_db();
+        fixture_confirmed_transfer(&conn, 1);
+        fixture_confirmed_transfer(&conn, 2);
+        let api = StubApi::new();
+        api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+        api.set_remote(remote_matching(2, "2024-06-15T00:00:00Z"));
+
+        let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+        assert_eq!(stats.pushed, 2);
+
+        let (reason, count): (String, i64) = conn
+            .query_row(
+                "SELECT reason, transactions_updated
+                   FROM _operations ORDER BY id DESC LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(reason, "push");
+        assert_eq!(count, 2);
+    }
+
+    /// End-to-end stub test: the full transfer lifecycle from raw
+    /// transactions through detection, confirmation, application, and push.
+    ///
+    /// Rationale: `push_happy_path` jumps straight to the post-`apply`
+    /// state via a hand-crafted `_transaction_changes` row. This test wires
+    /// the upstream as well — `transfers::find_pairs` then
+    /// `db::transfer_pairs::update_status` then `transfers::apply_confirmed`
+    /// — so push's pending query is verified against output that
+    /// `transfers --apply` actually produces. The wire format of the PUT is
+    /// already pinned by `tests/api_integration::test_transaction_lifecycle`
+    /// against the live API, so no live call is needed here.
+    #[test]
+    fn end_to_end_pair_lifecycle_via_stub() {
+        use crate::db::{upsert_category, upsert_transaction_account, upsert_transaction};
+        use crate::transfers::{self, Confidence, Status};
+
+        let conn = test_db();
+
+        // --- Fixture: two opposite-sign transactions on different accounts,
+        // same date, neither marked as transfer. Plus a `_Transfer` category
+        // (apply_confirmed bails without it).
+        with_operation(&conn, "sync", |conn| {
+            upsert_category(conn, &make_category(99, "_Transfer"))?;
+            upsert_transaction_account(conn, &make_transaction_account(10, "Checking"))?;
+            upsert_transaction_account(conn, &make_transaction_account(20, "Savings"))?;
+
+            let mut a = make_transaction(1, "Transfer to xx8005");
+            a.amount = Some(-250.0);
+            a.date = Some("2024-06-15".into());
+            a.transaction_account = Some(make_transaction_account(10, "Checking"));
+            a.is_transfer = Some(false);
+            a.category = None;
+            a.updated_at = Some("2024-06-15T00:00:00Z".into());
+            upsert_transaction(conn, &a)?;
+
+            let mut b = make_transaction(2, "Transfer from xx0001");
+            b.amount = Some(250.0);
+            b.date = Some("2024-06-15".into());
+            b.transaction_account = Some(make_transaction_account(20, "Savings"));
+            b.is_transfer = Some(false);
+            b.category = None;
+            b.updated_at = Some("2024-06-15T00:00:00Z".into());
+            upsert_transaction(conn, &b)?;
+            Ok(())
+        })
+        .unwrap();
+
+        // --- Step 1: detect. Must find exactly one pair.
+        let candidates = transfers::find_pairs(&conn).unwrap();
+        assert_eq!(
+            candidates.len(),
+            1,
+            "find_pairs should detect the seeded pair; got: {candidates:?}"
+        );
+        let cand = &candidates[0];
+        assert_eq!(cand.confidence, Confidence::High);
+        // Order isn't guaranteed; just check it's our two txns.
+        let mut ids = [cand.txn_id_a, cand.txn_id_b];
+        ids.sort();
+        assert_eq!(ids, [1, 2]);
+
+        // --- Step 2: insert as pending (mirrors what the auto-confirm path
+        // would do without auto-confirming).
+        crate::db::transfer_pairs::insert_pair(
+            &conn,
+            &crate::transfers::TransferPair {
+                txn_id_a: cand.txn_id_a,
+                txn_id_b: cand.txn_id_b,
+                amount_cents: cand.amount_cents,
+                confidence: cand.confidence,
+                status: Status::Pending,
+            },
+        )
+        .unwrap();
+
+        // --- Step 3: review marks it confirmed.
+        crate::db::transfer_pairs::update_status(
+            &conn,
+            cand.txn_id_a,
+            cand.txn_id_b,
+            Status::Confirmed,
+        )
+        .unwrap();
+        let status_int: i32 = conn
+            .query_row(
+                "SELECT status FROM transfer_pairs WHERE txn_id_a = ?1 AND txn_id_b = ?2",
+                rusqlite::params![cand.txn_id_a, cand.txn_id_b],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(status_int, Status::Confirmed.to_i32());
+
+        // --- Step 4: apply. Local UPDATEs set is_transfer=1 + category_id=99
+        // and delete the confirmed pair row.
+        let apply_stats = transfers::apply_confirmed(&conn).unwrap();
+        assert_eq!(apply_stats.pairs_applied, 1);
+        assert_eq!(apply_stats.transactions_updated, 2);
+
+        // --- Step 5: push picks both txns up.
+        let api = StubApi::new();
+        api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+        api.set_remote(remote_matching(2, "2024-06-15T00:00:00Z"));
+
+        // Pending query sees both before push.
+        let pending = pending_txn_ids(&conn, None).unwrap();
+        let mut p = pending.clone();
+        p.sort();
+        assert_eq!(p, vec![1, 2], "pending query must see both legs of the pair");
+
+        let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+        assert_eq!(stats.pushed, 2, "stats: {stats:?}");
+        assert_eq!(stats.failed, 0);
+
+        // Two PUTs, both with exactly the two Stage-1 fields and nothing else.
+        let puts = api.puts.borrow();
+        assert_eq!(puts.len(), 2);
+        for (id, put) in puts.iter() {
+            assert!(*id == 1 || *id == 2);
+            assert_eq!(put.is_transfer, Some(true));
+            assert_eq!(put.category_id, Some(99));
+            assert!(
+                put.payee.is_none()
+                    && put.note.is_none()
+                    && put.memo.is_none()
+                    && put.labels.is_none()
+                    && put.amount.is_none()
+                    && put.date.is_none(),
+                "PUT carried fields outside Stage 1 scope: {put:?}"
+            );
+        }
+
+        // Both txns stamped on their transfers row; sync rows untouched.
+        for id in [1i64, 2] {
+            let stamped_transfers: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM _transaction_changes c
+                       JOIN _operations o ON c.operation_id = o.id
+                      WHERE c.transaction_id = ?1 AND o.reason = 'transfers'
+                        AND c.pushed_at IS NOT NULL",
+                    [id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(stamped_transfers, 1, "txn {id} transfers row not stamped");
+
+            let stamped_sync: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM _transaction_changes c
+                       JOIN _operations o ON c.operation_id = o.id
+                      WHERE c.transaction_id = ?1 AND o.reason = 'sync'
+                        AND c.pushed_at IS NOT NULL",
+                    [id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(stamped_sync, 0, "txn {id} sync row was wrongly stamped");
+        }
+
+        // Push's operations row reports the right write count.
+        let (reason, written): (String, i64) = conn
+            .query_row(
+                "SELECT reason, transactions_updated
+                   FROM _operations ORDER BY id DESC LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(reason, "push");
+        assert_eq!(written, 2);
+
+        // Re-running push is a no-op.
+        let again = push(&api, &conn, &PushOpts::default()).unwrap();
+        assert_eq!(again.pushed, 0);
+        assert_eq!(again.would_push, 0);
     }
 
     #[test]

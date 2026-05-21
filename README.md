@@ -128,7 +128,13 @@ SELECT outcome, COUNT(*) FROM push_log GROUP BY outcome;
 SELECT * FROM push_log WHERE outcome = 'failed' OR outcome = 'skipped_changed_upstream';
 ```
 
-Successful pushes also stamp `_transaction_changes.pushed_at` on every change row whose mask includes a Stage-1 bit (`category_id` or `is_transfer`). Re-running `push` is a no-op once `pushed_at` is set — the pending query filters those out.
+Successful pushes also stamp `_transaction_changes.pushed_at` on every change row whose `mask` includes a Stage-1 bit (`category_id` or `is_transfer`) **and** whose `operation_id` came from `transfers --apply` (reason `'transfers'`). Re-running `push` is a no-op once `pushed_at` is set — the pending query filters those out.
+
+### Architectural invariant: push does not write to `transactions`
+
+`push` writes to `_transaction_changes` (the `pushed_at` column) and to `push_log`, but **never** to the `transactions` table itself. The `transactions` table is the local mirror of remote state managed by `sync`, overlaid with un-pushed local edits from `normalise` / `transfers --apply`; push is neither, so it has no business mutating that table. The server-side `updated_at` returned by the PUT is preserved in `push_log.response_body` for audit, and the next `sync` will naturally pull the bumped value.
+
+A dedicated regression test (`push::tests::push_does_not_modify_transactions_table`) snapshots every column of the affected `transactions` row before and after a push and asserts they're byte-identical.
 
 ### Typical workflow
 
@@ -136,8 +142,10 @@ Successful pushes also stamp `_transaction_changes.pushed_at` on every change ro
 cargo run --bin transfers -- --apply   # write local is_transfer + category_id
 cargo run --bin push -- --dry-run      # preview
 cargo run --bin push                   # actually PUT
-cargo run --bin sync                   # next pull picks up the bumped updated_at
+cargo run --bin sync                   # pulls the server-bumped updated_at
 ```
+
+The explicit `sync` after `push` is the supported pattern for keeping the local mirror in step with what the server now reports.
 
 ## Payee Normalisation
 
