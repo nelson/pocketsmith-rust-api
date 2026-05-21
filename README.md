@@ -134,7 +134,12 @@ Successful pushes also stamp `_transaction_changes.pushed_at` on every change ro
 
 `push` writes to `_transaction_changes` (the `pushed_at` column) and to `push_log`, but **never** to the `transactions` table itself. The `transactions` table is the local mirror of remote state managed by `sync`, overlaid with un-pushed local edits from `normalise` / `transfers --apply`; push is neither, so it has no business mutating that table. The server-side `updated_at` returned by the PUT is preserved in `push_log.response_body` for audit, and the next `sync` will naturally pull the bumped value.
 
-A dedicated regression test (`push::tests::push_does_not_modify_transactions_table`) snapshots every column of the affected `transactions` row before and after a push and asserts they're byte-identical.
+More generally, the `transactions` table has two classes of columns:
+
+- **Locally writable** (the six push-able fields): `payee`, `category_id`, `note`, `labels`, `is_transfer`, `memo`. Tracked by `_transaction_changes.mask`. May be UPDATEd under any operation reason.
+- **Sync-owned** (everything else — `amount`, `date`, `updated_at`, `status`, etc.). Only `db::upsert_transaction` under `reason='sync'` is permitted to write these. A `BEFORE UPDATE OF` trigger (`_transactions_protect_sync_owned_columns`) enforces this at the SQLite layer: any other writer attempting to touch a sync-owned column raises `ABORT`. The `'test'` reason is also allowed so fixtures can construct arbitrary states.
+
+Dedicated regression tests live in `tests/schema_conventions.rs` (`transactions_protect_*` and `transactions_allow_*`) plus `src/push/mod.rs::push_does_not_modify_transactions_table`, which snapshots every column of the affected row before and after a push and asserts byte equality.
 
 ### Typical workflow
 

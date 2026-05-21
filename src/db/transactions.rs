@@ -423,11 +423,11 @@ mod tests {
     #[test]
     fn test_change_record_operation_id_references_operations() {
         let conn = test_db();
-        with_operation(&conn, "sync1", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store A"))
         })
         .unwrap();
-        with_operation(&conn, "sync2", |conn| {
+        with_operation(&conn, "test", |conn| {
             upsert_transaction(conn, &make_transaction(1, "Store B"))
         })
         .unwrap();
