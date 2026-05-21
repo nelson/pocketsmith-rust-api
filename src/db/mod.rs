@@ -22,6 +22,8 @@ pub fn initialize(path: &str) -> Result<Connection> {
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
     drop_legacy_artifacts(&conn)?;
     migrate_add_pushed_at(&conn)?;
+    migrate_add_explicit_writes(&conn)?;
+    migrate_rename_pocketsmith_reason(&conn)?;
     seed_field_masks(&conn)?;
 
     Ok(conn)
@@ -33,6 +35,8 @@ pub fn initialize_in_memory() -> Result<Connection> {
     conn.execute_batch(schema::SCHEMA)?;
     drop_legacy_artifacts(&conn)?;
     migrate_add_pushed_at(&conn)?;
+    migrate_add_explicit_writes(&conn)?;
+    migrate_rename_pocketsmith_reason(&conn)?;
     seed_field_masks(&conn)?;
     Ok(conn)
 }
@@ -60,6 +64,45 @@ fn migrate_add_pushed_at(conn: &Connection) -> Result<()> {
             "ALTER TABLE _transaction_changes ADD COLUMN pushed_at TEXT;",
         )?;
     }
+    Ok(())
+}
+
+/// Idempotent migration: add `explicit_writes INTEGER` to `_current_operation`
+/// if absent. Older DBs (created before push) lack this column, so any
+/// `with_operation` invocation that tries to read it would otherwise fail.
+/// See `with_operation` / `record_operation_writes` for the semantics.
+fn migrate_add_explicit_writes(conn: &Connection) -> Result<()> {
+    let has_column: bool = {
+        let mut stmt = conn.prepare("PRAGMA table_info('_current_operation')")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        let mut found = false;
+        for r in rows {
+            if r? == "explicit_writes" {
+                found = true;
+                break;
+            }
+        }
+        found
+    };
+    if !has_column {
+        conn.execute_batch(
+            "ALTER TABLE _current_operation ADD COLUMN explicit_writes INTEGER;",
+        )?;
+    }
+    Ok(())
+}
+
+/// Idempotent migration: the sync subcommand's operation reason was originally
+/// 'pocketsmith'. We standardised on "reason = subcommand name" (so
+/// `normalise`, `transfers`, `push` all match the binary) and rebadged this
+/// one to 'sync'. Rewrite any historical rows so `get_last_change(conn,
+/// "sync")` returns the right high-water mark and incremental syncs don't
+/// re-pull the world.
+fn migrate_rename_pocketsmith_reason(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "UPDATE _operations SET reason = 'sync' WHERE reason = 'pocketsmith'",
+        [],
+    )?;
     Ok(())
 }
 
@@ -159,11 +202,25 @@ where
 
     let result = f(conn)?;
 
-    let count: i64 = tx.query_row(
-        "SELECT COUNT(DISTINCT transaction_id) FROM _transaction_changes WHERE operation_id = ?1",
-        [version],
-        |row| row.get(0),
+    // Prefer an explicit write-count if the closure called
+    // `record_operation_writes` (the way `push` reports its successful PUTs).
+    // Otherwise fall back to counting distinct transactions that triggered a
+    // `_transaction_changes` row — the right answer for sync / transfers /
+    // normalise, where every meaningful local mutation goes through the
+    // update trigger.
+    let explicit: Option<i64> = tx.query_row(
+        "SELECT explicit_writes FROM _current_operation",
+        [],
+        |row| row.get::<_, Option<i64>>(0),
     )?;
+    let count: i64 = match explicit {
+        Some(n) => n,
+        None => tx.query_row(
+            "SELECT COUNT(DISTINCT transaction_id) FROM _transaction_changes WHERE operation_id = ?1",
+            [version],
+            |row| row.get(0),
+        )?,
+    };
     tx.execute(
         "UPDATE _operations SET transactions_updated = ?1 WHERE id = ?2",
         rusqlite::params![count, version],
@@ -173,6 +230,21 @@ where
 
     tx.commit()?;
     Ok(result)
+}
+
+/// Override the write count that `with_operation` will record on the
+/// currently-running operation. Use this from inside a `with_operation`
+/// closure when the closure's mutations don't go through the
+/// `_transaction_changes` update trigger (notably: `push`, which doesn't
+/// modify `transactions` at all and so wouldn't otherwise show any writes).
+///
+/// Idempotent within an operation — last call wins.
+pub fn record_operation_writes(conn: &Connection, n: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE _current_operation SET explicit_writes = ?1",
+        [n],
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -283,23 +355,23 @@ mod tests {
     #[test]
     fn test_get_last_change_returns_none_when_empty() {
         let conn = test_db();
-        assert_eq!(get_last_change(&conn, "pocketsmith").unwrap(), None);
+        assert_eq!(get_last_change(&conn, "sync").unwrap(), None);
     }
 
     #[test]
     fn test_with_operation_creates_entry() {
         let conn = test_db();
-        with_operation(&conn, "pocketsmith", |_| Ok(())).unwrap();
-        let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
+        with_operation(&conn, "sync", |_| Ok(())).unwrap();
+        let (version, _) = get_last_change(&conn, "sync").unwrap().unwrap();
         assert_eq!(version, 1);
     }
 
     #[test]
     fn test_get_last_change_filters_by_reason() {
         let conn = test_db();
-        with_operation(&conn, "pocketsmith", |_| Ok(())).unwrap();
+        with_operation(&conn, "sync", |_| Ok(())).unwrap();
         with_operation(&conn, "rules", |_| Ok(())).unwrap();
-        let (version, _) = get_last_change(&conn, "pocketsmith").unwrap().unwrap();
+        let (version, _) = get_last_change(&conn, "sync").unwrap().unwrap();
         assert_eq!(version, 1);
         let (version, _) = get_last_change(&conn, "rules").unwrap().unwrap();
         assert_eq!(version, 2);
@@ -328,6 +400,100 @@ mod tests {
             [], |row| row.get(0),
         ).unwrap();
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_record_operation_writes_overrides_count() {
+        let conn = test_db();
+        // Closure does nothing that would fire the change trigger, so the
+        // default count would be 0. record_operation_writes overrides it.
+        with_operation(&conn, "push", |conn| {
+            crate::db::record_operation_writes(conn, 7)
+        })
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT transactions_updated FROM _operations WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 7);
+    }
+
+    #[test]
+    fn test_record_operation_writes_last_call_wins() {
+        let conn = test_db();
+        with_operation(&conn, "push", |conn| {
+            crate::db::record_operation_writes(conn, 3)?;
+            crate::db::record_operation_writes(conn, 5)?;
+            Ok(())
+        })
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT transactions_updated FROM _operations WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 5);
+    }
+
+    #[test]
+    fn test_explicit_writes_cleared_between_operations() {
+        let conn = test_db();
+        with_operation(&conn, "push", |conn| {
+            crate::db::record_operation_writes(conn, 4)
+        })
+        .unwrap();
+        // A subsequent operation that doesn't call record_operation_writes
+        // must NOT inherit the previous run's override — the column lives on
+        // _current_operation, which is wiped between runs.
+        with_operation(&conn, "test", |conn| {
+            upsert_transaction(conn, &make_transaction(1, "A"))?;
+            Ok(())
+        })
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT transactions_updated FROM _operations WHERE id = 2",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "second op should count its own change row, not inherit");
+    }
+
+    #[test]
+    fn test_migrate_rename_pocketsmith_reason() {
+        let conn = test_db();
+        // Simulate an older DB that has historical 'pocketsmith' rows by
+        // inserting one directly, then running the migration.
+        conn.execute(
+            "INSERT INTO _operations (reason) VALUES ('pocketsmith')",
+            [],
+        )
+        .unwrap();
+        super::migrate_rename_pocketsmith_reason(&conn).unwrap();
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _operations WHERE reason = 'pocketsmith'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 0);
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _operations WHERE reason = 'sync'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 1);
+        // Idempotent: re-run is a no-op.
+        super::migrate_rename_pocketsmith_reason(&conn).unwrap();
     }
 
     #[test]

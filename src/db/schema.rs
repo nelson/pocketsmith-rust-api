@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS _operations (
 );
 
 CREATE TABLE IF NOT EXISTS _current_operation (
-    id INTEGER NOT NULL
+    id              INTEGER NOT NULL,
+    explicit_writes INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS users (
