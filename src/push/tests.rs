@@ -813,3 +813,449 @@ fn cli_parse_rejects_unknown() {
     assert!(parse_args(&["--limit"]).is_err()); // missing value
     assert!(parse_args(&["--limit", "abc"]).is_err());
 }
+
+// =============================================================================
+// Stage 3 tests — generalised pending query, multi-reason fold, all six
+// locally-mutated fields. See `.claude/plans/push-stage-3-expand-fields.md`.
+// =============================================================================
+
+/// Helper: insert a baseline txn under reason='sync', then mutate it under
+/// the given reason. Returns the txn id.
+fn fixture_local_edit(conn: &Connection, id: i64, reason: &str, mutate_sql: &str) -> i64 {
+    with_operation(conn, "sync", |conn| {
+        let mut t = make_transaction(id, "Initial Payee");
+        t.is_transfer = Some(false);
+        t.category = None;
+        t.memo = None;
+        t.note = None;
+        t.payee = Some("Initial Payee".into());
+        t.labels = None;
+        t.updated_at = Some("2024-06-15T00:00:00Z".into());
+        upsert_transaction(conn, &t)?;
+        Ok(())
+    })
+    .unwrap();
+    with_operation(conn, reason, |conn| {
+        conn.execute(mutate_sql, [])?;
+        Ok(())
+    })
+    .unwrap();
+    id
+}
+
+/// Stage 3 test 14: pending query picks up `reason='normalisation'` rows.
+#[test]
+fn pending_query_picks_up_normalisation_rows() {
+    let conn = test_db();
+    fixture_local_edit(
+        &conn,
+        1,
+        "normalisation",
+        "UPDATE transactions SET payee = 'Cleaned Payee' WHERE id = 1",
+    );
+    assert_eq!(pending_txn_ids(&conn, None).unwrap(), vec![1]);
+}
+
+/// Stage 3 test 15a: pending query ignores `reason='sync'` rows.
+#[test]
+fn pending_query_ignores_sync_rows() {
+    let conn = test_db();
+    // Sync-only insert, no local edits afterwards.
+    with_operation(&conn, "sync", |conn| {
+        upsert_transaction(conn, &make_transaction(1, "Anything"))
+    })
+    .unwrap();
+    assert!(pending_txn_ids(&conn, None).unwrap().is_empty());
+}
+
+/// Stage 3 test 15b: pending query ignores `reason='push'` rows. (Push
+/// itself doesn't currently write to `transactions`, but a future writer
+/// under reason='push' must not generate self-pushable rows.)
+#[test]
+fn pending_query_ignores_push_rows() {
+    let conn = test_db();
+    with_operation(&conn, "sync", |conn| {
+        upsert_transaction(conn, &make_transaction(1, "X"))
+    })
+    .unwrap();
+    // Force a row under reason='push' with a dirty bit. We can't go through
+    // the trigger because push doesn't UPDATE transactions, so we synthesise
+    // a change row directly.
+    with_operation(&conn, "push", |conn| {
+        conn.execute(
+            "INSERT INTO _transaction_changes
+               (transaction_id, payee, operation_id, mask)
+               VALUES (1, 'fake', (SELECT id FROM _current_operation), 1)",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    assert!(pending_txn_ids(&conn, None).unwrap().is_empty());
+}
+
+/// Stage 3 test 16: two unpushed history rows on the same txn (one
+/// `normalisation`, one `transfers`) → a single PUT carrying both fields.
+#[test]
+fn multi_reason_dirty_bits_fold_into_one_put() {
+    let conn = test_db();
+
+    // Sync seed.
+    with_operation(&conn, "sync", |conn| {
+        crate::db::upsert_category(conn, &make_category(99, "_Transfer"))?;
+        let mut t = make_transaction(1, "Initial Payee");
+        t.is_transfer = Some(false);
+        t.category = None;
+        t.payee = Some("Initial Payee".into());
+        t.updated_at = Some("2024-06-15T00:00:00Z".into());
+        upsert_transaction(conn, &t)?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Normalisation: clean the payee.
+    with_operation(&conn, "normalisation", |conn| {
+        conn.execute(
+            "UPDATE transactions SET payee = 'Cleaned Payee' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Transfers --apply: flip is_transfer + category_id.
+    with_operation(&conn, "transfers", |conn| {
+        conn.execute(
+            "UPDATE transactions SET is_transfer = 1, category_id = 99 WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Push.
+    let api = StubApi::new();
+    api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+    let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+
+    assert_eq!(stats.pushed, 1, "stats: {stats:?}");
+    let puts = api.puts.borrow();
+    assert_eq!(puts.len(), 1, "a multi-reason fold must produce exactly one PUT");
+    let (id, put) = &puts[0];
+    assert_eq!(*id, 1);
+    assert_eq!(put.payee.as_deref(), Some("Cleaned Payee"));
+    assert_eq!(put.is_transfer, Some(true));
+    assert_eq!(put.category_id, Some(99));
+    // Untouched fields stay None.
+    assert!(put.memo.is_none() && put.note.is_none() && put.labels.is_none());
+}
+
+/// Stage 3 test 17: after a successful Stage-3 PUT, all involved
+/// `_transaction_changes` rows (across reasons) have `pushed_at` stamped;
+/// the sync-create marker stays unstamped.
+#[test]
+fn pushed_at_stamped_on_all_local_writer_rows() {
+    let conn = test_db();
+    with_operation(&conn, "sync", |conn| {
+        crate::db::upsert_category(conn, &make_category(99, "_Transfer"))?;
+        let mut t = make_transaction(1, "Initial Payee");
+        t.is_transfer = Some(false);
+        t.category = None;
+        t.payee = Some("Initial Payee".into());
+        t.updated_at = Some("2024-06-15T00:00:00Z".into());
+        upsert_transaction(conn, &t)?;
+        Ok(())
+    })
+    .unwrap();
+    with_operation(&conn, "normalisation", |conn| {
+        conn.execute(
+            "UPDATE transactions SET payee = 'Cleaned' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    with_operation(&conn, "transfers", |conn| {
+        conn.execute(
+            "UPDATE transactions SET is_transfer = 1, category_id = 99 WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    let api = StubApi::new();
+    api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+    push(&api, &conn, &PushOpts::default()).unwrap();
+
+    let stamped: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM _transaction_changes c
+               JOIN _operations o ON c.operation_id = o.id
+              WHERE c.transaction_id = 1
+                AND o.reason IN ('normalisation','transfers')
+                AND c.pushed_at IS NOT NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stamped, 2, "both local-writer rows should be stamped");
+
+    let unstamped_sync: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM _transaction_changes c
+               JOIN _operations o ON c.operation_id = o.id
+              WHERE c.transaction_id = 1 AND o.reason = 'sync'
+                AND c.pushed_at IS NOT NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(unstamped_sync, 0, "sync row must remain unstamped");
+}
+
+/// Stage 3 test 18: labels stored as a JSON array locally are PUT as CSV
+/// on the wire. Pinned here so a future serialisation tweak doesn't drift.
+#[test]
+fn labels_serialise_as_csv_on_wire() {
+    let conn = test_db();
+    fixture_local_edit(
+        &conn,
+        1,
+        "normalisation",
+        "UPDATE transactions SET labels = '[\"food\",\"weekly\"]' WHERE id = 1",
+    );
+
+    let api = StubApi::new();
+    api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+    let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+    assert_eq!(stats.pushed, 1);
+
+    let puts = api.puts.borrow();
+    assert_eq!(puts.len(), 1);
+    let put = &puts[0].1;
+    assert_eq!(put.labels.as_deref(), Some("food,weekly"));
+
+    // And the on-wire JSON pins the shape directly (not a Vec, not an array).
+    let body = serde_json::to_string(put).unwrap();
+    assert!(
+        body.contains("\"labels\":\"food,weekly\""),
+        "unexpected serialisation: {body}"
+    );
+}
+
+/// Module-level safety: `build_update` populates exactly the dirty bits.
+#[test]
+fn build_update_only_sets_dirty_bits() {
+    let local = LocalSnapshot {
+        payee: Some("P".into()),
+        category_id: Some(7),
+        note: Some("N".into()),
+        labels: Some("[\"a\"]".into()),
+        is_transfer: 1,
+        memo: Some("M".into()),
+        updated_at: Some("2024-06-15T00:00:00Z".into()),
+    };
+    // Only payee + memo dirty.
+    let put = build_update(&local, MASK_PAYEE | MASK_MEMO);
+    assert_eq!(put.payee.as_deref(), Some("P"));
+    assert_eq!(put.memo.as_deref(), Some("M"));
+    assert!(put.category_id.is_none());
+    assert!(put.note.is_none());
+    assert!(put.labels.is_none());
+    assert!(put.is_transfer.is_none());
+}
+
+/// Each mask bit drives exactly one `TransactionUpdate` field; setting a
+/// bit on its own must populate that field and leave the other five `None`.
+/// Pinned so that adding a new locally-mutated field can't silently break
+/// the bit→field mapping.
+#[test]
+fn build_update_each_bit_in_isolation() {
+    let local = LocalSnapshot {
+        payee: Some("P".into()),
+        category_id: Some(7),
+        note: Some("N".into()),
+        labels: Some("[\"a\",\"b\"]".into()),
+        is_transfer: 1,
+        memo: Some("M".into()),
+        updated_at: Some("2024-06-15T00:00:00Z".into()),
+    };
+
+    let put = build_update(&local, MASK_PAYEE);
+    assert_eq!(put.payee.as_deref(), Some("P"));
+    assert!(put.category_id.is_none() && put.note.is_none() && put.labels.is_none()
+        && put.is_transfer.is_none() && put.memo.is_none());
+
+    let put = build_update(&local, MASK_CATEGORY_ID);
+    assert_eq!(put.category_id, Some(7));
+    assert!(put.payee.is_none() && put.note.is_none() && put.labels.is_none()
+        && put.is_transfer.is_none() && put.memo.is_none());
+
+    let put = build_update(&local, MASK_NOTE);
+    assert_eq!(put.note.as_deref(), Some("N"));
+
+    let put = build_update(&local, MASK_LABELS);
+    assert_eq!(put.labels.as_deref(), Some("a,b"));
+
+    let put = build_update(&local, MASK_IS_TRANSFER);
+    assert_eq!(put.is_transfer, Some(true));
+
+    let put = build_update(&local, MASK_MEMO);
+    assert_eq!(put.memo.as_deref(), Some("M"));
+
+    // Empty mask → fully empty body.
+    let put = build_update(&local, 0);
+    assert_eq!(serde_json::to_string(&put).unwrap(), "{}");
+}
+
+/// Direct coverage of the JSON→CSV labels transform. Production behaviour
+/// is pinned indirectly through `labels_serialise_as_csv_on_wire`, but the
+/// helper has edge cases (empty array, invalid JSON, single element) that
+/// don't appear there.
+#[test]
+fn labels_for_put_shapes() {
+    assert_eq!(labels_for_put(None), None);
+    assert_eq!(labels_for_put(Some("[]")).as_deref(), Some(""));
+    assert_eq!(labels_for_put(Some("[\"only\"]")).as_deref(), Some("only"));
+    assert_eq!(
+        labels_for_put(Some("[\"a\",\"b\",\"c\"]")).as_deref(),
+        Some("a,b,c")
+    );
+    // Invalid JSON: pass through unchanged so the user sees what's stored
+    // rather than a silent drop. Inline-checked with a deliberately weird
+    // value (CSV-ish, missing brackets).
+    assert_eq!(
+        labels_for_put(Some("already,csv")).as_deref(),
+        Some("already,csv")
+    );
+}
+
+/// Reproduces the live Stage 3 smoke test: a single normalisation
+/// edit (payee only) on an otherwise-clean txn produces a PUT body of
+/// exactly `{"payee":"<new>"}` — no other fields, not even is_transfer.
+/// Pinned because Stage 1's transfer-path tests would never catch a
+/// regression that accidentally sent is_transfer:false on payee-only
+/// pushes (which would silently overwrite a server-side classification).
+#[test]
+fn payee_only_push_sends_only_payee() {
+    let conn = test_db();
+    fixture_local_edit(
+        &conn,
+        1,
+        "normalisation",
+        "UPDATE transactions SET payee = 'Cleaned Payee' WHERE id = 1",
+    );
+
+    let api = StubApi::new();
+    api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+    let stats = push(&api, &conn, &PushOpts::default()).unwrap();
+    assert_eq!(stats.pushed, 1);
+
+    let puts = api.puts.borrow();
+    assert_eq!(puts.len(), 1);
+    let (id, put) = &puts[0];
+    assert_eq!(*id, 1);
+    assert_eq!(put.payee.as_deref(), Some("Cleaned Payee"));
+    // Critical: no other field set, including is_transfer (which has a
+    // dedicated bool field on TransactionUpdate and is the easiest
+    // accidental-default to trip).
+    assert!(
+        put.is_transfer.is_none()
+            && put.category_id.is_none()
+            && put.note.is_none()
+            && put.labels.is_none()
+            && put.memo.is_none()
+            && put.amount.is_none()
+            && put.date.is_none()
+            && put.cheque_number.is_none()
+            && put.needs_review.is_none(),
+        "PUT carried unexpected fields: {put:?}"
+    );
+
+    // And on the wire the body is exactly the one-key object.
+    let body = serde_json::to_string(put).unwrap();
+    assert_eq!(body, r#"{"payee":"Cleaned Payee"}"#);
+
+    // push_log captures the same body verbatim.
+    let logged: String = conn
+        .query_row(
+            "SELECT request_body FROM push_log WHERE outcome = 'pushed' AND txn_id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(logged, r#"{"payee":"Cleaned Payee"}"#);
+}
+
+/// Lifecycle: edit → push → edit-again → push must pick up only the
+/// second edit. Mirrors the live behaviour we saw with the six
+/// originally-pushed transfer pairs that got re-pushed after
+/// `--annotate-existing` added their `[paired:<id>]` memos: the first
+/// batch's rows stay stamped, the new mask=32 row is fresh and gets
+/// picked up. Generalised here for the normalisation reason.
+#[test]
+fn re_edit_after_push_picks_up_only_new_change() {
+    let conn = test_db();
+    fixture_local_edit(
+        &conn,
+        1,
+        "normalisation",
+        "UPDATE transactions SET payee = 'First Pass' WHERE id = 1",
+    );
+
+    let api = StubApi::new();
+    api.set_remote(remote_matching(1, "2024-06-15T00:00:00Z"));
+    let first = push(&api, &conn, &PushOpts::default()).unwrap();
+    assert_eq!(first.pushed, 1);
+
+    // Simulate sync absorbing the server's bumped updated_at — production
+    // does this on the next `cargo run --bin sync`. We need it because the
+    // stub stamped a new updated_at into its remote view.
+    *api.next_updated_at.borrow_mut() = "2024-07-01T00:00:00Z".into();
+    api.set_remote(remote_matching(1, "2024-07-01T00:00:00Z"));
+    with_operation(&conn, "sync", |conn| {
+        conn.execute(
+            "UPDATE transactions SET updated_at = '2024-07-01T00:00:00Z' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Second normalisation edit — e.g. a rule was tightened.
+    with_operation(&conn, "normalisation", |conn| {
+        conn.execute(
+            "UPDATE transactions SET payee = 'Second Pass' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Pending query sees exactly the new edit, not the stamped one.
+    assert_eq!(pending_txn_ids(&conn, None).unwrap(), vec![1]);
+
+    let second = push(&api, &conn, &PushOpts::default()).unwrap();
+    assert_eq!(second.pushed, 1);
+    let puts = api.puts.borrow();
+    assert_eq!(puts.len(), 2, "first + second push together");
+    assert_eq!(puts[1].1.payee.as_deref(), Some("Second Pass"));
+
+    // Both normalisation rows are now stamped (chronological).
+    let stamps: Vec<Option<String>> = conn
+        .prepare(
+            "SELECT c.pushed_at FROM _transaction_changes c
+               JOIN _operations o ON c.operation_id = o.id
+              WHERE c.transaction_id = 1 AND o.reason = 'normalisation'
+              ORDER BY c.id",
+        )
+        .unwrap()
+        .query_map([], |r| r.get::<_, Option<String>>(0))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    assert_eq!(stamps.len(), 2);
+    assert!(stamps[0].is_some() && stamps[1].is_some());
+    assert_ne!(stamps[0], stamps[1], "stamps should reflect different push runs");
+}
