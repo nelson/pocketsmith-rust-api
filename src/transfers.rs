@@ -142,13 +142,49 @@ pub struct ApplyStats {
     pub transactions_updated: usize,
 }
 
+/// Build the new memo value for one leg of a transfer pair: existing memo
+/// (preserved verbatim) with ` [paired:<other_id>]` appended. Idempotent —
+/// if a `[paired:` marker is already present anywhere in the memo we leave
+/// it untouched (returns `None`, signalling "no UPDATE needed").
+///
+/// The marker is a machine-readable backreference users (and the matching
+/// logic on the next sync) can rely on to identify the counterparty of an
+/// already-applied transfer pair, even after `transfer_pairs` has been
+/// pruned by `apply_confirmed`.
+pub fn paired_memo(existing: Option<&str>, other_id: i64) -> Option<String> {
+    let existing = existing.unwrap_or("");
+    if existing.contains("[paired:") {
+        return None;
+    }
+    let tag = format!("[paired:{other_id}]");
+    Some(if existing.is_empty() {
+        tag
+    } else {
+        format!("{existing} {tag}")
+    })
+}
+
+fn load_memo(conn: &Connection, txn_id: i64) -> Result<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT memo FROM transactions WHERE id = ?1",
+            [txn_id],
+            |row| row.get::<_, Option<String>>(0),
+        )?)
+}
+
 /// Apply all confirmed transfer pairs. For each pair:
 ///   - Tag both transactions with the `_Transfer` category and `is_transfer = 1`.
+///   - Append `[paired:<other_id>]` to each leg's `memo` (preserving existing
+///     memo content; idempotent — see [`paired_memo`]).
 ///   - Delete the pair from `transfer_pairs` (it is no longer pending action;
 ///     the transactions themselves carry the transfer marker).
 ///
 /// All writes happen inside a single `db::with_operation("transfers", ...)` so
-/// the resulting `_transaction_changes` rows are attributable.
+/// the resulting `_transaction_changes` rows are attributable. Each leg's
+/// `category_id` / `is_transfer` / `memo` are written in a single UPDATE so
+/// the resulting change row carries one combined mask (2|16|32 = 50) instead
+/// of two separate rows — push then issues one PUT per leg.
 ///
 /// Rejected and pending pairs are untouched. They stay in `transfer_pairs` so
 /// future `find_pairs()` runs continue to skip the involved transactions.
@@ -175,14 +211,20 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
 
     with_operation(conn, "transfers", |conn| {
         for pair in &pairs {
-            conn.execute(
-                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
-                rusqlite::params![transfer_category_id, pair.txn_id_a],
-            )?;
-            conn.execute(
-                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
-                rusqlite::params![transfer_category_id, pair.txn_id_b],
-            )?;
+            // Read current memos before the UPDATE so paired_memo can preserve
+            // them. This is one extra SELECT per leg — fine for transfer-pair
+            // volumes, and keeps the memo logic inside Rust (the SQL trigger
+            // doesn't know about the pair counterparty).
+            let memo_a = paired_memo(load_memo(conn, pair.txn_id_a)?.as_deref(), pair.txn_id_b);
+            let memo_b = paired_memo(load_memo(conn, pair.txn_id_b)?.as_deref(), pair.txn_id_a);
+
+            // Combine category_id + is_transfer + (optional) memo into a
+            // single UPDATE per leg so the resulting _transaction_changes
+            // row has one mask covering all dirty bits — push then issues
+            // exactly one PUT carrying all three fields.
+            apply_leg(conn, pair.txn_id_a, transfer_category_id, memo_a.as_deref())?;
+            apply_leg(conn, pair.txn_id_b, transfer_category_id, memo_b.as_deref())?;
+
             // Invariant: a confirmed pair is removed once its transactions
             // carry the transfer marker. This keeps `transfer_pairs` as the
             // set of "pairs still pending an outcome" (pending) or "pairs we
@@ -200,6 +242,164 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
         pairs_applied,
         transactions_updated,
     })
+}
+
+fn apply_leg(
+    conn: &Connection,
+    txn_id: i64,
+    transfer_category_id: i64,
+    new_memo: Option<&str>,
+) -> rusqlite::Result<()> {
+    match new_memo {
+        Some(memo) => {
+            conn.execute(
+                "UPDATE transactions
+                    SET category_id = ?1, is_transfer = 1, memo = ?2
+                  WHERE id = ?3",
+                rusqlite::params![transfer_category_id, memo, txn_id],
+            )?;
+        }
+        None => {
+            // Idempotent path: memo already carried a [paired:...] marker, so
+            // touch only the other two fields. (Hit when re-applying a pair
+            // whose memo was annotated by `annotate_existing_pairs` first.)
+            conn.execute(
+                "UPDATE transactions SET category_id = ?1, is_transfer = 1 WHERE id = ?2",
+                rusqlite::params![transfer_category_id, txn_id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// Retroactive backfill of the `[paired:<other_id>]` memo marker on
+/// already-applied transfer pairs. After Stage-1 `apply_confirmed` runs, the
+/// `transfer_pairs` row is deleted, so we can't recover pair identity from
+/// that table — we re-derive it from the transactions themselves using the
+/// same matching rules as `find_pairs`, but inverted: we *only* look at
+/// already-tagged (`is_transfer = 1`) transactions, and skip any whose memo
+/// already carries a `[paired:` marker (idempotent across re-runs).
+///
+/// Returns the number of transactions whose memos were updated. All writes
+/// happen under `with_operation("transfers", ...)` so the resulting change
+/// rows have `reason='transfers'` and are picked up by `push`'s pending
+/// query like any other transfer-side edit.
+pub fn annotate_existing_pairs(conn: &Connection) -> Result<usize> {
+    use crate::db::with_operation;
+
+    // Load all is_transfer=1 transactions that don't already carry a marker.
+    let mut stmt = conn.prepare(
+        "SELECT id, amount, date, COALESCE(original_payee, payee, ''), transaction_account_id, memo
+           FROM transactions
+          WHERE is_transfer = 1
+            AND amount IS NOT NULL AND date IS NOT NULL AND transaction_account_id IS NOT NULL
+            AND (memo IS NULL OR memo NOT LIKE '%[paired:%')",
+    )?;
+    let txns: Vec<(TxnRow, Option<String>)> = stmt
+        .query_map([], |row| {
+            let amount: f64 = row.get(1)?;
+            Ok((
+                TxnRow {
+                    id: row.get(0)?,
+                    amount_cents: amount_to_cents(amount),
+                    date: row.get(2)?,
+                    original_payee: row.get(3)?,
+                    transaction_account_id: row.get(4)?,
+                },
+                row.get::<_, Option<String>>(5)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    // Group by abs(amount_cents), then greedy-match opposite-sign,
+    // different-account, within-2-days. Same as find_pairs but no transfer_pairs
+    // exclusion list (those rows are already gone — that's the whole point).
+    let mut groups: HashMap<i64, Vec<usize>> = HashMap::new();
+    for (idx, (t, _)) in txns.iter().enumerate() {
+        groups.entry(t.amount_cents.abs()).or_default().push(idx);
+    }
+
+    let mut candidates: Vec<Candidate> = Vec::new();
+    for indices in groups.values() {
+        for (i, &ai) in indices.iter().enumerate() {
+            for &bi in indices.iter().skip(i + 1) {
+                let a = &txns[ai].0;
+                let b = &txns[bi].0;
+                if (a.amount_cents > 0) == (b.amount_cents > 0) {
+                    continue;
+                }
+                if a.transaction_account_id == b.transaction_account_id {
+                    continue;
+                }
+                let date_diff = date_diff_days(&a.date, &b.date);
+                if date_diff > 2 {
+                    continue;
+                }
+                let a_like = is_transfer_like(&a.original_payee);
+                let b_like = is_transfer_like(&b.original_payee);
+                let confidence = match (a_like, b_like) {
+                    (true, true) => Confidence::High,
+                    (true, false) | (false, true) => Confidence::Medium,
+                    (false, false) => Confidence::Low,
+                };
+                let (id_a, id_b) = if a.amount_cents > 0 {
+                    (a.id, b.id)
+                } else {
+                    (b.id, a.id)
+                };
+                candidates.push(Candidate {
+                    txn_id_a: id_a,
+                    txn_id_b: id_b,
+                    amount_cents: a.amount_cents.abs(),
+                    confidence,
+                    date_diff,
+                });
+            }
+        }
+    }
+    candidates.sort_by(|a, b| {
+        let conf_ord = confidence_rank(a.confidence).cmp(&confidence_rank(b.confidence));
+        conf_ord.then(a.date_diff.cmp(&b.date_diff))
+    });
+
+    let memo_by_id: HashMap<i64, Option<String>> =
+        txns.iter().map(|(t, m)| (t.id, m.clone())).collect();
+
+    let mut matched: HashSet<i64> = HashSet::new();
+    let mut updated = 0usize;
+    with_operation(conn, "transfers", |conn| {
+        for c in &candidates {
+            if matched.contains(&c.txn_id_a) || matched.contains(&c.txn_id_b) {
+                continue;
+            }
+            matched.insert(c.txn_id_a);
+            matched.insert(c.txn_id_b);
+
+            if let Some(memo) = paired_memo(
+                memo_by_id.get(&c.txn_id_a).and_then(|m| m.as_deref()),
+                c.txn_id_b,
+            ) {
+                conn.execute(
+                    "UPDATE transactions SET memo = ?1 WHERE id = ?2",
+                    rusqlite::params![memo, c.txn_id_a],
+                )?;
+                updated += 1;
+            }
+            if let Some(memo) = paired_memo(
+                memo_by_id.get(&c.txn_id_b).and_then(|m| m.as_deref()),
+                c.txn_id_a,
+            ) {
+                conn.execute(
+                    "UPDATE transactions SET memo = ?1 WHERE id = ?2",
+                    rusqlite::params![memo, c.txn_id_b],
+                )?;
+                updated += 1;
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(updated)
 }
 
 fn amount_to_cents(amount: f64) -> i64 {
@@ -502,6 +702,141 @@ mod tests {
             .unwrap();
         assert_eq!(cat_id, 999);
         assert!(is_transfer);
+
+        // Both legs of the pair now carry the [paired:<other_id>] marker.
+        let memo1: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        let memo2: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 2", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(memo1.as_deref(), Some("[paired:2]"));
+        assert_eq!(memo2.as_deref(), Some("[paired:1]"));
+    }
+
+    #[test]
+    fn test_paired_memo_appends_to_existing_and_is_idempotent() {
+        assert_eq!(paired_memo(None, 42).as_deref(), Some("[paired:42]"));
+        assert_eq!(paired_memo(Some(""), 42).as_deref(), Some("[paired:42]"));
+        assert_eq!(
+            paired_memo(Some("rent share"), 42).as_deref(),
+            Some("rent share [paired:42]")
+        );
+        // Idempotent: marker already present -> None signals no-op.
+        assert!(paired_memo(Some("already [paired:7] noted"), 42).is_none());
+        assert!(paired_memo(Some("[paired:7]"), 42).is_none());
+    }
+
+    #[test]
+    fn test_apply_confirmed_preserves_existing_memo() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_category, upsert_transaction, upsert_transaction_account, with_operation};
+
+        let conn = test_db();
+        let mut transfer_cat = make_category(999, "_Transfer");
+        transfer_cat.is_transfer = Some(true);
+        upsert_category(&conn, &transfer_cat).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(100, "S")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "E")).unwrap();
+
+        with_operation(&conn, "sync", |conn| {
+            let mut t1 = make_transaction(1, "a");
+            t1.amount = Some(50.0);
+            t1.transaction_account = Some(make_transaction_account(100, "S"));
+            t1.memo = Some("rent share".into());
+            upsert_transaction(conn, &t1)?;
+            let mut t2 = make_transaction(2, "b");
+            t2.amount = Some(-50.0);
+            t2.transaction_account = Some(make_transaction_account(200, "E"));
+            // leg 2 has no prior memo; ensure we don't accidentally produce " [paired:1]".
+            t2.memo = None;
+            upsert_transaction(conn, &t2)?;
+            Ok(())
+        })
+        .unwrap();
+
+        crate::db::transfer_pairs::insert_pair(
+            &conn,
+            &TransferPair {
+                txn_id_a: 1,
+                txn_id_b: 2,
+                amount_cents: 5000,
+                confidence: Confidence::High,
+                status: Status::Confirmed,
+            },
+        )
+        .unwrap();
+
+        apply_confirmed(&conn).unwrap();
+
+        let memo1: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        let memo2: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 2", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(memo1.as_deref(), Some("rent share [paired:2]"));
+        assert_eq!(memo2.as_deref(), Some("[paired:1]"));
+    }
+
+    #[test]
+    fn test_annotate_existing_pairs_backfills_already_applied_pairs() {
+        use crate::db::test_helpers::*;
+        use crate::db::{upsert_category, upsert_transaction, upsert_transaction_account, with_operation};
+
+        let conn = test_db();
+        let mut transfer_cat = make_category(999, "_Transfer");
+        transfer_cat.is_transfer = Some(true);
+        upsert_category(&conn, &transfer_cat).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(100, "S")).unwrap();
+        upsert_transaction_account(&conn, &make_transaction_account(200, "E")).unwrap();
+
+        // Seed a pair that's already been applied: is_transfer=1,
+        // category_id=999, transfer_pairs row long gone, memo empty.
+        with_operation(&conn, "sync", |conn| {
+            let mut a = make_transaction(11, "Transfer to xx");
+            a.amount = Some(120.0);
+            a.transaction_account = Some(make_transaction_account(100, "S"));
+            a.is_transfer = Some(true);
+            a.category = Some(make_category(999, "_Transfer"));
+            upsert_transaction(conn, &a)?;
+            let mut b = make_transaction(22, "Transfer from xx");
+            b.amount = Some(-120.0);
+            b.transaction_account = Some(make_transaction_account(200, "E"));
+            b.is_transfer = Some(true);
+            b.category = Some(make_category(999, "_Transfer"));
+            upsert_transaction(conn, &b)?;
+            // A control row that's is_transfer=1 but has no counterparty —
+            // must not be annotated.
+            let mut c = make_transaction(33, "Solo transfer");
+            c.amount = Some(7.0);
+            c.transaction_account = Some(make_transaction_account(100, "S"));
+            c.is_transfer = Some(true);
+            c.category = Some(make_category(999, "_Transfer"));
+            upsert_transaction(conn, &c)?;
+            Ok(())
+        })
+        .unwrap();
+
+        let updated = annotate_existing_pairs(&conn).unwrap();
+        assert_eq!(updated, 2, "should update exactly the two paired legs");
+
+        let memo11: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 11", [], |r| r.get(0))
+            .unwrap();
+        let memo22: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 22", [], |r| r.get(0))
+            .unwrap();
+        let memo33: Option<String> = conn
+            .query_row("SELECT memo FROM transactions WHERE id = 33", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(memo11.as_deref(), Some("[paired:22]"));
+        assert_eq!(memo22.as_deref(), Some("[paired:11]"));
+        assert!(memo33.is_none(), "unpaired solo txn must be left alone");
+
+        // Idempotent: re-running picks up zero.
+        let again = annotate_existing_pairs(&conn).unwrap();
+        assert_eq!(again, 0);
     }
 
     #[test]
