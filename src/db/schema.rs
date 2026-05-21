@@ -156,8 +156,24 @@ CREATE TABLE IF NOT EXISTS _transaction_changes (
     old_memo        TEXT,
     operation_id    INTEGER NOT NULL REFERENCES _operations(id),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    mask            INTEGER NOT NULL DEFAULT 0 REFERENCES field_masks(mask)
+    mask            INTEGER NOT NULL DEFAULT 0 REFERENCES field_masks(mask),
+    pushed_at       TEXT
 );
+
+CREATE TABLE IF NOT EXISTS push_log (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    txn_id                   INTEGER NOT NULL,
+    attempted_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    outcome                  TEXT NOT NULL CHECK(outcome IN
+                               ('pushed','would_push','skipped_changed_upstream','deleted_upstream','failed')),
+    local_updated_at_before  TEXT,
+    remote_updated_at_seen   TEXT,
+    request_body             TEXT,
+    response_body            TEXT,
+    error_message            TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_push_log_attempted_at ON push_log(attempted_at);
+CREATE INDEX IF NOT EXISTS idx_push_log_txn_id ON push_log(txn_id);
 
 CREATE INDEX IF NOT EXISTS idx_transaction_changes_transaction_id
     ON _transaction_changes(transaction_id);

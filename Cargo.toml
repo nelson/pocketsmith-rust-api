@@ -34,3 +34,7 @@ name = "serve"
 path = "src/bin/serve/main.rs"
 required-features = ["web"]
 
+[[bin]]
+name = "push"
+path = "src/bin/push.rs"
+

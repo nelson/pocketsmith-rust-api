@@ -21,6 +21,7 @@ pub fn initialize(path: &str) -> Result<Connection> {
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
     drop_legacy_artifacts(&conn)?;
+    migrate_add_pushed_at(&conn)?;
     seed_field_masks(&conn)?;
 
     Ok(conn)
@@ -31,8 +32,35 @@ pub fn initialize_in_memory() -> Result<Connection> {
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA)?;
     drop_legacy_artifacts(&conn)?;
+    migrate_add_pushed_at(&conn)?;
     seed_field_masks(&conn)?;
     Ok(conn)
+}
+
+/// Idempotent migration: add `pushed_at TEXT` to `_transaction_changes` if it
+/// is not already there. Fresh DBs already have the column (via SCHEMA) so the
+/// PRAGMA check short-circuits. Older DBs (created before the push feature)
+/// get the column added in place — no data movement required because the
+/// default is NULL.
+fn migrate_add_pushed_at(conn: &Connection) -> Result<()> {
+    let has_column: bool = {
+        let mut stmt = conn.prepare("PRAGMA table_info('_transaction_changes')")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        let mut found = false;
+        for r in rows {
+            if r? == "pushed_at" {
+                found = true;
+                break;
+            }
+        }
+        found
+    };
+    if !has_column {
+        conn.execute_batch(
+            "ALTER TABLE _transaction_changes ADD COLUMN pushed_at TEXT;",
+        )?;
+    }
+    Ok(())
 }
 
 /// Drop artifacts left behind by older schema versions. The legacy
