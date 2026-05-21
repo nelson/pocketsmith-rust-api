@@ -1,13 +1,13 @@
-//! Stage 1 push — narrow MVP: push `is_transfer` + `category_id` for confirmed
-//! transfer pairs that `transfers --apply` has already applied locally.
+//! Stage 1+ push — push `is_transfer` + `category_id` + `memo` for confirmed
+//! transfer pairs that `transfers --apply` (or `transfers --annotate-existing`)
+//! has already written locally.
 //!
-//! See [`.claude/plans/push-stage-1-transfer-pair-mvp.md`] for the design
-//! rationale. This module is intentionally minimal so we can observe how it
-//! behaves in anger (Stage 2) before generalising to other fields (Stage 3)
-//! or adding per-field conflict detection (Stage 4).
+//! See [`.claude/plans/push-stage-1-transfer-pair-mvp.md`] for the original
+//! design rationale and [`.claude/plans/push-stage-3-expand-fields.md`] for
+//! the broader generalisation. This module is still scoped to the transfers
+//! reason — normalise / other writers are deferred to a later Stage-3 pass.
 //!
-//! Out of scope for Stage 1 (documented here so reviewers don't add them):
-//! - `payee`, `note`, `labels`, `memo`        → Stage 3.
+//! Out of scope here (documented so reviewers don't add them):
 //! - per-field conflict detection / table     → Stage 4.
 //! - conflict review UX                       → Stage 5.
 //! - rate limiting / 429 retry                → not yet needed for the volumes
@@ -19,13 +19,11 @@
 //!   2. If remote.updated_at != local.updated_at → record
 //!      `skipped_changed_upstream`, do not PUT.
 //!   3. If dry-run → record `would_push`, do not PUT.
-//!   4. PUT { is_transfer, category_id } only.
-//!   5. Update local `transactions.updated_at` to the response's value
-//!      (under reason `push` so the resulting `_transaction_changes` row is
-//!      attributable).
-//!   6. Stamp `pushed_at` on every `_transaction_changes` row for this txn
-//!      whose mask intersects bits 2|16 (category_id, is_transfer) and which
-//!      is still `pushed_at IS NULL`.
+//!   4. PUT { is_transfer, category_id, memo } only.
+//!   5. Stamp `pushed_at` on every `_transaction_changes` row for this txn
+//!      whose mask intersects bits 2|16|32 (category_id, is_transfer, memo)
+//!      and which is still `pushed_at IS NULL`, scoped to operations whose
+//!      reason='transfers'.
 //!
 //! A 404 from the GET is recorded as `deleted_upstream` (the txn was removed
 //! on the server). Any other error path records `failed` with the error
@@ -38,8 +36,9 @@ use crate::client::PocketSmithClient;
 use crate::db;
 use crate::models::{Transaction, TransactionUpdate};
 
-/// Bits we touch in Stage 1: `category_id` (1<<1 = 2) | `is_transfer` (1<<4 = 16) = 18.
-const STAGE1_MASK: i64 = 18;
+/// Bits we touch for transfer pushes: `category_id` (1<<1 = 2) | `is_transfer`
+/// (1<<4 = 16) | `memo` (1<<5 = 32) = 50.
+const TRANSFERS_PUSH_MASK: i64 = 50;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PushOpts {
@@ -128,13 +127,17 @@ pub fn push<A: PushApi>(api: &A, conn: &Connection, opts: &PushOpts) -> Result<P
     Ok(stats)
 }
 
-/// Pending query — see plan §"Pending query". Only Stage-1 transfer pushes.
+/// Pending query — transfer-side edits awaiting push. Picks up any
+/// `reason='transfers'` change row whose mask intersects any of
+/// `(category_id | is_transfer | memo)` and which hasn't yet been stamped
+/// `pushed_at`. The memo bit is what lets `annotate_existing_pairs` produce
+/// a memo-only change that still gets caught here.
 fn pending_txn_ids(conn: &Connection, limit: Option<usize>) -> Result<Vec<i64>> {
     let sql = "
         SELECT DISTINCT c.transaction_id
         FROM _transaction_changes c
         JOIN _operations o ON c.operation_id = o.id
-        WHERE (c.mask & 16) != 0
+        WHERE (c.mask & 50) != 0
           AND o.reason = 'transfers'
           AND c.pushed_at IS NULL
           AND EXISTS (SELECT 1 FROM transactions t WHERE t.id = c.transaction_id)
@@ -152,18 +155,20 @@ fn pending_txn_ids(conn: &Connection, limit: Option<usize>) -> Result<Vec<i64>> 
 struct LocalSnapshot {
     is_transfer: i64,
     category_id: Option<i64>,
+    memo: Option<String>,
     updated_at: Option<String>,
 }
 
 fn load_local(conn: &Connection, txn_id: i64) -> Result<LocalSnapshot> {
     conn.query_row(
-        "SELECT is_transfer, category_id, updated_at FROM transactions WHERE id = ?1",
+        "SELECT is_transfer, category_id, memo, updated_at FROM transactions WHERE id = ?1",
         [txn_id],
         |row| {
             Ok(LocalSnapshot {
                 is_transfer: row.get::<_, Option<i64>>(0)?.unwrap_or(0),
                 category_id: row.get(1)?,
-                updated_at: row.get(2)?,
+                memo: row.get(2)?,
+                updated_at: row.get(3)?,
             })
         },
     )
@@ -229,6 +234,7 @@ fn run_one_txn<A: PushApi>(
     let put = TransactionUpdate {
         is_transfer: Some(local.is_transfer != 0),
         category_id: local.category_id,
+        memo: local.memo.clone(),
         ..Default::default()
     };
 
@@ -288,7 +294,7 @@ fn run_one_txn<A: PushApi>(
             AND operation_id IN (
                 SELECT id FROM _operations WHERE reason = 'transfers'
             )",
-        params![txn_id, STAGE1_MASK],
+        params![txn_id, TRANSFERS_PUSH_MASK],
     )?;
 
     let response_body = serde_json::to_string(&resp).ok();

@@ -14,6 +14,9 @@ fn main() -> Result<()> {
     if args.iter().any(|a| a == "--apply") {
         return apply(&args);
     }
+    if args.iter().any(|a| a == "--annotate-existing") {
+        return annotate_existing(&args);
+    }
     if args.iter().any(|a| a == "--review") {
         bail!(
             "--review is no longer supported. Use the web UI: \
@@ -51,6 +54,18 @@ fn detect(args: &[String]) -> Result<()> {
     }
 
     print_status_summary(&conn)?;
+    Ok(())
+}
+
+fn annotate_existing(_args: &[String]) -> Result<()> {
+    // One-shot retroactive backfill: append `[paired:<other_id>]` to the
+    // memo of every already-applied (is_transfer=1) transfer pair whose
+    // memo doesn't already carry the marker. Idempotent across re-runs.
+    // After this prints `Annotated N transactions.`, run `push` to send the
+    // new memos upstream.
+    let conn = db::initialize("pocketsmith.db")?;
+    let updated = transfers::annotate_existing_pairs(&conn)?;
+    println!("Annotated {updated} transactions with paired-marker memos.");
     Ok(())
 }
 

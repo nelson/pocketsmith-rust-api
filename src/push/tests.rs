@@ -722,21 +722,29 @@ fn end_to_end_pair_lifecycle_via_stub() {
     assert_eq!(stats.pushed, 2, "stats: {stats:?}");
     assert_eq!(stats.failed, 0);
 
-    // Two PUTs, both with exactly the two Stage-1 fields and nothing else.
+    // Two PUTs, both carrying the transfer-side fields (is_transfer,
+    // category_id, and the new `[paired:<other_id>]` memo marker) and
+    // nothing else.
     let puts = api.puts.borrow();
     assert_eq!(puts.len(), 2);
     for (id, put) in puts.iter() {
         assert!(*id == 1 || *id == 2);
         assert_eq!(put.is_transfer, Some(true));
         assert_eq!(put.category_id, Some(99));
+        // memo should reference the other leg of the pair.
+        let other = if *id == 1 { 2 } else { 1 };
+        assert_eq!(
+            put.memo.as_deref(),
+            Some(format!("[paired:{other}]").as_str()),
+            "PUT memo should be the paired-marker for txn {id}"
+        );
         assert!(
             put.payee.is_none()
                 && put.note.is_none()
-                && put.memo.is_none()
                 && put.labels.is_none()
                 && put.amount.is_none()
                 && put.date.is_none(),
-            "PUT carried fields outside Stage 1 scope: {put:?}"
+            "PUT carried fields outside transfer-push scope: {put:?}"
         );
     }
 

@@ -60,10 +60,20 @@ This is a graphical alternative to the now-removed `--review` CLI flag.
 
 ### Apply
 
-Applies all confirmed pairs - sets `category_id` to `_Transfer` and `is_transfer = 1` on both transactions. Changes are tracked via `_operations` with reason `"transfers"`:
+Applies all confirmed pairs - sets `category_id` to `_Transfer`, `is_transfer = 1`, and appends a `[paired:<other_id>]` backreference to each leg's `memo` (preserving any existing memo content, idempotent). Changes are tracked via `_operations` with reason `"transfers"`:
 
 ```
 cargo run --bin transfers -- --apply
+```
+
+### Backfill paired-marker memos
+
+One-shot retroactive command: appends `[paired:<other_id>]` to the memos of every transfer pair that was applied *before* this feature shipped (re-derives pair identity from `is_transfer=1` transactions using the same matching rules as `find_pairs`, since `transfer_pairs` rows are deleted at apply time). Idempotent across re-runs. After running this, `push` will pick the memo edits up like any other transfer-side change.
+
+```
+cargo run --bin transfers -- --annotate-existing
+cargo run --bin push -- --dry-run   # verify the PUTs look right
+cargo run --bin push                # actually send them
 ```
 
 ### Confidence scoring
@@ -88,11 +98,11 @@ GROUP BY tp.confidence, tp.status;
 
 Each transaction can appear in at most one pair (enforced by unique constraints on `txn_id_a` and `txn_id_b`).
 
-## Push to PocketSmith (Stage 1)
+## Push to PocketSmith
 
-Pushes the result of `transfers --apply` back to PocketSmith: for each confirmed transfer pair, a single PUT sets `is_transfer=true` and `category_id=<_Transfer>` on each of the two transactions. Driven entirely from local DB state — no manual ids.
+Pushes the result of `transfers --apply` back to PocketSmith: for each confirmed transfer pair, a single PUT sets `is_transfer=true`, `category_id=<_Transfer>`, and the `[paired:<other_id>]` memo on each of the two transactions. Driven entirely from local DB state — no manual ids.
 
-This is **Stage 1** of a staged rollout. Out of scope until later stages: `payee` / `note` / `labels` / `memo` (Stage 3), per-field conflict detection (Stage 4), conflict review UX (Stage 5). See `.claude/plans/push-overview.md` for the stage table and rationale.
+This is the Stage 1 + early-Stage-3 push surface (transfer pairs only, including memo). Out of scope until later stages: other writers' fields like `payee` from `normalise` (rest of Stage 3), per-field conflict detection (Stage 4), conflict review UX (Stage 5). See `.claude/plans/push-overview.md` for the stage table and rationale.
 
 ### Dry-run
 
