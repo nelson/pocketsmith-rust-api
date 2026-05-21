@@ -368,3 +368,167 @@ fn transfer_pairs_status_fk_accepts_valid() {
         .unwrap();
     }
 }
+
+// ----------------------------------------------------------------------------
+// `transactions` sync-owned column protection
+// ----------------------------------------------------------------------------
+//
+// The `_transactions_protect_sync_owned_columns` trigger enforces that
+// metadata columns (id, transaction_type, amount, amount_in_base_currency,
+// date, cheque_number, original_payee, upload_source, closing_balance,
+// transaction_account_id, status, needs_review, created_at, updated_at) may
+// only be UPDATEd when the current operation's reason is 'sync' or 'test'.
+// The six push-able columns (payee, category_id, note, labels, is_transfer,
+// memo) remain writable under any reason.
+
+/// Seed an account + a fully-formed transaction under reason='sync', so
+/// follow-up UPDATEs can target a row that already has every column populated.
+fn seed_synced_txn(conn: &Connection) {
+    db::with_operation(conn, "sync", |conn| {
+        conn.execute(
+            "INSERT INTO transaction_accounts (id, name) VALUES (1, 'acct')",
+            [],
+        )?;
+        conn.execute(
+            "INSERT INTO transactions
+               (id, transaction_type, payee, amount, date, transaction_account_id,
+                is_transfer, category_id, note, labels, memo, updated_at)
+             VALUES
+               (1, 'debit', 'p', 1.0, '2024-01-01', 1,
+                0, NULL, NULL, NULL, NULL, '2024-01-01T00:00:00Z')",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn transactions_protect_updated_at_outside_sync_or_test() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    let err = db::with_operation(&conn, "normalisation", |c| {
+        c.execute(
+            "UPDATE transactions SET updated_at = '2099-01-01T00:00:00Z' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("sync-owned column"),
+        "expected sync-owned error, got: {msg}"
+    );
+}
+
+#[test]
+fn transactions_protect_amount_outside_sync_or_test() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    let err = db::with_operation(&conn, "transfers", |c| {
+        c.execute("UPDATE transactions SET amount = 999.0 WHERE id = 1", [])?;
+        Ok(())
+    })
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("sync-owned column"));
+}
+
+#[test]
+fn transactions_protect_date_outside_sync_or_test() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    let err = db::with_operation(&conn, "push", |c| {
+        c.execute("UPDATE transactions SET date = '2030-01-01' WHERE id = 1", [])?;
+        Ok(())
+    })
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("sync-owned column"));
+}
+
+/// Regression test for the push-bumps-updated_at bug. Even if a future commit
+/// reintroduced that write, the trigger now catches it at the DB layer.
+#[test]
+fn transactions_protect_push_cannot_bump_updated_at() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    let err = db::with_operation(&conn, "push", |c| {
+        c.execute(
+            "UPDATE transactions SET updated_at = '2099-12-31T23:59:59Z' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("sync-owned column"));
+}
+
+#[test]
+fn transactions_allow_payee_outside_sync() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    db::with_operation(&conn, "normalisation", |c| {
+        c.execute("UPDATE transactions SET payee = 'new payee' WHERE id = 1", [])?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn transactions_allow_category_and_is_transfer_outside_sync() {
+    let conn = open();
+    seed_synced_txn(&conn);
+    db::with_operation(&conn, "sync", |c| {
+        c.execute("INSERT INTO categories (id, title) VALUES (99, '_Transfer')", [])?;
+        Ok(())
+    })
+    .unwrap();
+
+    db::with_operation(&conn, "transfers", |c| {
+        c.execute(
+            "UPDATE transactions SET category_id = 99, is_transfer = 1 WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn transactions_sync_can_write_any_column() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    db::with_operation(&conn, "sync", |c| {
+        c.execute(
+            "UPDATE transactions
+                SET updated_at = '2025-06-01T00:00:00Z',
+                    amount = 42.0,
+                    status = 'posted'
+              WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn transactions_test_reason_can_write_any_column() {
+    let conn = open();
+    seed_synced_txn(&conn);
+
+    db::with_operation(&conn, "test", |c| {
+        c.execute(
+            "UPDATE transactions SET updated_at = '2025-06-01T00:00:00Z' WHERE id = 1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}

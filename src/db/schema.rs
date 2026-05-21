@@ -248,4 +248,37 @@ BEGIN
         | (CASE WHEN OLD.memo IS NOT NEW.memo THEN 32 ELSE 0 END)
     );
 END;
+
+-- Convention C, part 2 (sync-owned columns):
+--   `transactions` is the local mirror of the Pocketsmith state, overlaid
+--   with un-pushed local edits. Only six columns are locally writable —
+--   the same six tracked by `_transaction_changes.mask`:
+--       payee, category_id, note, labels, is_transfer, memo
+--   Every other column (id, transaction_type, amount, amount_in_base_currency,
+--   date, cheque_number, original_payee, upload_source, closing_balance,
+--   transaction_account_id, status, needs_review, created_at, updated_at) is
+--   sync-owned: it is set by `db::upsert_transaction` under reason=sync,
+--   reflects what Pocketsmith returned, and must never be mutated by
+--   normalise / transfers --apply / push / serve / any other local writer.
+--
+--   The trigger below enforces that invariant: a `BEFORE UPDATE OF <metadata>`
+--   on `transactions` raises ABORT unless the current operation's reason is
+--   `sync` (the production sync subcommand) or `test` (fixtures that need
+--   to construct arbitrary states).
+--
+--   INSERTs are not gated: the only path that inserts is
+--   `db::upsert_transaction`, used by sync (in production) and by tests.
+CREATE TRIGGER IF NOT EXISTS _transactions_protect_sync_owned_columns
+BEFORE UPDATE OF
+    id, transaction_type, amount, amount_in_base_currency, date,
+    cheque_number, original_payee, upload_source, closing_balance,
+    transaction_account_id, status, needs_review, created_at, updated_at
+ON transactions
+WHEN (
+    SELECT o.reason FROM _operations o
+    WHERE o.id = (SELECT id FROM _current_operation)
+) NOT IN ('sync', 'test')
+BEGIN
+    SELECT RAISE(ABORT, 'transactions: sync-owned column may only be modified under reason sync or test');
+END;
 ";
