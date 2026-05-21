@@ -137,7 +137,7 @@ Note: bumping `transactions.updated_at` after the PUT will fire the `_transactio
 In `src/push/mod.rs` `#[cfg(test)] mod tests` using an in-memory DB + `StubApi`:
 
 1. **Schema migration:** fresh DB → `pushed_at` column exists on `_transaction_changes`.
-2. **Pending query empty:** pull a txn under reason="pocketsmith", no `transfers --apply` ran → pending list is empty.
+2. **Pending query empty:** pull a txn under reason="sync", no `transfers --apply` ran → pending list is empty.
 3. **Pending query finds confirmed transfer:** simulate `transfers --apply` writing `is_transfer=1, category_id=99` → pending list has the txn.
 4. **Push happy path:** stub remote has same `updated_at` as local; run → exactly one PUT with `{is_transfer: Some(true), category_id: Some(99)}` and nothing else; `pushed_at` set; `transactions.updated_at` refreshed; stats `pushed=1`.
 5. **Timestamp guard aborts:** stub remote has different `updated_at` → no PUT, no `pushed_at`, stats `skipped_changed_upstream=1`.

@@ -19,7 +19,7 @@ SELECT DISTINCT c.transaction_id
 FROM _transaction_changes c
 JOIN _operations o ON c.operation_id = o.id
 WHERE c.mask != 0
-  AND o.reason NOT IN ('pocketsmith','push')
+  AND o.reason NOT IN ('sync','push')
   AND c.pushed_at IS NULL
   AND EXISTS (SELECT 1 FROM transactions t WHERE t.id = c.transaction_id);
 ```
@@ -36,7 +36,7 @@ Per txn: union the masks of all matching unpushed history rows. For each dirty b
 ## Tests (additions on top of the Stage 1 test list)
 
 14. Pending query picks up `reason='normalisation'` rows.
-15. Pending query ignores `reason='pocketsmith'` and `reason='push'`.
+15. Pending query ignores `reason='sync'` and `reason='push'`.
 16. Two unpushed history rows on the same txn (one normalisation, one transfers) → single PUT with both fields set.
 17. After a successful Stage-3 PUT, all involved `_transaction_changes` rows have `pushed_at` set.
 18. Field-specific serialisation: labels JSON-array → CSV on wire (verify against `models::TransactionUpdate::serialize` snapshot).

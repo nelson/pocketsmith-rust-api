@@ -14,7 +14,7 @@ Stages 1–3 use a blunt guard: any change to `updated_at` on the remote → ref
 
 ## Baseline value
 
-For a dirty field `F` on txn `T`, the baseline is `T.F`'s value at the moment we last pulled it from Pocketsmith — i.e. the most recent `_transaction_changes` row for `T` with `reason='pocketsmith'` AND mask bit for `F` set. We materialise this lazily during push (no new table).
+For a dirty field `F` on txn `T`, the baseline is `T.F`'s value at the moment we last pulled it from Pocketsmith — i.e. the most recent `_transaction_changes` row for `T` with `reason='sync'` AND mask bit for `F` set. We materialise this lazily during push (no new table).
 
 ## Decision matrix per dirty field
 
@@ -60,7 +60,7 @@ Values stored as text JSON (so labels arrays, NULL category_id, etc. all round-t
 
 ## Open questions
 
-1. **Baseline source.** "Most recent `reason='pocketsmith'` history row with this bit set" vs "most recent successful push response (we stored `response_body` in `push_log`)". The former is correct for fields the user changes locally that we haven't pushed yet; the latter is correct *after* a push (the response is the new baseline). Probably: use the more recent of the two.
+1. **Baseline source.** "Most recent `reason='sync'` history row with this bit set" vs "most recent successful push response (we stored `response_body` in `push_log`)". The former is correct for fields the user changes locally that we haven't pushed yet; the latter is correct *after* a push (the response is the new baseline). Probably: use the more recent of the two.
 2. **`push_conflicts` granularity.** One row per (txn, field, detection event) with UNIQUE on (txn, field, detected_at)? Or upsert one row per (txn, field) that gets updated as new conflicts arise? Lean: append-only with UNIQUE (we want a history).
 3. **Outcome taxonomy in `push_log`.** Keep `skipped_changed_upstream` as a Stage-1 holdover, or replace with `conflict_recorded` (Stage 4)? Probably introduce `conflict_recorded` and let `skipped_changed_upstream` go to zero naturally.
 4. **Partial push vs all-or-nothing.** Txn has 3 dirty fields, 1 conflicts → push the 2 clean fields, record conflict on the 1? Or block the whole PUT until conflict is resolved? Partial is safer (less work lost), all-or-nothing is simpler (atomic). Lean partial; decide at Stage 4 design time after Stage 2 data.
