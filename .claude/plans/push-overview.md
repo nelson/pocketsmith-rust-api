@@ -17,7 +17,7 @@ Guiding rule: **never silently overwrite upstream**. Every stage refuses to writ
 | Stage | Name | Code? | Gate | Plan |
 |-------|------|-------|------|------|
 | 1 | `is_transfer` + `category_id` push for confirmed transfer pairs | yes | passes own tests + manual smoke | [push-stage-1-transfer-pair-mvp.md](./push-stage-1-transfer-pair-mvp.md) |
-| 2 | Observation | no — usage only | written debrief informs Stage 3 | [push-stage-2-observation.md](./push-stage-2-observation.md) |
+| 2 | Observation | no — usage only | written debrief informs Stage 3 | [push-stage-2-observation.md](./push-stage-2-observation.md) ([debrief](./push-stage-2-debrief.md)) |
 | 3 | Expand to `payee` (normalise) and remaining tracked fields | yes | tests + manual | [push-stage-3-expand-fields.md](./push-stage-3-expand-fields.md) |
 | 4 | Replace timestamp guard with per-field conflict detection + conflicts table | yes | tests + manual | [push-stage-4-per-field-conflict-detection.md](./push-stage-4-per-field-conflict-detection.md) |
 | 5 | Conflict review/resolution UX | yes | only after seeing real conflicts in Stage 4 | [push-stage-5-conflict-resolution-ux.md](./push-stage-5-conflict-resolution-ux.md) |
