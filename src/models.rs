@@ -28,7 +28,7 @@ pub struct User {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TransactionAccount {
     pub id: i64,
     pub name: Option<String>,
@@ -48,7 +48,7 @@ pub struct TransactionAccount {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Category {
     pub id: i64,
     pub title: Option<String>,
@@ -63,7 +63,7 @@ pub struct Category {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Transaction {
     pub id: i64,
     #[serde(rename = "type")]

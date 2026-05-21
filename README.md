@@ -1,8 +1,8 @@
 # pocketsmith-sync
 
-Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Includes CLI binaries for sync/normalisation/transfer detection and a local web UI for reviewing transfer pairs.
+Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Includes CLI binaries for sync / normalisation / transfer detection / push-to-Pocketsmith, and a local web UI for reviewing transfer pairs.
 
-All data — including review decisions (confirm/reject) — is stored locally in `pocketsmith.db`. Nothing is written back to PocketSmith.
+Most data — including review decisions (confirm/reject) — lives locally in `pocketsmith.db`. The `push` binary is the only path that writes back to PocketSmith; it is opt-in and currently limited to confirmed transfer pairs (Stage 1 of the push rollout — see `.claude/plans/push-overview.md`).
 
 ## Setup
 
@@ -87,6 +87,57 @@ GROUP BY tp.confidence, tp.status;
 ```
 
 Each transaction can appear in at most one pair (enforced by unique constraints on `txn_id_a` and `txn_id_b`).
+
+## Push to PocketSmith (Stage 1)
+
+Pushes the result of `transfers --apply` back to PocketSmith: for each confirmed transfer pair, a single PUT sets `is_transfer=true` and `category_id=<_Transfer>` on each of the two transactions. Driven entirely from local DB state — no manual ids.
+
+This is **Stage 1** of a staged rollout. Out of scope until later stages: `payee` / `note` / `labels` / `memo` (Stage 3), per-field conflict detection (Stage 4), conflict review UX (Stage 5). See `.claude/plans/push-overview.md` for the stage table and rationale.
+
+### Dry-run
+
+Lists the work without issuing any PUTs:
+
+```
+cargo run --bin push -- --dry-run
+```
+
+### Apply
+
+```
+cargo run --bin push
+```
+
+Optional flags:
+
+- `--dry-run` — log `would_push` for each pending txn; issue no PUTs.
+- `--limit N` — cap the batch size (useful when first turning this on).
+
+The summary at the end reports five counters: `pushed`, `would_push`, `skipped_changed_upstream`, `deleted_upstream`, `failed`. Exit code is non-zero only on `failed > 0`.
+
+### Safety: timestamp guard
+
+Before each PUT the binary issues a `GET /transactions/{id}` and compares the remote `updated_at` against the local one. If they differ → that txn is skipped (recorded as `skipped_changed_upstream`) and no PUT is sent. This is intentionally blunt; Stage 4 will replace it with a per-field check.
+
+### Audit trail
+
+Every attempt — regardless of outcome — writes a row to the `push_log` table with the request body, response body or error, and both observed `updated_at` timestamps. Inspect with:
+
+```sql
+SELECT outcome, COUNT(*) FROM push_log GROUP BY outcome;
+SELECT * FROM push_log WHERE outcome = 'failed' OR outcome = 'skipped_changed_upstream';
+```
+
+Successful pushes also stamp `_transaction_changes.pushed_at` on every change row whose mask includes a Stage-1 bit (`category_id` or `is_transfer`). Re-running `push` is a no-op once `pushed_at` is set — the pending query filters those out.
+
+### Typical workflow
+
+```
+cargo run --bin transfers -- --apply   # write local is_transfer + category_id
+cargo run --bin push -- --dry-run      # preview
+cargo run --bin push                   # actually PUT
+cargo run --bin sync                   # next pull picks up the bumped updated_at
+```
 
 ## Payee Normalisation
 
