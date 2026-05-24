@@ -45,25 +45,14 @@ mod tests {
     use super::*;
     use crate::db::initialize_in_memory;
     use crate::db::payee_normalisations::PayeeNormalisationRow;
+    use crate::test_support::{seed_account, seed_txn};
 
     fn setup(conn: &Connection) {
-        conn.execute(
-            "INSERT INTO transaction_accounts (id, name) VALUES (1, 'Test') ON CONFLICT DO NOTHING",
-            [],
-        )
-        .unwrap();
+        seed_account(conn, 1, "Test").unwrap();
     }
 
     fn insert_txn(conn: &Connection, id: i64, original_payee: &str, payee: &str) {
-        crate::db::with_operation(conn, "test-seed", |conn| {
-            conn.execute(
-                "INSERT INTO transactions (id, transaction_account_id, date, amount, original_payee, payee)
-                 VALUES (?1, 1, '2026-01-01', -10.0, ?2, ?3)",
-                params![id, original_payee, payee],
-            )?;
-            Ok(())
-        })
-        .unwrap();
+        seed_txn(conn, id, 1, original_payee, payee).unwrap();
     }
 
     fn stage(

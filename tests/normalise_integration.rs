@@ -8,30 +8,19 @@
 
 use rusqlite::{params, Connection};
 
-use pocketsmith_sync::db::{self, payee_normalisations as pn, with_operation};
+use pocketsmith_sync::db::{self, payee_normalisations as pn};
 use pocketsmith_sync::normalise::{apply as norm_apply, scan as norm_scan};
-use pocketsmith_sync::transfers::Status;
+use pocketsmith_sync::review::Status;
+use pocketsmith_sync::test_support::{seed_account, seed_txn};
 
 fn fresh_db() -> Connection {
     let conn = db::initialize_in_memory().unwrap();
-    conn.execute(
-        "INSERT INTO transaction_accounts (id, name) VALUES (1, 'Test') ON CONFLICT DO NOTHING",
-        [],
-    )
-    .unwrap();
+    seed_account(&conn, 1, "Test").unwrap();
     conn
 }
 
 fn insert_txn(conn: &Connection, id: i64, original_payee: &str, payee: &str) {
-    with_operation(conn, "test-seed", |conn| {
-        conn.execute(
-            "INSERT INTO transactions (id, transaction_account_id, date, amount, original_payee, payee)
-             VALUES (?1, 1, '2026-01-01', -10.0, ?2, ?3)",
-            params![id, original_payee, payee],
-        )?;
-        Ok(())
-    })
-    .unwrap();
+    seed_txn(conn, id, 1, original_payee, payee).unwrap();
 }
 
 fn payee_of(conn: &Connection, id: i64) -> Option<String> {

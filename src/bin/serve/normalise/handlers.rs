@@ -113,8 +113,7 @@ pub fn apply(state: &Arc<Mutex<AppState>>) {
 mod tests {
     use super::*;
     use pocketsmith_sync::db::initialize_in_memory;
-    use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
-    use rusqlite::params;
+    use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
 
     fn make_state() -> Arc<Mutex<AppState>> {
         let conn = initialize_in_memory().unwrap();
@@ -123,40 +122,13 @@ mod tests {
 
     fn seed(state: &Arc<Mutex<AppState>>, original: &str, proposed: &str, status: Status, txn_count: i64) -> String {
         let st = state.lock().unwrap();
-        let slug = pn::slug_for(original);
-        pn::upsert(
-            &st.conn,
-            &PayeeNormalisationRow {
-                original_payee: original.into(),
-                proposed_payee: proposed.into(),
-                slug: slug.clone(),
-                class: Some("merchant".into()),
-                features_json: "{}".into(),
-                txn_count,
-                status,
-            },
-        )
-        .unwrap();
-        slug
+        seed_pn(&st.conn, original, proposed, status, txn_count).unwrap()
     }
 
-    fn seed_txn(state: &Arc<Mutex<AppState>>, id: i64, original_payee: &str, payee: &str) {
+    fn insert_txn(state: &Arc<Mutex<AppState>>, id: i64, original_payee: &str, payee: &str) {
         let st = state.lock().unwrap();
-        st.conn
-            .execute(
-                "INSERT INTO transaction_accounts (id, name) VALUES (1, 'Test') ON CONFLICT DO NOTHING",
-                [],
-            )
-            .unwrap();
-        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |conn| {
-            conn.execute(
-                "INSERT INTO transactions (id, transaction_account_id, date, amount, original_payee, payee)
-                 VALUES (?1, 1, '2026-01-01', -10.0, ?2, ?3)",
-                params![id, original_payee, payee],
-            )?;
-            Ok(())
-        })
-        .unwrap();
+        seed_account(&st.conn, 1, "Test").unwrap();
+        seed_txn(&st.conn, id, 1, original_payee, payee).unwrap();
     }
 
     fn current_status(state: &Arc<Mutex<AppState>>, original: &str) -> Option<Status> {
@@ -242,8 +214,8 @@ mod tests {
     #[test]
     fn apply_drains_confirmed_rows_and_bumps_session_counter() {
         let state = make_state();
-        seed_txn(&state, 1, "WOOLIES", "WOOLIES");
-        seed_txn(&state, 2, "WOOLIES", "WOOLIES");
+        insert_txn(&state, 1, "WOOLIES", "WOOLIES");
+        insert_txn(&state, 2, "WOOLIES", "WOOLIES");
         let _slug = seed(&state, "WOOLIES", "Woolworths", Status::Confirmed, 2);
         apply(&state);
         assert_eq!(state.lock().unwrap().normalise.applied, 2);

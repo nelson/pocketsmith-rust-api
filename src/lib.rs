@@ -5,4 +5,5 @@ pub mod normalise;
 pub mod push;
 pub mod review;
 pub mod sync;
+pub mod test_support;
 pub mod transfers;
