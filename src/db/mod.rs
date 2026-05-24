@@ -15,6 +15,20 @@ pub use users::upsert_user;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 
+/// Default DB filename used by the binaries when `POCKETSMITH_DB` is
+/// unset. Lives alongside `cwd` so a developer running `cargo run` from
+/// the project root will hit the production DB by default.
+pub const DEFAULT_DB_PATH: &str = "pocketsmith.db";
+
+/// Pick the SQLite database path each binary should open. Reads the
+/// `POCKETSMITH_DB` env var if set, otherwise falls back to
+/// [`DEFAULT_DB_PATH`]. Every binary calls this rather than
+/// hard-coding the filename so smoke / dev runs can point at an
+/// isolated file (e.g. `POCKETSMITH_DB=/tmp/test.db cargo run --bin serve`).
+pub fn path_from_env() -> String {
+    std::env::var("POCKETSMITH_DB").unwrap_or_else(|_| DEFAULT_DB_PATH.to_string())
+}
+
 pub fn initialize(path: &str) -> Result<Connection> {
     let conn = Connection::open(path).context("Failed to open database")?;
 
