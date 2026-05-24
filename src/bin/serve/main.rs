@@ -62,6 +62,48 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     }
 
     let response = match (method, path.as_str()) {
+        // --- Normalise tab (checked first so /normalise/... POST paths
+        // don't fall into the transfer-side /confirm contains-match).
+        (Method::Get, "/normalise" | "/normalise/") => normalise::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/normalise/item/") => {
+            let slug = p.trim_start_matches("/normalise/item/");
+            normalise::views::render_detail_fragment(&state, slug)
+        }
+        (Method::Get, p) if p.starts_with("/normalise/queue?") => {
+            let params = p.strip_prefix("/normalise/queue?").unwrap_or("");
+            let filter = extract_param(params, "filter").unwrap_or("pending".to_string());
+            let class = extract_param(params, "class").unwrap_or("all".to_string());
+            normalise::views::render_queue_fragment(&state, &filter, &class)
+        }
+        (Method::Get, "/normalise/queue") => {
+            normalise::views::render_queue_fragment(&state, "all", "all")
+        }
+        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/confirm") => {
+            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/confirm");
+            normalise::handlers::confirm(&state, slug);
+            normalise::views::render_page_shell(&state)
+        }
+        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/reject") => {
+            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/reject");
+            normalise::handlers::reject(&state, slug);
+            normalise::views::render_page_shell(&state)
+        }
+        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/unskip") => {
+            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/unskip");
+            normalise::handlers::unskip(&state, slug);
+            normalise::views::render_page_shell(&state)
+        }
+        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/skip") => {
+            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/skip");
+            normalise::handlers::skip(&state, slug);
+            normalise::views::render_page_shell(&state)
+        }
+        (Method::Post, "/normalise/apply") => {
+            normalise::handlers::apply(&state);
+            normalise::views::render_page_shell(&state)
+        }
+
+        // --- Transfers tab
         (Method::Get, "/transfers" | "/transfers/") => render_page_shell(&state),
         (Method::Get, p) if p.starts_with("/transfers/pair/") => {
             let id = parse_pair_id(p, "/transfers/pair/");
