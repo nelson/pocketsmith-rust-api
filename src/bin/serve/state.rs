@@ -38,16 +38,32 @@ pub struct AppState {
     pub active_pair: Option<(i64, i64)>,
 
     // --- Normalise tab session state ---
-    /// Session-only "skip" set for normalise proposals, keyed by
-    /// `original_payee`. Skipped rows stay pending in the DB but are
-    /// hidden from the Pending queue and surfaced under Skipped.
-    pub norm_skipped: HashMap<String, ()>,
+    /// Session decisions for normalise proposals, keyed by `original_payee`.
+    /// Mirrors `decisions` for transfers. Decision::Skip is session-only;
+    /// Decision::Confirm/Reject also reflect a DB write to
+    /// `payee_normalisations.status`.
+    pub norm_decisions: HashMap<String, Decision>,
+    /// Activity log of normalise actions, in chronological order.
+    pub norm_activity: Vec<NormActivityEntry>,
+    /// Cumulative count of undo actions on the normalise tab.
+    pub norm_undone: usize,
     /// Cumulative count of `transactions.payee` writes applied this
     /// session via the normalise tab's "Apply confirmed" button.
     pub norm_applied: usize,
     pub norm_status_filter: String,
     pub norm_class_filter: String,
     pub norm_active_slug: Option<String>,
+}
+
+/// Activity-log entry for the normalise tab. Mirrors [`ActivityEntry`] in
+/// shape so the renderer can lay them out the same way.
+pub struct NormActivityEntry {
+    pub slug: String,
+    #[allow(dead_code)] // useful for debugging / future activity-row tooltips
+    pub original_payee: String,
+    pub proposed_payee: String,
+    pub txn_count: i64,
+    pub decision: Decision,
 }
 
 impl AppState {
@@ -63,7 +79,9 @@ impl AppState {
             confidence_filter: "all".to_string(),
             decisions: HashMap::new(),
             active_pair: None,
-            norm_skipped: HashMap::new(),
+            norm_decisions: HashMap::new(),
+            norm_activity: Vec::new(),
+            norm_undone: 0,
             norm_applied: 0,
             norm_status_filter: "all".to_string(),
             norm_class_filter: "all".to_string(),

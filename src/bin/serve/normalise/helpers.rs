@@ -12,6 +12,8 @@ use rusqlite::Connection;
 use pocketsmith_sync::db::payee_normalisations::{self as pn, PayeeNormalisationRow};
 use pocketsmith_sync::transfers::Status;
 
+use crate::state::Decision;
+
 /// A single transaction row for the "matching transactions" panel on the
 /// normalise detail view. Mirrors `transfers::get_prior_pairs` in shape.
 #[derive(Debug, Clone)]
@@ -156,18 +158,25 @@ impl NormClassFilter {
 }
 
 /// Load all `payee_normalisations` rows and filter by status + class +
-/// session skip decisions. Returns rows ordered by `txn_count DESC,
+/// session decisions. Returns rows ordered by `txn_count DESC,
 /// original_payee ASC` (the natural list order from `pn::list_all`).
+///
+/// `decisions` is the session-only decision map (keyed by
+/// `original_payee`). Skip decisions take precedence and pull a row out
+/// of every status filter except `Skipped`. Confirm/Reject decisions are
+/// already reflected by the DB row's status, so they're not consulted
+/// here — the filter just operates on the row's stored status.
 pub fn get_filtered_normalisations(
     conn: &Connection,
     status: NormStatusFilter,
     class: NormClassFilter,
-    skipped: &HashMap<String, ()>,
+    decisions: &HashMap<String, Decision>,
 ) -> Vec<PayeeNormalisationRow> {
     let all = pn::list_all(conn).unwrap_or_default();
     all.into_iter()
         .filter(|row| {
-            let is_skipped = skipped.contains_key(&row.original_payee);
+            let session_decision = decisions.get(&row.original_payee).copied();
+            let is_skipped = session_decision == Some(Decision::Skip);
             let status_ok = match status {
                 NormStatusFilter::All => true,
                 NormStatusFilter::Skipped => is_skipped,
@@ -178,6 +187,26 @@ pub fn get_filtered_normalisations(
             status_ok && class.matches(row.class.as_deref())
         })
         .collect()
+}
+
+/// Find the slug that follows `current` in the filtered list. Mirrors
+/// `next_pair_after` for the transfers tab. Stays on the last element if
+/// `current` is the tail.
+pub fn next_slug_after(rows: &[PayeeNormalisationRow], current: &str) -> Option<String> {
+    let idx = rows.iter().position(|r| r.slug == current)?;
+    let next_idx = (idx + 1).min(rows.len().saturating_sub(1));
+    rows.get(next_idx).map(|r| r.slug.clone())
+}
+
+/// Count session decisions of a particular kind on the normalise tab.
+pub fn count_norm_decisions(decisions: &HashMap<String, Decision>, d: Decision) -> usize {
+    decisions.values().filter(|v| **v == d).count()
+}
+
+/// True iff the session has any active Skip decision — used by the
+/// "Clear skipped" affordance in the queue header.
+pub fn any_skipped(decisions: &HashMap<String, Decision>) -> usize {
+    count_norm_decisions(decisions, Decision::Skip)
 }
 
 #[cfg(test)]
@@ -238,11 +267,11 @@ mod tests {
         upsert(&conn, "U", None, Status::Pending, 1);
         upsert(&conn, "R", Some("other"), Status::Rejected, 2);
 
-        let mut skipped = HashMap::new();
+        let mut decisions: HashMap<String, Decision> = HashMap::new();
 
         // All / All returns all five rows.
         assert_eq!(
-            get_filtered_normalisations(&conn, NormStatusFilter::All, NormClassFilter::All, &skipped).len(),
+            get_filtered_normalisations(&conn, NormStatusFilter::All, NormClassFilter::All, &decisions).len(),
             5
         );
 
@@ -251,7 +280,7 @@ mod tests {
             &conn,
             NormStatusFilter::Pending,
             NormClassFilter::Merchant,
-            &skipped,
+            &decisions,
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].original_payee, "W");
@@ -261,27 +290,47 @@ mod tests {
             &conn,
             NormStatusFilter::All,
             NormClassFilter::Unclassified,
-            &skipped,
+            &decisions,
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].original_payee, "U");
 
         // Skipping W moves it out of Pending and into Skipped.
-        skipped.insert("W".to_string(), ());
+        decisions.insert("W".to_string(), Decision::Skip);
         let pending = get_filtered_normalisations(
             &conn,
             NormStatusFilter::Pending,
             NormClassFilter::All,
-            &skipped,
+            &decisions,
         );
         assert!(pending.iter().all(|r| r.original_payee != "W"));
         let skipped_view = get_filtered_normalisations(
             &conn,
             NormStatusFilter::Skipped,
             NormClassFilter::All,
-            &skipped,
+            &decisions,
         );
         assert_eq!(skipped_view.len(), 1);
         assert_eq!(skipped_view[0].original_payee, "W");
+    }
+
+    #[test]
+    fn next_slug_after_returns_following_row_or_stays_on_tail() {
+        let conn = initialize_in_memory().unwrap();
+        upsert(&conn, "A", Some("merchant"), Status::Pending, 10);
+        upsert(&conn, "B", Some("merchant"), Status::Pending, 5);
+        upsert(&conn, "C", Some("merchant"), Status::Pending, 1);
+        let decisions: HashMap<String, Decision> = HashMap::new();
+        let rows = get_filtered_normalisations(&conn, NormStatusFilter::All, NormClassFilter::All, &decisions);
+        // ordered by txn_count DESC -> A, B, C.
+        let a_slug = pn::slug_for("A");
+        let b_slug = pn::slug_for("B");
+        let c_slug = pn::slug_for("C");
+        assert_eq!(next_slug_after(&rows, &a_slug), Some(b_slug.clone()));
+        assert_eq!(next_slug_after(&rows, &b_slug), Some(c_slug.clone()));
+        // Tail stays on tail (matches transfer next_pair_after semantics).
+        assert_eq!(next_slug_after(&rows, &c_slug), Some(c_slug));
+        // Unknown slug returns None.
+        assert_eq!(next_slug_after(&rows, "deadbeefdeadbeef"), None);
     }
 }
