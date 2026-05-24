@@ -10,20 +10,16 @@ mod views;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use maud::html;
+use maud::{html, Markup};
 use tiny_http::{Header, Method, Request, Response, Server};
 
 use pocketsmith_sync::db;
 
-use crate::handlers::{
-    handle_action, handle_apply, handle_bulk_action, handle_clear_all_skipped, handle_undo,
-    handle_unskip,
-};
 use crate::helpers::{extract_param, parse_pair_id};
-use crate::state::AppState;
+use crate::state::{AppState, Decision};
 use crate::views::{
-    render_bulk_buttons_fragment, render_bulk_prompt_fragment, render_detail_fragment,
-    render_page_shell, render_queue_fragment,
+    render_bulk_buttons_fragment, render_bulk_prompt_fragment, render_current_page,
+    render_detail_fragment, render_page_shell, render_queue_fragment,
 };
 
 fn main() -> Result<()> {
@@ -133,15 +129,36 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             render_bulk_prompt_fragment(&state, &action)
         }
         (Method::Get, "/transfers/bulk-buttons") => render_bulk_buttons_fragment(&state),
-        (Method::Post, p) if p.contains("/confirm") => handle_action(&state, p, "confirm"),
-        (Method::Post, p) if p.contains("/reject") => handle_action(&state, p, "reject"),
-        (Method::Post, p) if p.contains("/skip") => handle_action(&state, p, "skip"),
-        (Method::Post, "/transfers/bulk-confirm") => handle_bulk_action(&state, "confirm"),
-        (Method::Post, "/transfers/bulk-reject") => handle_bulk_action(&state, "reject"),
-        (Method::Post, "/transfers/apply") => handle_apply(&state),
-        (Method::Post, "/transfers/clear-all-skipped") => handle_clear_all_skipped(&state),
-        (Method::Post, p) if p.contains("/unskip") => handle_unskip(&state, p),
-        (Method::Post, p) if p.contains("/undo") => handle_undo(&state, p),
+        // All five transfer pair actions share the path shape
+        // `/transfers/pair/<a>-<b>/<verb>`.
+        (Method::Post, p) if p.starts_with("/transfers/pair/") => {
+            let key = parse_pair_id(p, "/transfers/pair/");
+            let verb = p.rsplit('/').next().unwrap_or("");
+            match (key, verb) {
+                (Some(k), "confirm") => handlers::act(&state, k, Decision::Confirm),
+                (Some(k), "reject") => handlers::act(&state, k, Decision::Reject),
+                (Some(k), "skip") => handlers::act(&state, k, Decision::Skip),
+                (Some(k), "undo") | (Some(k), "unskip") => handlers::undo(&state, k),
+                _ => return_invalid_action(),
+            }
+            render_current_page_locked(&state)
+        }
+        (Method::Post, "/transfers/bulk-confirm") => {
+            handlers::bulk_act(&state, Decision::Confirm);
+            render_current_page_locked(&state)
+        }
+        (Method::Post, "/transfers/bulk-reject") => {
+            handlers::bulk_act(&state, Decision::Reject);
+            render_current_page_locked(&state)
+        }
+        (Method::Post, "/transfers/apply") => {
+            handlers::apply(&state);
+            render_current_page_locked(&state)
+        }
+        (Method::Post, "/transfers/clear-all-skipped") => {
+            handlers::clear_all_skipped(&state);
+            render_current_page_locked(&state)
+        }
         _ => html! { p { "Not found" } },
     };
 
@@ -149,4 +166,18 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let resp = Response::from_data(html_str.as_bytes().to_vec())
         .with_header(Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap());
     let _ = request.respond(resp);
+}
+
+/// Re-render the transfers page from the current AppState (locks state
+/// internally). Used after every mutating POST.
+fn render_current_page_locked(state: &Arc<Mutex<AppState>>) -> Markup {
+    let st = state.lock().unwrap();
+    render_current_page(&st)
+}
+
+/// Friendly response for malformed action URLs.
+fn return_invalid_action() {
+    // No-op placeholder: the caller still renders the page shell, which is
+    // the friendliest fallback. Reserved as a hook for future error
+    // surfacing in the UI.
 }

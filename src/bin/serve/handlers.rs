@@ -1,216 +1,138 @@
 use std::sync::{Arc, Mutex};
 
-use maud::{html, Markup};
-
 use pocketsmith_sync::db::transfer_pairs;
-use pocketsmith_sync::transfers::{self, Status};
+use pocketsmith_sync::review::Status;
+use pocketsmith_sync::transfers;
 
-use crate::helpers::{
-    get_filtered_pairs, pairs_eligible_for_bulk, parse_pair_id,
-};
+use crate::helpers::{get_filtered_pairs, pairs_eligible_for_bulk};
 use crate::state::{ActivityEntry, AppState, Decision};
 use crate::tab::next_after;
-use crate::views::render_current_page;
 
-// Handles confirm/reject/skip actions on a pair. Parses pair ID from path, updates DB status
-// (for confirm/reject), records the decision in memory, logs activity, advances to next pair.
-// Called by: main::handle_request (POST /pair/{id}/confirm, /reject, /skip).
-// Calls: parse_pair_id, get_filtered_pairs, next_pair_after, find_pair_index,
-//        transfer_pairs::get_pair_by_id, transfer_pairs::update_status, render_current_page.
-pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
-    let id = parse_pair_id(path, "/transfers/pair/");
-    if let Some((a, b)) = id {
-        let mut state = state.lock().unwrap();
+/// Build an [`ActivityEntry`] for a transfer pair, fetching account/amount
+/// info from the DB. Returns None if the pair has disappeared.
+fn activity_for(state: &AppState, key: (i64, i64), decision: Decision) -> Option<ActivityEntry> {
+    transfer_pairs::get_pair_by_id(&state.conn, key.0, key.1)
+        .ok()
+        .flatten()
+        .map(|p| ActivityEntry {
+            pair_id: key,
+            decision,
+            amount_cents: p.amount_cents,
+            account_a: p.account_name_a,
+            account_b: p.account_name_b,
+        })
+}
 
-        let decision = match action {
-            "confirm" => Decision::Confirm,
-            "reject" => Decision::Reject,
-            "skip" => Decision::Skip,
-            _ => return html! { p { "Invalid action" } },
-        };
+/// Re-fetch the visible pair set with the current filters.
+fn visible_pairs(state: &AppState) -> Vec<pocketsmith_sync::db::transfer_pairs::TransferPairRow> {
+    get_filtered_pairs(
+        &state.conn,
+        &state.status_filter,
+        &state.confidence_filter,
+        &state.transfers.decisions,
+    )
+}
 
-        let current_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
-        let next = next_after(&current_pairs, |p| (p.txn_id_a, p.txn_id_b) == (a, b))
-            .map(|p| (p.txn_id_a, p.txn_id_b));
+/// Apply a decision to a single pair. Confirm/Reject also flips the DB
+/// status. After every action `state.transfers.active` advances to the
+/// next visible pair (or the tail of the new visible set). Mirrors
+/// `normalise::handlers::act`.
+pub fn act(state: &Arc<Mutex<AppState>>, key: (i64, i64), decision: Decision) {
+    let mut st = state.lock().unwrap();
+    let current = visible_pairs(&st);
+    let next = next_after(&current, |p| (p.txn_id_a, p.txn_id_b) == key)
+        .map(|p| (p.txn_id_a, p.txn_id_b));
 
-        let pair_info = transfer_pairs::get_pair_by_id(&state.conn, a, b)
-            .ok()
-            .flatten()
-            .map(|p| (p.amount_cents, p.account_name_a, p.account_name_b));
+    let activity = activity_for(&st, key, decision);
 
-        match decision {
-            Decision::Confirm => {
-                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Confirmed);
-            }
-            Decision::Reject => {
-                let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Rejected);
-            }
-            Decision::Skip => {}
+    match decision {
+        Decision::Confirm => {
+            let _ = transfer_pairs::update_status(&st.conn, key.0, key.1, Status::Confirmed);
         }
-        state.transfers.decisions.insert((a, b), decision);
-
-        if let Some((amount, acct_a, acct_b)) = pair_info {
-            state.transfers.push_activity(ActivityEntry {
-                pair_id: (a, b),
-                decision,
-                amount_cents: amount,
-                account_a: acct_a,
-                account_b: acct_b,
-            });
+        Decision::Reject => {
+            let _ = transfer_pairs::update_status(&st.conn, key.0, key.1, Status::Rejected);
         }
-
-        let new_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
-        if let Some(next_id) = next {
-            if new_pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == next_id) {
-                state.transfers.active = Some(next_id);
-            } else {
-                state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
-            }
-        } else {
-            state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
-        }
-
-        return render_current_page(&state);
+        Decision::Skip => {}
+    }
+    st.transfers.decisions.insert(key, decision);
+    if let Some(a) = activity {
+        st.transfers.push_activity(a);
     }
 
-    html! { p { "Invalid request" } }
+    let new_pairs = visible_pairs(&st);
+    st.transfers.active = next
+        .filter(|n| new_pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == *n))
+        .or_else(|| new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b)));
 }
 
-// Reverts a confirm/reject/skip: resets DB status to Pending, removes the decision, and clears
-// the activity entry. Increments the undone counter.
-// Called by: main::handle_request (POST /pair/{id}/undo).
-// Calls: parse_pair_id, transfer_pairs::update_status, render_current_page.
-pub fn handle_undo(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
-    let id = parse_pair_id(path, "/transfers/pair/");
-    if let Some((a, b)) = id {
-        let mut state = state.lock().unwrap();
-        let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Pending);
-        state.transfers.undone += 1;
-        state.transfers.decisions.remove(&(a, b));
-        state.transfers.activity.retain(|e| e.pair_id != (a, b));
-        return render_current_page(&state);
+/// Revert a decision. Resets DB status to Pending and bumps the undone
+/// counter only when undoing a real DB-touching decision
+/// (Confirm/Reject). Undoing a Skip is a session-only operation.
+/// Mirrors `normalise::handlers::undo`.
+pub fn undo(state: &Arc<Mutex<AppState>>, key: (i64, i64)) {
+    let mut st = state.lock().unwrap();
+    let prior = st.transfers.decisions.get(&key).copied();
+    if matches!(prior, Some(Decision::Confirm | Decision::Reject)) {
+        let _ = transfer_pairs::update_status(&st.conn, key.0, key.1, Status::Pending);
+        st.transfers.undone += 1;
     }
-
-    let state = state.lock().unwrap();
-    render_current_page(&state)
+    st.transfers.decisions.remove(&key);
+    st.transfers.activity.retain(|e| e.pair_id != key);
 }
 
-// Removes all skip decisions at once, clearing the skipped filter view.
-// Called by: main::handle_request (POST /clear-all-skipped).
-// Calls: render_current_page.
-pub fn handle_clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
-    let mut state = state.lock().unwrap();
-    state.transfers.activity.retain(|e| e.decision != Decision::Skip);
-    state.transfers.decisions.retain(|_, v| *v != Decision::Skip);
-    render_current_page(&state)
+/// Drop every active Skip decision in one shot.
+pub fn clear_all_skipped(state: &Arc<Mutex<AppState>>) {
+    let mut st = state.lock().unwrap();
+    st.transfers.activity.retain(|e| e.decision != Decision::Skip);
+    st.transfers.decisions.retain(|_, v| *v != Decision::Skip);
 }
 
-// Apply confirm or reject to every pair currently visible in the queue, except
-// session-skipped ones. The current filters (status + confidence) come from
-// AppState so this matches exactly what the user sees on screen. Each affected
-// pair gets a DB write, an in-memory decision, and an activity entry. Active
-// pair advances to the last remaining visible pair (or None if none).
-//
-// Called by: main::handle_request (POST /bulk-confirm, POST /bulk-reject).
-// Calls: get_filtered_pairs, pairs_eligible_for_bulk, transfer_pairs::update_status,
-//        transfer_pairs::get_pair_by_id, render_current_page.
-pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup {
-    let (decision, status) = match action {
-        "confirm" => (Decision::Confirm, Status::Confirmed),
-        "reject" => (Decision::Reject, Status::Rejected),
-        _ => return html! { p { "Invalid bulk action" } },
+/// Apply a single decision to every pair currently visible in the queue
+/// (excluding session-skipped). Decision must be Confirm or Reject.
+pub fn bulk_act(state: &Arc<Mutex<AppState>>, decision: Decision) {
+    let status = match decision {
+        Decision::Confirm => Status::Confirmed,
+        Decision::Reject => Status::Rejected,
+        Decision::Skip => return, // bulk-skip is not a thing
     };
+    let mut st = state.lock().unwrap();
+    let pairs = visible_pairs(&st);
+    let eligible = pairs_eligible_for_bulk(&pairs, &st.transfers.decisions);
 
-    let mut state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(
-        &state.conn,
-        &state.status_filter,
-        &state.confidence_filter,
-        &state.transfers.decisions,
-    );
-    let eligible = pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
-
-    for (a, b) in &eligible {
-        let pair_info = transfer_pairs::get_pair_by_id(&state.conn, *a, *b)
-            .ok()
-            .flatten()
-            .map(|p| (p.amount_cents, p.account_name_a, p.account_name_b));
-        let _ = transfer_pairs::update_status(&state.conn, *a, *b, status);
-        state.transfers.decisions.insert((*a, *b), decision);
-        if let Some((amount, acct_a, acct_b)) = pair_info {
-            state.transfers.push_activity(ActivityEntry {
-                pair_id: (*a, *b),
-                decision,
-                amount_cents: amount,
-                account_a: acct_a,
-                account_b: acct_b,
-            });
+    for key in &eligible {
+        let activity = activity_for(&st, *key, decision);
+        let _ = transfer_pairs::update_status(&st.conn, key.0, key.1, status);
+        st.transfers.decisions.insert(*key, decision);
+        if let Some(a) = activity {
+            st.transfers.push_activity(a);
         }
     }
-
-    let new_pairs = get_filtered_pairs(
-        &state.conn,
-        &state.status_filter,
-        &state.confidence_filter,
-        &state.transfers.decisions,
-    );
-    state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
-
-    render_current_page(&state)
+    let new_pairs = visible_pairs(&st);
+    st.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
 }
 
-// Removes a single skip decision (unlike handle_undo, does not touch DB status or undone counter).
-// Called by: main::handle_request (POST /pair/{id}/unskip).
-// Calls: parse_pair_id, render_current_page.
-pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
-    let id = parse_pair_id(path, "/transfers/pair/");
-    if let Some((a, b)) = id {
-        let mut state = state.lock().unwrap();
-        state.transfers.decisions.remove(&(a, b));
-        state.transfers.activity.retain(|e| !(e.pair_id == (a, b) && e.decision == Decision::Skip));
-        return render_current_page(&state);
-    }
-    let state = state.lock().unwrap();
-    render_current_page(&state)
-}
-
-// Apply all confirmed pairs by calling transfers::apply_confirmed (which tags
-// transactions with the _Transfer category and deletes the pair rows). Then:
-//   - Bump state.transfers.applied by the number of pairs processed.
-//   - Clear in-memory Confirm decisions for pairs that are no longer in
-//     transfer_pairs (so the "Confirmed N" stat in the activity header stays
-//     truthful after apply).
-//   - Reset active_pair to whatever's still visible (or None).
-//
-// Errors from apply_confirmed (e.g. missing _Transfer category) are silently
-// swallowed for now; surfacing them in the UI is a future improvement.
-//
-// Called by: main::handle_request (POST /apply).
-// Calls: transfers::apply_confirmed, get_filtered_pairs, render_current_page.
-pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
-    let mut state = state.lock().unwrap();
-    let stats = match transfers::apply_confirmed(&state.conn) {
+/// Drain confirmed pairs: tag both legs of each pair and delete the
+/// pair row. Bumps `transfers.applied`. Drops in-memory Confirm
+/// decisions whose pair rows are gone.
+pub fn apply(state: &Arc<Mutex<AppState>>) {
+    let mut st = state.lock().unwrap();
+    let stats = match transfers::apply_confirmed(&st.conn) {
         Ok(s) => s,
-        Err(_) => {
-            // Surface errors in the UI in a later iteration; for now no-op.
-            return render_current_page(&state);
-        }
+        // Errors surface to the UI in a later iteration; no-op for now.
+        Err(_) => return,
     };
-    state.transfers.applied += stats.rows_drained;
+    st.transfers.applied += stats.rows_drained;
 
-    // After apply, confirmed pairs are deleted from transfer_pairs. Clear any
-    // in-memory Confirm decisions for pair-ids that no longer exist so the
-    // activity header counts reflect reality. Two-step to satisfy the borrow
-    // checker: collect ids first while holding only &state.conn, then mutate
-    // state.transfers.decisions.
-    let stale_confirms: Vec<(i64, i64)> = state
+    // Clear stale in-memory Confirm decisions whose pair rows are gone
+    // (so the 'Confirmed N' stat in the activity header stays truthful).
+    let stale_confirms: Vec<(i64, i64)> = st
         .transfers
         .decisions
         .iter()
         .filter(|(_, d)| **d == Decision::Confirm)
         .map(|(k, _)| *k)
         .filter(|(a, b)| {
-            let exists: i64 = state
+            let exists: i64 = st
                 .conn
                 .query_row(
                     "SELECT COUNT(*) FROM transfer_pairs WHERE txn_id_a = ?1 AND txn_id_b = ?2",
@@ -222,18 +144,11 @@ pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
         })
         .collect();
     for id in stale_confirms {
-        state.transfers.decisions.remove(&id);
+        st.transfers.decisions.remove(&id);
     }
 
-    let new_pairs = get_filtered_pairs(
-        &state.conn,
-        &state.status_filter,
-        &state.confidence_filter,
-        &state.transfers.decisions,
-    );
-    state.transfers.active = new_pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
-
-    render_current_page(&state)
+    let new_pairs = visible_pairs(&st);
+    st.transfers.active = new_pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
 }
 
 #[cfg(test)]
@@ -347,7 +262,7 @@ mod tests {
     #[test]
     fn handle_apply_deletes_confirmed_pair_and_bumps_counter() {
         let state = fixture_with_confirmed_pair();
-        let _ = handle_apply(&state);
+        apply(&state);
         let s = state.lock().unwrap();
         assert_eq!(s.transfers.applied, 1, "applied counter should be 1 after applying 1 pair");
         assert!(
@@ -368,7 +283,7 @@ mod tests {
     fn handle_apply_with_nothing_to_apply_is_noop() {
         let conn = initialize_in_memory().unwrap();
         let state = Arc::new(Mutex::new(AppState::new(conn)));
-        let _ = handle_apply(&state);
+        apply(&state);
         let s = state.lock().unwrap();
         assert_eq!(s.transfers.applied, 0);
     }
