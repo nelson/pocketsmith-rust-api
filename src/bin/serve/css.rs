@@ -19,26 +19,24 @@ pub const CSS: &str = r#"
 
 .tab-bar {
     display: flex;
-    gap: 0;
+    gap: 0.25rem;
+    margin: 0.75rem 1rem;
+    padding: 0.35rem;
     background: var(--bg-surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: fit-content;
 }
 .tab-bar .tab {
     display: inline-block;
-    padding: 0.6rem 1.2rem;
+    padding: 0.35rem 1rem;
+    border-radius: 7px;
     color: var(--fg-dim);
     text-decoration: none;
-    border-bottom: 2px solid transparent;
-    font-weight: 500;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 .tab-bar .tab:hover { color: var(--fg); background: var(--bg-highlight); }
-.tab-bar .tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    background: var(--bg-highlight);
-}
+.tab-bar .tab.active { background: var(--accent); color: var(--bg); }
 
 body {
     background: var(--bg);
