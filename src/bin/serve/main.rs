@@ -6,7 +6,6 @@ mod normalise;
 mod state;
 mod views;
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -35,16 +34,7 @@ fn main() -> Result<()> {
         .unwrap_or(3141);
 
     let conn = db::initialize("pocketsmith.db")?;
-    let state = Arc::new(Mutex::new(AppState {
-        conn,
-        activity: Vec::new(),
-        undone: 0,
-        applied: 0,
-        status_filter: "all".to_string(),
-        confidence_filter: "all".to_string(),
-        decisions: HashMap::new(),
-        active_pair: None,
-    }));
+    let state = Arc::new(Mutex::new(AppState::new(conn)));
 
     let addr = format!("127.0.0.1:{port}");
     let server = Server::http(&addr).map_err(|e| anyhow::anyhow!("{e}"))?;

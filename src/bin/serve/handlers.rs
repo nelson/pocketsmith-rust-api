@@ -340,15 +340,10 @@ mod tests {
         let mut decisions = HashMap::new();
         decisions.insert((1, 2), Decision::Confirm);
 
-        Arc::new(Mutex::new(AppState {
-            conn,
-            activity: Vec::new(),
-            undone: 0,
-            applied: 0,
-            status_filter: "all".to_string(),
-            confidence_filter: "all".to_string(),
-            decisions,
-            active_pair: None,
+        Arc::new(Mutex::new({
+            let mut s = AppState::new(conn);
+            s.decisions = decisions;
+            s
         }))
     }
 
@@ -375,16 +370,7 @@ mod tests {
     #[test]
     fn handle_apply_with_nothing_to_apply_is_noop() {
         let conn = initialize_in_memory().unwrap();
-        let state = Arc::new(Mutex::new(AppState {
-            conn,
-            activity: Vec::new(),
-            undone: 0,
-            applied: 0,
-            status_filter: "all".to_string(),
-            confidence_filter: "all".to_string(),
-            decisions: HashMap::new(),
-            active_pair: None,
-        }));
+        let state = Arc::new(Mutex::new(AppState::new(conn)));
         let _ = handle_apply(&state);
         let s = state.lock().unwrap();
         assert_eq!(s.applied, 0);

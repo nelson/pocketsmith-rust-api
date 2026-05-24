@@ -6,4 +6,5 @@
 //! once `mod.rs` wires the routes in.
 #![allow(dead_code)]
 
+pub mod handlers;
 pub mod helpers;
