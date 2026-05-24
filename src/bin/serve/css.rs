@@ -17,6 +17,29 @@ pub const CSS: &str = r#"
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+.tab-bar {
+    display: flex;
+    gap: 0;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1rem;
+}
+.tab-bar .tab {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    color: var(--fg-dim);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+.tab-bar .tab:hover { color: var(--fg); background: var(--bg-highlight); }
+.tab-bar .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--bg-highlight);
+}
+
 body {
     background: var(--bg);
     color: var(--fg);
