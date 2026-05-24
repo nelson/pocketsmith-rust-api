@@ -2,6 +2,7 @@ mod css;
 mod handlers;
 mod helpers;
 mod js;
+mod normalise;
 mod state;
 mod views;
 
