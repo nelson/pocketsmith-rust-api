@@ -2,22 +2,25 @@
 // Embedded as a string constant and injected into <script> by views::full_page.
 // Uses a _navInitialized guard so the listener isn't duplicated on HTMX body swaps.
 //
-// Functions:
-//   selectItem(item)    – highlights a .queue-item and scrolls it into view.
-//                         Called by: click handler, keydown ArrowUp/ArrowDown handler.
-//   getSelectedIndex()  – returns the index of the currently selected .queue-item.
-//                         Called by: keydown ArrowUp/ArrowDown handler.
+// Tab-agnostic via data attributes:
+//
+//   On each .queue-item:
+//     data-detail-url     – URL to fetch for the detail panel on arrow nav.
+//     data-detail-target  – CSS selector of the panel to swap into.
+//
+//   On each .actions container in the detail panel:
+//     data-action-base    – URL prefix shared by confirm/reject/skip POSTs.
+//                           e.g. "/transfers/pair/3-4" or "/normalise/item/abc".
+//                           Y posts {base}/confirm, N posts {base}/reject,
+//                           S posts {base}/skip.
 //
 // Event listeners:
 //   click on .queue-item – calls selectItem to mark clicked row as active.
 //   keydown:
-//     ArrowUp/ArrowDown – navigates the queue list, calls selectItem + htmx.ajax GET /pair/{id}
-//                         to load the detail panel for the newly selected pair.
-//     Y                 – POST /pair/{id}/confirm (calls handlers::action_handler via main router).
-//     N                 – POST /pair/{id}/reject  (calls handlers::action_handler via main router).
-//     S                 – POST /pair/{id}/skip    (calls handlers::action_handler via main router).
-//     U                 – clicks the .undo-btn if present (triggers handlers::undo_handler or
-//                         handlers::unskip_handler depending on the button's hx-post URL).
+//     ArrowUp/ArrowDown – navigates the queue list and triggers an htmx.ajax
+//                         GET on data-detail-url into data-detail-target.
+//     Y / N / S         – POST {data-action-base}/{confirm|reject|skip}.
+//     U                 – clicks the .undo-btn if present.
 pub const JS: &str = r#"
 if (!window._navInitialized) {
 window._navInitialized = true;
@@ -53,29 +56,32 @@ document.addEventListener('keydown', function(e) {
         } else {
             idx = Math.max(idx - 1, 0);
         }
-        selectItem(items[idx]);
-        htmx.ajax('GET', '/pair/' + items[idx].dataset.pairId, {target: '#detail', swap: 'innerHTML'});
+        const item = items[idx];
+        selectItem(item);
+        const url = item.dataset.detailUrl;
+        const target = item.dataset.detailTarget || '#detail';
+        if (url) htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
         return;
     }
 
     const actions = document.querySelector('.actions');
-    const pairId = actions ? actions.dataset.pairId : null;
+    const base = actions ? actions.dataset.actionBase : null;
 
     switch(e.key.toLowerCase()) {
         case 'y':
-            if (!pairId) return;
+            if (!base) return;
             e.preventDefault();
-            htmx.ajax('POST', '/pair/' + pairId + '/confirm', {target: 'body'});
+            htmx.ajax('POST', base + '/confirm', {target: 'body'});
             break;
         case 'n':
-            if (!pairId) return;
+            if (!base) return;
             e.preventDefault();
-            htmx.ajax('POST', '/pair/' + pairId + '/reject', {target: 'body'});
+            htmx.ajax('POST', base + '/reject', {target: 'body'});
             break;
         case 's':
-            if (!pairId) return;
+            if (!base) return;
             e.preventDefault();
-            htmx.ajax('POST', '/pair/' + pairId + '/skip', {target: 'body'});
+            htmx.ajax('POST', base + '/skip', {target: 'body'});
             break;
         case 'u':
             e.preventDefault();

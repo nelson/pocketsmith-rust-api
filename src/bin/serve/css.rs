@@ -20,11 +20,12 @@ pub const CSS: &str = r#"
 .tab-bar {
     display: flex;
     gap: 0.25rem;
-    margin: 0.75rem 1rem;
+    margin: 0 0 0.75rem 0;
     padding: 0.35rem;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 10px;
+    align-self: flex-start;
     width: fit-content;
 }
 .tab-bar .tab {
@@ -53,7 +54,7 @@ body {
 
 .layout {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 420px 1fr;
     gap: 16px;
     flex: 1;
     min-height: 0;
@@ -93,7 +94,7 @@ body {
     color: var(--fg);
 }
 
-.filter-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.filter-row { display: flex; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; }
 .filter-row:last-child { margin-bottom: 0; }
 
 .filter-btn {
@@ -310,7 +311,7 @@ body {
     font-size: 12px;
 }
 .field-label { color: var(--fg-dim); }
-.field-value { color: var(--fg); text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-value { color: var(--fg); text-align: right; max-width: 60%; overflow-wrap: anywhere; word-break: break-word; }
 .amount-positive { color: var(--green) !important; font-weight: 600; }
 .amount-negative { color: var(--red) !important; font-weight: 600; }
 
@@ -337,6 +338,48 @@ body {
 .status-confirmed { color: var(--green); }
 .status-rejected { color: var(--red); }
 .status-skipped { color: var(--fg-dim); }
+
+/* Normalise tab: matching-transactions list + extracted-features block */
+.norm-txn-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+.norm-txn-list .prior-row {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 0;
+}
+.norm-txn-list .prior-row:last-child { border-bottom: none; }
+.norm-txn-list .prior-row > span:nth-child(2) {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.norm-txn-acct { color: var(--fg-dark); font-size: 11px; }
+
+.norm-features {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.norm-features h3 {
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.norm-features-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 16px;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    font-size: 12px;
+}
+.norm-feature-key { color: var(--fg-dim); }
+.norm-feature-val { color: var(--fg); overflow-wrap: anywhere; }
 
 /* Actions */
 .actions {

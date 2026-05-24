@@ -12,6 +12,50 @@ use rusqlite::Connection;
 use pocketsmith_sync::db::payee_normalisations::{self as pn, PayeeNormalisationRow};
 use pocketsmith_sync::transfers::Status;
 
+/// A single transaction row for the "matching transactions" panel on the
+/// normalise detail view. Mirrors `transfers::get_prior_pairs` in shape.
+#[derive(Debug, Clone)]
+pub struct MatchingTxn {
+    #[allow(dead_code)] // may be exposed in a future detail-row link
+    pub id: i64,
+    pub date: String,
+    pub payee: Option<String>,
+    pub amount_cents: i64,
+    pub account_name: Option<String>,
+}
+
+/// All transactions whose `original_payee` matches the given value, joined
+/// with the account name and ordered by date DESC. Capped at 100 rows so an
+/// extremely common payee can't pin the renderer.
+pub fn matching_transactions(conn: &Connection, original_payee: &str) -> Vec<MatchingTxn> {
+    let mut stmt = match conn.prepare(
+        "SELECT t.id, t.date, t.payee, t.amount, ta.name
+           FROM transactions t
+           LEFT JOIN transaction_accounts ta ON ta.id = t.transaction_account_id
+          WHERE t.original_payee = ?1
+          ORDER BY t.date DESC, t.id DESC
+          LIMIT 100",
+    ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let rows = stmt
+        .query_map(rusqlite::params![original_payee], |row| {
+            let amount: f64 = row.get(3)?;
+            Ok(MatchingTxn {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                payee: row.get(2)?,
+                amount_cents: (amount * 100.0).round() as i64,
+                account_name: row.get(4)?,
+            })
+        })
+        .ok();
+    rows.into_iter()
+        .flat_map(|it| it.filter_map(Result::ok))
+        .collect()
+}
+
 /// Status filter for the normalise queue. `Skipped` is session-only — it
 /// surfaces rows the user has temporarily set aside in the current serve
 /// run (the underlying DB row is still pending).
