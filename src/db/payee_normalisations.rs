@@ -10,14 +10,9 @@
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
 
-use crate::transfers::Status;
+use crate::review::Status;
 
-/// 16-char lowercase hex of XXH3-64 hash of `original_payee`. Stable across
-/// Rust versions (xxhash spec). Used as the URL slug for the review UI.
-pub fn slug_for(original_payee: &str) -> String {
-    let h = xxhash_rust::xxh3::xxh3_64(original_payee.as_bytes());
-    format!("{:016x}", h)
-}
+pub use crate::normalise::slug_for;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayeeNormalisationRow {

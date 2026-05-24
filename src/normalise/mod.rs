@@ -172,6 +172,7 @@ pub fn features_to_json(f: &Features) -> String {
 }
 
 /// Run the full normalisation pipeline on a raw payee string.
+/// Run the full normalisation pipeline on a raw payee string.
 pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
     run_traced(&mut result, "prefix", prefix::apply);
@@ -207,14 +208,13 @@ fn run_traced(
     apply: fn(&mut NormalisationResult),
 ) {
     let before_str = result.normalised.clone();
-    let before_features = features_snapshot(&result.features);
+    let before_keys = populated_feature_keys(&result.features);
     let before_class = result.class.clone();
     apply(result);
-    let after_features = features_snapshot(&result.features);
-    let features_added: Vec<&'static str> = FEATURE_KEYS
-        .iter()
-        .filter(|(_, idx)| !before_features[*idx] && after_features[*idx])
-        .map(|(name, _)| *name)
+    let after_keys = populated_feature_keys(&result.features);
+    let features_added: Vec<&'static str> = after_keys
+        .into_iter()
+        .filter(|k| !before_keys.contains(k))
         .collect();
     let class_set = if before_class.is_none() && result.class.is_some() {
         result.class.clone()
@@ -232,32 +232,29 @@ fn run_traced(
     }
 }
 
-const FEATURE_KEYS: &[(&str, usize)] = &[
-    ("entity_name", 0),
-    ("location", 1),
-    ("operation", 2),
-    ("reason", 3),
-    ("institution", 4),
-    ("gateway", 5),
-    ("account", 6),
-    ("date", 7),
-    ("currency_code", 8),
-    ("amount_in_cents", 9),
-];
+/// Names of the [`Features`] fields that are currently populated. Order
+/// matches the field order in [`Features`] for deterministic output.
+fn populated_feature_keys(f: &Features) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if f.entity_name.is_some() { out.push("entity_name"); }
+    if f.location.is_some() { out.push("location"); }
+    if f.operation.is_some() { out.push("operation"); }
+    if f.reason.is_some() { out.push("reason"); }
+    if f.institution.is_some() { out.push("institution"); }
+    if f.gateway.is_some() { out.push("gateway"); }
+    if f.account.is_some() { out.push("account"); }
+    if f.date.is_some() { out.push("date"); }
+    if f.currency_code.is_some() { out.push("currency_code"); }
+    if f.amount_in_cents.is_some() { out.push("amount_in_cents"); }
+    out
+}
 
-fn features_snapshot(f: &Features) -> [bool; 10] {
-    [
-        f.entity_name.is_some(),
-        f.location.is_some(),
-        f.operation.is_some(),
-        f.reason.is_some(),
-        f.institution.is_some(),
-        f.gateway.is_some(),
-        f.account.is_some(),
-        f.date.is_some(),
-        f.currency_code.is_some(),
-        f.amount_in_cents.is_some(),
-    ]
+/// 16-char lowercase hex of XXH3-64 hash of `original_payee`. Stable across
+/// Rust versions (xxhash spec). Used as the URL slug for the review UI and
+/// stored in `payee_normalisations.slug`.
+pub fn slug_for(original_payee: &str) -> String {
+    let h = xxhash_rust::xxh3::xxh3_64(original_payee.as_bytes());
+    format!("{:016x}", h)
 }
 
 #[cfg(test)]
