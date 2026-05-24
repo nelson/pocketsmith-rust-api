@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 
 use pocketsmith_sync::db;
 use pocketsmith_sync::db::transfer_pairs;
-use pocketsmith_sync::transfers::{self, Confidence, Status};
+use pocketsmith_sync::transfers::{self, Status};
 
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -27,8 +27,7 @@ fn main() -> Result<()> {
     detect(&args)
 }
 
-fn detect(args: &[String]) -> Result<()> {
-    let no_auto = args.iter().any(|a| a == "--no-auto");
+fn detect(_args: &[String]) -> Result<()> {
     let conn = db::initialize("pocketsmith.db")?;
 
     let pairs = transfers::find_pairs(&conn)?;
@@ -38,20 +37,12 @@ fn detect(args: &[String]) -> Result<()> {
     }
 
     let mut inserted = 0;
-    let mut auto_confirmed = 0;
-    for mut pair in pairs {
-        if !no_auto && pair.confidence == Confidence::High {
-            pair.status = Status::Confirmed;
-            auto_confirmed += 1;
-        }
+    for pair in pairs {
         transfer_pairs::insert_pair(&conn, &pair)?;
         inserted += 1;
     }
 
-    println!("Inserted {inserted} new transfer pairs.");
-    if auto_confirmed > 0 {
-        println!("Auto-confirmed {auto_confirmed} high-confidence pairs.");
-    }
+    println!("Inserted {inserted} new transfer pairs (all pending review).");
 
     print_status_summary(&conn)?;
     Ok(())
