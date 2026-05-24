@@ -80,6 +80,25 @@ pub struct NormalisationResult {
     pub normalised: String,
     class: Option<PayeeClass>,
     pub features: Features,
+    /// Per-stage transformation log. One entry per pipeline stage that
+    /// changed `normalised` or attached a feature. Populated only by
+    /// [`normalise`] (raw stages don't write this).
+    pub trace: Vec<TraceEntry>,
+}
+
+/// One entry in [`NormalisationResult::trace`]. Records what a single
+/// pipeline stage saw on the way in, what it produced on the way out,
+/// and any features it attached.
+#[derive(Debug, Clone)]
+pub struct TraceEntry {
+    pub stage: &'static str,
+    pub before: String,
+    pub after: String,
+    /// New feature keys this stage populated (entity_name, location,
+    /// operation, etc.). Empty if the stage only mutated the string.
+    pub features_added: Vec<&'static str>,
+    /// Class set by this stage, if any.
+    pub class_set: Option<PayeeClass>,
 }
 
 impl NormalisationResult {
@@ -89,6 +108,7 @@ impl NormalisationResult {
             normalised: payee.to_string(),
             class: None,
             features: Features::default(),
+            trace: Vec::new(),
         }
     }
 
@@ -154,21 +174,90 @@ pub fn features_to_json(f: &Features) -> String {
 /// Run the full normalisation pipeline on a raw payee string.
 pub fn normalise(original: &str) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
-    prefix::apply(&mut result);
-    suffix::apply(&mut result);
-    expand::apply(&mut result);
-    persons::apply(&mut result);
-    employers::apply(&mut result);
-    merchants::apply(&mut result);
-    banking_ops::apply(&mut result);
+    run_traced(&mut result, "prefix", prefix::apply);
+    run_traced(&mut result, "suffix", suffix::apply);
+    run_traced(&mut result, "expand", expand::apply);
+    run_traced(&mut result, "persons", persons::apply);
+    run_traced(&mut result, "employers", employers::apply);
+    run_traced(&mut result, "merchants", merchants::apply);
+    run_traced(&mut result, "banking_ops", banking_ops::apply);
     // If normalised string is empty after stripping, use banking op name or "Cash"
     if result.normalised.trim().is_empty() {
+        let before = result.normalised.clone();
         result.normalised = match &result.features.operation {
             Some(op) => op.display_name().to_string(),
             None => BankingOperation::Cash.display_name().to_string(),
         };
+        result.trace.push(TraceEntry {
+            stage: "empty-fallback",
+            before,
+            after: result.normalised.clone(),
+            features_added: Vec::new(),
+            class_set: None,
+        });
     }
     result
+}
+
+/// Snapshot the result, run a pipeline stage, and (if anything changed)
+/// append a [`TraceEntry`]. Stages that have no effect produce no entry.
+fn run_traced(
+    result: &mut NormalisationResult,
+    stage: &'static str,
+    apply: fn(&mut NormalisationResult),
+) {
+    let before_str = result.normalised.clone();
+    let before_features = features_snapshot(&result.features);
+    let before_class = result.class.clone();
+    apply(result);
+    let after_features = features_snapshot(&result.features);
+    let features_added: Vec<&'static str> = FEATURE_KEYS
+        .iter()
+        .filter(|(_, idx)| !before_features[*idx] && after_features[*idx])
+        .map(|(name, _)| *name)
+        .collect();
+    let class_set = if before_class.is_none() && result.class.is_some() {
+        result.class.clone()
+    } else {
+        None
+    };
+    if before_str != result.normalised || !features_added.is_empty() || class_set.is_some() {
+        result.trace.push(TraceEntry {
+            stage,
+            before: before_str,
+            after: result.normalised.clone(),
+            features_added,
+            class_set,
+        });
+    }
+}
+
+const FEATURE_KEYS: &[(&str, usize)] = &[
+    ("entity_name", 0),
+    ("location", 1),
+    ("operation", 2),
+    ("reason", 3),
+    ("institution", 4),
+    ("gateway", 5),
+    ("account", 6),
+    ("date", 7),
+    ("currency_code", 8),
+    ("amount_in_cents", 9),
+];
+
+fn features_snapshot(f: &Features) -> [bool; 10] {
+    [
+        f.entity_name.is_some(),
+        f.location.is_some(),
+        f.operation.is_some(),
+        f.reason.is_some(),
+        f.institution.is_some(),
+        f.gateway.is_some(),
+        f.account.is_some(),
+        f.date.is_some(),
+        f.currency_code.is_some(),
+        f.amount_in_cents.is_some(),
+    ]
 }
 
 #[cfg(test)]

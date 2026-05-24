@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 
 use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
+use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, TraceEntry};
 use pocketsmith_sync::transfers::Status;
 
 use crate::css::CSS;
@@ -60,7 +61,8 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Marku
         Ok(Some(row)) => {
             let txns = matching_transactions(&st.conn, &row.original_payee);
             let is_skipped = st.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
-            render_detail(&row, &txns, is_skipped)
+            let pipeline = run_normalise(&row.original_payee);
+            render_detail(&row, &txns, is_skipped, &pipeline)
         }
         _ => html! { div.empty-state { p { "Item not found." } } },
     }
@@ -97,7 +99,8 @@ fn render_full_page(
                     div.detail-panel #norm-detail {
                         @if let Some(row) = active_row {
                             @let is_skipped = state.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
-                            (render_detail(row, &active_txns, is_skipped))
+                            @let pipeline = run_normalise(&row.original_payee);
+                            (render_detail(row, &active_txns, is_skipped, &pipeline))
                         } @else {
                             div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } }
                         }
@@ -212,9 +215,13 @@ fn row_status_css(s: Option<Status>) -> &'static str {
     }
 }
 
-fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: bool) -> Markup {
+fn render_detail(
+    row: &PayeeNormalisationRow,
+    txns: &[MatchingTxn],
+    is_skipped: bool,
+    pipeline: &NormalisationResult,
+) -> Markup {
     let action_base = format!("/normalise/item/{}", row.slug);
-    let features = parse_features(&row.features_json);
     html! {
         div.detail-header {
             h2 {
@@ -259,6 +266,8 @@ fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: 
             }
         }
 
+        (render_pipeline_trace(pipeline))
+
         div.actions data-action-base=(action_base) {
             button.btn.btn-confirm
                 hx-post=(format!("{action_base}/confirm"))
@@ -298,15 +307,53 @@ fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: 
                 }
             }
         }
+    }
+}
 
-        @if !features.is_empty() {
-            div.norm-features {
-                h3 { "Extracted features" }
-                div.norm-features-list {
-                    @for (k, v) in &features {
-                        div.norm-feature-row {
-                            span.norm-feature-key { (k) }
-                            span.norm-feature-val { (v) }
+/// Render the per-stage transformation trace for the active row. One row
+/// per pipeline stage that mutated `normalised` or attached a feature.
+/// Lets the reviewer see *what each rule did*, intuitively.
+fn render_pipeline_trace(p: &NormalisationResult) -> Markup {
+    if p.trace.is_empty() {
+        return html! {
+            div.norm-trace {
+                h3 { "Pipeline trace" }
+                div.norm-trace-empty { "(no rules matched \u{2014} normalised string equals the original)" }
+            }
+        };
+    }
+    html! {
+        div.norm-trace {
+            h3 { "Pipeline trace" }
+            div.norm-trace-list {
+                @for entry in &p.trace {
+                    (render_trace_entry(entry))
+                }
+            }
+        }
+    }
+}
+
+fn render_trace_entry(entry: &TraceEntry) -> Markup {
+    let changed_string = entry.before != entry.after;
+    html! {
+        div.norm-trace-row {
+            span.norm-trace-stage { (entry.stage) }
+            div.norm-trace-body {
+                @if changed_string {
+                    div.norm-trace-diff {
+                        span.norm-trace-before { (entry.before) }
+                        span.norm-trace-arrow { " \u{2192} " }
+                        span.norm-trace-after { (entry.after) }
+                    }
+                }
+                @if !entry.features_added.is_empty() || entry.class_set.is_some() {
+                    div.norm-trace-extracted {
+                        @if let Some(c) = &entry.class_set {
+                            span.norm-trace-class { "class = " (format!("{:?}", c).to_lowercase()) }
+                        }
+                        @for feat in &entry.features_added {
+                            span.norm-trace-feat { "+" (feat) }
                         }
                     }
                 }
@@ -315,7 +362,10 @@ fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: 
     }
 }
 
-/// Minimal JSON-string-to-pairs parse for the features metadata.
+/// Minimal JSON-string-to-pairs parse for the features metadata. Kept for
+/// reference / future use — the live UI now shows the per-stage trace
+/// from [`render_pipeline_trace`] instead.
+#[allow(dead_code)]
 fn parse_features(s: &str) -> Vec<(String, String)> {
     let v: serde_json::Value = match serde_json::from_str(s) {
         Ok(v) => v,

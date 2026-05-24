@@ -386,6 +386,55 @@ body {
 .norm-feature-key { color: var(--fg-dim); }
 .norm-feature-val { color: var(--fg); overflow-wrap: anywhere; }
 
+/* Pipeline trace: per-stage before/after with feature attribution */
+.norm-trace {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.norm-trace h3 {
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.norm-trace-empty {
+    color: var(--fg-dark);
+    font-style: italic;
+    font-size: 12px;
+}
+.norm-trace-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.norm-trace-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    font-size: 12px;
+}
+.norm-trace-row:last-child { border-bottom: none; }
+.norm-trace-stage {
+    color: var(--accent);
+    font-weight: 600;
+}
+.norm-trace-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.norm-trace-diff { overflow-wrap: anywhere; word-break: break-word; }
+.norm-trace-before { color: var(--red); text-decoration: line-through; }
+.norm-trace-arrow { color: var(--fg-dim); }
+.norm-trace-after { color: var(--green); font-weight: 600; }
+.norm-trace-extracted { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; }
+.norm-trace-class { color: var(--magenta); }
+.norm-trace-feat { color: var(--cyan); }
+
 /* Actions */
 .actions {
     display: flex;
