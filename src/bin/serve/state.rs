@@ -45,11 +45,8 @@ pub struct AppState {
     /// Cumulative count of `transactions.payee` writes applied this
     /// session via the normalise tab's "Apply confirmed" button.
     pub norm_applied: usize,
-    #[allow(dead_code)] // wired in commit 9 (views + routes)
     pub norm_status_filter: String,
-    #[allow(dead_code)] // wired in commit 9
     pub norm_class_filter: String,
-    #[allow(dead_code)] // wired in commit 9
     pub norm_active_slug: Option<String>,
 }
 

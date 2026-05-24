@@ -1,10 +1,10 @@
-//! Normalise review tab — `/normalise/*` routes. See submodules for the
-//! split between filter helpers, handlers, and view rendering.
+//! Normalise review tab — `/normalise/*` routes.
 //!
-//! `#[allow(dead_code)]` is applied module-wide while the tab is being built
-//! up commit-by-commit (helpers → handlers → views). The allow goes away
-//! once `mod.rs` wires the routes in.
-#![allow(dead_code)]
+//! Submodules:
+//! - [`helpers`]  filter enums + `get_filtered_normalisations`
+//! - [`handlers`] action handlers (confirm/reject/skip/unskip/apply)
+//! - [`views`]    page + fragment rendering
 
 pub mod handlers;
 pub mod helpers;
+pub mod views;
