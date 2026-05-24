@@ -287,15 +287,17 @@ body {
 .card-label {
     font-size: 11px;
     font-weight: 700;
-    width: 20px;
+    min-width: 20px;
     height: 20px;
-    display: flex;
+    padding: 0 6px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 3px;
     background: var(--bg-highlight);
     color: var(--accent);
     font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    white-space: nowrap;
 }
 
 .card-account {
