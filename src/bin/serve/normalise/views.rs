@@ -28,14 +28,14 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut st = state.lock().unwrap();
     let status = NormStatusFilter::parse(&st.norm_status_filter);
     let class = NormClassFilter::parse(&st.norm_class_filter);
-    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_decisions);
+    let rows = get_filtered_normalisations(&st.conn, status, class, &st.normalise.decisions);
 
     let active_slug = st
-        .norm_active_slug
+        .normalise.active
         .clone()
         .filter(|s| rows.iter().any(|r| &r.slug == s))
         .or_else(|| rows.first().map(|r| r.slug.clone()));
-    st.norm_active_slug = active_slug.clone();
+    st.normalise.active = active_slug.clone();
 
     render_full_page(&st, &rows, status, class, active_slug.as_deref())
 }
@@ -50,18 +50,18 @@ pub fn render_queue_fragment(
     st.norm_class_filter = class_str.to_string();
     let status = NormStatusFilter::parse(status_str);
     let class = NormClassFilter::parse(class_str);
-    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_decisions);
-    let active = st.norm_active_slug.clone();
-    render_queue(&rows, active.as_deref(), status, class, &st.norm_decisions)
+    let rows = get_filtered_normalisations(&st.conn, status, class, &st.normalise.decisions);
+    let active = st.normalise.active.clone();
+    render_queue(&rows, active.as_deref(), status, class, &st.normalise.decisions)
 }
 
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Markup {
     let mut st = state.lock().unwrap();
-    st.norm_active_slug = Some(slug.to_string());
+    st.normalise.active = Some(slug.to_string());
     match pocketsmith_sync::db::payee_normalisations::get_by_slug(&st.conn, slug) {
         Ok(Some(row)) => {
             let txns = matching_transactions(&st.conn, &row.original_payee);
-            let is_skipped = st.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
+            let is_skipped = st.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
             let pipeline = run_normalise(&row.original_payee);
             render_detail(&row, &txns, is_skipped, &pipeline)
         }
@@ -95,11 +95,11 @@ fn render_full_page(
                 (render_tab_bar("normalise"))
                 div.layout {
                     div.queue-panel #norm-queue {
-                        (render_queue(rows, active_slug, status, class, &state.norm_decisions))
+                        (render_queue(rows, active_slug, status, class, &state.normalise.decisions))
                     }
                     div.detail-panel #norm-detail {
                         @if let Some(row) = active_row {
-                            @let is_skipped = state.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
+                            @let is_skipped = state.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
                             @let pipeline = run_normalise(&row.original_payee);
                             (render_detail(row, &active_txns, is_skipped, &pipeline))
                         } @else {
@@ -367,11 +367,11 @@ fn render_activity(state: &AppState) -> Markup {
     let confirmed_in_db = count_confirmed_in_db(&state.conn);
     html! {
         div.activity-header {
-            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.norm_decisions, Decision::Confirm)) } }
-            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.norm_decisions, Decision::Reject)) } }
-            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.norm_decisions, Decision::Skip)) } }
-            span.stat { "Undone " span.count-undone { (state.norm_undone) } }
-            span.stat { "Applied " span.count-applied { (state.norm_applied) } }
+            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.normalise.decisions, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.normalise.decisions, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.normalise.decisions, Decision::Skip)) } }
+            span.stat { "Undone " span.count-undone { (state.normalise.undone) } }
+            span.stat { "Applied " span.count-applied { (state.normalise.applied) } }
             button.apply-btn
                 hx-post="/normalise/apply"
                 hx-target="body"
@@ -380,7 +380,7 @@ fn render_activity(state: &AppState) -> Markup {
             { "Apply confirmed (" (confirmed_in_db) ")" }
         }
         div.activity-list {
-            @for entry in state.norm_activity.iter().rev().take(20) {
+            @for entry in state.normalise.activity.iter().rev().take(20) {
                 div.activity-row {
                     span.((match entry.decision {
                         Decision::Confirm => "status-confirmed",

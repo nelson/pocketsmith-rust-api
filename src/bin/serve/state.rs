@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::Hash;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Decision {
@@ -17,6 +18,49 @@ impl Decision {
     }
 }
 
+/// Per-tab session state. Both the transfers and normalise tabs maintain
+/// the same shape: a map of session decisions keyed by row identifier, an
+/// activity log of those decisions, plus three small counters and an
+/// "active row" pointer. `K` is the row identifier (e.g. `(i64, i64)` or
+/// `String`); `A` is the tab's activity-row type.
+pub struct TabState<K, A> {
+    /// Session decisions, keyed by row identifier.
+    pub decisions: HashMap<K, Decision>,
+    /// Activity log; newest at the tail. Capped at 100 entries via
+    /// [`TabState::push_activity`].
+    pub activity: Vec<A>,
+    /// Cumulative undo count.
+    pub undone: usize,
+    /// Cumulative apply count.
+    pub applied: usize,
+    /// Identifier of the row currently shown in the detail panel.
+    pub active: Option<K>,
+}
+
+impl<K: Eq + Hash, A> Default for TabState<K, A> {
+    fn default() -> Self {
+        Self {
+            decisions: HashMap::new(),
+            activity: Vec::new(),
+            undone: 0,
+            applied: 0,
+            active: None,
+        }
+    }
+}
+
+impl<K: Eq + Hash, A> TabState<K, A> {
+    /// Append `entry` to the activity log, trimming the oldest entry if
+    /// the log would exceed 100 items. Mirrors what both handler files
+    /// were doing inline.
+    pub fn push_activity(&mut self, entry: A) {
+        self.activity.push(entry);
+        if self.activity.len() > 100 {
+            self.activity.remove(0);
+        }
+    }
+}
+
 pub struct ActivityEntry {
     pub pair_id: (i64, i64),
     pub decision: Decision,
@@ -25,38 +69,7 @@ pub struct ActivityEntry {
     pub account_b: String,
 }
 
-pub struct AppState {
-    pub conn: rusqlite::Connection,
-    pub activity: Vec<ActivityEntry>,
-    pub undone: usize,
-    /// Cumulative count of pairs applied this session via the "Apply all
-    /// changes" button. Shown in the activity header.
-    pub applied: usize,
-    pub status_filter: String,
-    pub confidence_filter: String,
-    pub decisions: HashMap<(i64, i64), Decision>,
-    pub active_pair: Option<(i64, i64)>,
-
-    // --- Normalise tab session state ---
-    /// Session decisions for normalise proposals, keyed by `original_payee`.
-    /// Mirrors `decisions` for transfers. Decision::Skip is session-only;
-    /// Decision::Confirm/Reject also reflect a DB write to
-    /// `payee_normalisations.status`.
-    pub norm_decisions: HashMap<String, Decision>,
-    /// Activity log of normalise actions, in chronological order.
-    pub norm_activity: Vec<NormActivityEntry>,
-    /// Cumulative count of undo actions on the normalise tab.
-    pub norm_undone: usize,
-    /// Cumulative count of `transactions.payee` writes applied this
-    /// session via the normalise tab's "Apply confirmed" button.
-    pub norm_applied: usize,
-    pub norm_status_filter: String,
-    pub norm_class_filter: String,
-    pub norm_active_slug: Option<String>,
-}
-
-/// Activity-log entry for the normalise tab. Mirrors [`ActivityEntry`] in
-/// shape so the renderer can lay them out the same way.
+/// Activity-log entry for the normalise tab.
 pub struct NormActivityEntry {
     pub slug: String,
     #[allow(dead_code)] // useful for debugging / future activity-row tooltips
@@ -66,26 +79,30 @@ pub struct NormActivityEntry {
     pub decision: Decision,
 }
 
+pub struct AppState {
+    pub conn: rusqlite::Connection,
+
+    // --- Transfers tab ---
+    pub transfers: TabState<(i64, i64), ActivityEntry>,
+    pub status_filter: String,
+    pub confidence_filter: String,
+
+    // --- Normalise tab ---
+    pub normalise: TabState<String, NormActivityEntry>,
+    pub norm_status_filter: String,
+    pub norm_class_filter: String,
+}
+
 impl AppState {
-    /// Construct an AppState pre-populated for tests / fresh sessions.
-    /// Carries no decisions, no activity, default filter strings.
     pub fn new(conn: rusqlite::Connection) -> Self {
         Self {
             conn,
-            activity: Vec::new(),
-            undone: 0,
-            applied: 0,
+            transfers: TabState::default(),
             status_filter: "all".to_string(),
             confidence_filter: "all".to_string(),
-            decisions: HashMap::new(),
-            active_pair: None,
-            norm_decisions: HashMap::new(),
-            norm_activity: Vec::new(),
-            norm_undone: 0,
-            norm_applied: 0,
+            normalise: TabState::default(),
             norm_status_filter: "all".to_string(),
             norm_class_filter: "all".to_string(),
-            norm_active_slug: None,
         }
     }
 }

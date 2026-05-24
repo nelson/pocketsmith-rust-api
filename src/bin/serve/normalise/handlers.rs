@@ -27,7 +27,7 @@ fn row_for_slug(state: &AppState, slug: &str) -> Option<pn::PayeeNormalisationRo
 fn refilter(state: &AppState) -> Vec<pn::PayeeNormalisationRow> {
     let status = NormStatusFilter::parse(&state.norm_status_filter);
     let class = NormClassFilter::parse(&state.norm_class_filter);
-    get_filtered_normalisations(&state.conn, status, class, &state.norm_decisions)
+    get_filtered_normalisations(&state.conn, status, class, &state.normalise.decisions)
 }
 
 /// Apply a decision to a slug. Confirm/Reject also flips the DB status.
@@ -56,23 +56,20 @@ pub fn act(state: &Arc<Mutex<AppState>>, slug: &str, decision: Decision) {
         Decision::Skip => {}
     }
 
-    st.norm_decisions.insert(row.original_payee.clone(), decision);
-    st.norm_activity.push(NormActivityEntry {
+    st.normalise.decisions.insert(row.original_payee.clone(), decision);
+    st.normalise.push_activity(NormActivityEntry {
         slug: row.slug.clone(),
         original_payee: row.original_payee.clone(),
         proposed_payee: row.proposed_payee.clone(),
         txn_count: row.txn_count,
         decision,
     });
-    if st.norm_activity.len() > 100 {
-        st.norm_activity.remove(0);
-    }
 
     // Re-filter (the just-acted-on row may have left the visible set) and
     // pick the new active slug: prefer the previously-computed `next`
     // slug if it's still visible, else fall back to the tail.
     let new_view = refilter(&st);
-    st.norm_active_slug = next
+    st.normalise.active = next
         .filter(|n| new_view.iter().any(|r| r.slug == *n))
         .or_else(|| new_view.last().map(|r| r.slug.clone()));
 }
@@ -87,16 +84,16 @@ pub fn undo(state: &Arc<Mutex<AppState>>, slug: &str) {
         None => return,
     };
     let _ = pn::update_status(&st.conn, &row.original_payee, Status::Pending);
-    st.norm_undone += 1;
-    st.norm_decisions.remove(&row.original_payee);
-    st.norm_activity.retain(|e| e.slug != row.slug);
+    st.normalise.undone += 1;
+    st.normalise.decisions.remove(&row.original_payee);
+    st.normalise.activity.retain(|e| e.slug != row.slug);
 }
 
 /// Drop every active Skip decision in one shot. Mirrors
 /// `handle_clear_all_skipped` in `crate::handlers`.
 pub fn clear_all_skipped(state: &Arc<Mutex<AppState>>) {
     let mut st = state.lock().unwrap();
-    st.norm_decisions.retain(|_, d| *d != Decision::Skip);
+    st.normalise.decisions.retain(|_, d| *d != Decision::Skip);
 }
 
 // `act` and `undo` are the only entry points the route table needs;
@@ -108,7 +105,7 @@ pub fn clear_all_skipped(state: &Arc<Mutex<AppState>>) {
 pub fn apply(state: &Arc<Mutex<AppState>>) {
     let mut st = state.lock().unwrap();
     if let Ok(stats) = norm_apply::apply_confirmed(&st.conn) {
-        st.norm_applied += stats.transactions_updated;
+        st.normalise.applied += stats.transactions_updated;
     }
 }
 
@@ -174,9 +171,9 @@ mod tests {
         act(&state, &slug, Decision::Confirm);
         assert_eq!(current_status(&state, "WOOLIES"), Some(Status::Confirmed));
         let st = state.lock().unwrap();
-        assert_eq!(st.norm_decisions.get("WOOLIES"), Some(&Decision::Confirm));
-        assert_eq!(st.norm_activity.len(), 1);
-        assert_eq!(st.norm_activity[0].txn_count, 7);
+        assert_eq!(st.normalise.decisions.get("WOOLIES"), Some(&Decision::Confirm));
+        assert_eq!(st.normalise.activity.len(), 1);
+        assert_eq!(st.normalise.activity[0].txn_count, 7);
     }
 
     #[test]
@@ -185,7 +182,7 @@ mod tests {
         let slug = seed(&state, "COLES", "Coles", Status::Pending, 1);
         act(&state, &slug, Decision::Reject);
         assert_eq!(current_status(&state, "COLES"), Some(Status::Rejected));
-        assert_eq!(state.lock().unwrap().norm_decisions.get("COLES"), Some(&Decision::Reject));
+        assert_eq!(state.lock().unwrap().normalise.decisions.get("COLES"), Some(&Decision::Reject));
     }
 
     #[test]
@@ -194,7 +191,7 @@ mod tests {
         let slug = seed(&state, "ALDI", "ALDI", Status::Pending, 1);
         act(&state, &slug, Decision::Skip);
         let st = state.lock().unwrap();
-        assert_eq!(st.norm_decisions.get("ALDI"), Some(&Decision::Skip));
+        assert_eq!(st.normalise.decisions.get("ALDI"), Some(&Decision::Skip));
         drop(st);
         assert_eq!(current_status(&state, "ALDI"), Some(Status::Pending));
     }
@@ -208,10 +205,10 @@ mod tests {
         let _c = seed(&state, "C", "c", Status::Pending, 1);
         // Filter set to Pending so confirming A pushes us off A onto B.
         state.lock().unwrap().norm_status_filter = "pending".into();
-        state.lock().unwrap().norm_active_slug = Some(a.clone());
+        state.lock().unwrap().normalise.active = Some(a.clone());
         act(&state, &a, Decision::Confirm);
         let st = state.lock().unwrap();
-        assert_eq!(st.norm_active_slug.as_deref(), Some(pn::slug_for("B")).as_deref());
+        assert_eq!(st.normalise.active.as_deref(), Some(pn::slug_for("B")).as_deref());
     }
 
     #[test]
@@ -222,9 +219,9 @@ mod tests {
         undo(&state, &slug);
         assert_eq!(current_status(&state, "WOOLIES"), Some(Status::Pending));
         let st = state.lock().unwrap();
-        assert!(st.norm_decisions.is_empty());
-        assert!(st.norm_activity.is_empty());
-        assert_eq!(st.norm_undone, 1);
+        assert!(st.normalise.decisions.is_empty());
+        assert!(st.normalise.activity.is_empty());
+        assert_eq!(st.normalise.undone, 1);
     }
 
     #[test]
@@ -238,8 +235,8 @@ mod tests {
         act(&state, &s3, Decision::Skip);
         clear_all_skipped(&state);
         let st = state.lock().unwrap();
-        assert_eq!(st.norm_decisions.len(), 1);
-        assert_eq!(st.norm_decisions.get("Y"), Some(&Decision::Confirm));
+        assert_eq!(st.normalise.decisions.len(), 1);
+        assert_eq!(st.normalise.decisions.get("Y"), Some(&Decision::Confirm));
     }
 
     #[test]
@@ -249,13 +246,13 @@ mod tests {
         seed_txn(&state, 2, "WOOLIES", "WOOLIES");
         let _slug = seed(&state, "WOOLIES", "Woolworths", Status::Confirmed, 2);
         apply(&state);
-        assert_eq!(state.lock().unwrap().norm_applied, 2);
+        assert_eq!(state.lock().unwrap().normalise.applied, 2);
     }
 
     #[test]
     fn act_is_noop_for_unknown_slug() {
         let state = make_state();
         act(&state, "0000000000000000", Decision::Confirm);
-        assert!(state.lock().unwrap().norm_decisions.is_empty());
+        assert!(state.lock().unwrap().normalise.decisions.is_empty());
     }
 }

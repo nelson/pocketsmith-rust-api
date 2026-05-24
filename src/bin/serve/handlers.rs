@@ -29,7 +29,7 @@ pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> 
             _ => return html! { p { "Invalid action" } },
         };
 
-        let current_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+        let current_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
         let next = next_after(&current_pairs, |p| (p.txn_id_a, p.txn_id_b) == (a, b))
             .map(|p| (p.txn_id_a, p.txn_id_b));
 
@@ -47,30 +47,27 @@ pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> 
             }
             Decision::Skip => {}
         }
-        state.decisions.insert((a, b), decision);
+        state.transfers.decisions.insert((a, b), decision);
 
         if let Some((amount, acct_a, acct_b)) = pair_info {
-            state.activity.push(ActivityEntry {
+            state.transfers.push_activity(ActivityEntry {
                 pair_id: (a, b),
                 decision,
                 amount_cents: amount,
                 account_a: acct_a,
                 account_b: acct_b,
             });
-            if state.activity.len() > 100 {
-                state.activity.remove(0);
-            }
         }
 
-        let new_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+        let new_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
         if let Some(next_id) = next {
             if new_pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == next_id) {
-                state.active_pair = Some(next_id);
+                state.transfers.active = Some(next_id);
             } else {
-                state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+                state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
             }
         } else {
-            state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+            state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
         }
 
         return render_current_page(&state);
@@ -88,9 +85,9 @@ pub fn handle_undo(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
         let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Pending);
-        state.undone += 1;
-        state.decisions.remove(&(a, b));
-        state.activity.retain(|e| e.pair_id != (a, b));
+        state.transfers.undone += 1;
+        state.transfers.decisions.remove(&(a, b));
+        state.transfers.activity.retain(|e| e.pair_id != (a, b));
         return render_current_page(&state);
     }
 
@@ -103,8 +100,8 @@ pub fn handle_undo(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
 // Calls: render_current_page.
 pub fn handle_clear_all_skipped(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut state = state.lock().unwrap();
-    state.activity.retain(|e| e.decision != Decision::Skip);
-    state.decisions.retain(|_, v| *v != Decision::Skip);
+    state.transfers.activity.retain(|e| e.decision != Decision::Skip);
+    state.transfers.decisions.retain(|_, v| *v != Decision::Skip);
     render_current_page(&state)
 }
 
@@ -129,9 +126,9 @@ pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup 
         &state.conn,
         &state.status_filter,
         &state.confidence_filter,
-        &state.decisions,
+        &state.transfers.decisions,
     );
-    let eligible = pairs_eligible_for_bulk(&pairs, &state.decisions);
+    let eligible = pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
 
     for (a, b) in &eligible {
         let pair_info = transfer_pairs::get_pair_by_id(&state.conn, *a, *b)
@@ -139,9 +136,9 @@ pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup 
             .flatten()
             .map(|p| (p.amount_cents, p.account_name_a, p.account_name_b));
         let _ = transfer_pairs::update_status(&state.conn, *a, *b, status);
-        state.decisions.insert((*a, *b), decision);
+        state.transfers.decisions.insert((*a, *b), decision);
         if let Some((amount, acct_a, acct_b)) = pair_info {
-            state.activity.push(ActivityEntry {
+            state.transfers.push_activity(ActivityEntry {
                 pair_id: (*a, *b),
                 decision,
                 amount_cents: amount,
@@ -150,17 +147,14 @@ pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup 
             });
         }
     }
-    while state.activity.len() > 100 {
-        state.activity.remove(0);
-    }
 
     let new_pairs = get_filtered_pairs(
         &state.conn,
         &state.status_filter,
         &state.confidence_filter,
-        &state.decisions,
+        &state.transfers.decisions,
     );
-    state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
+    state.transfers.active = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
 
     render_current_page(&state)
 }
@@ -172,8 +166,8 @@ pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
     let id = parse_pair_id(path, "/transfers/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
-        state.decisions.remove(&(a, b));
-        state.activity.retain(|e| !(e.pair_id == (a, b) && e.decision == Decision::Skip));
+        state.transfers.decisions.remove(&(a, b));
+        state.transfers.activity.retain(|e| !(e.pair_id == (a, b) && e.decision == Decision::Skip));
         return render_current_page(&state);
     }
     let state = state.lock().unwrap();
@@ -182,7 +176,7 @@ pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
 
 // Apply all confirmed pairs by calling transfers::apply_confirmed (which tags
 // transactions with the _Transfer category and deletes the pair rows). Then:
-//   - Bump state.applied by the number of pairs processed.
+//   - Bump state.transfers.applied by the number of pairs processed.
 //   - Clear in-memory Confirm decisions for pairs that are no longer in
 //     transfer_pairs (so the "Confirmed N" stat in the activity header stays
 //     truthful after apply).
@@ -202,14 +196,15 @@ pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
             return render_current_page(&state);
         }
     };
-    state.applied += stats.rows_drained;
+    state.transfers.applied += stats.rows_drained;
 
     // After apply, confirmed pairs are deleted from transfer_pairs. Clear any
     // in-memory Confirm decisions for pair-ids that no longer exist so the
     // activity header counts reflect reality. Two-step to satisfy the borrow
     // checker: collect ids first while holding only &state.conn, then mutate
-    // state.decisions.
+    // state.transfers.decisions.
     let stale_confirms: Vec<(i64, i64)> = state
+        .transfers
         .decisions
         .iter()
         .filter(|(_, d)| **d == Decision::Confirm)
@@ -227,16 +222,16 @@ pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
         })
         .collect();
     for id in stale_confirms {
-        state.decisions.remove(&id);
+        state.transfers.decisions.remove(&id);
     }
 
     let new_pairs = get_filtered_pairs(
         &state.conn,
         &state.status_filter,
         &state.confidence_filter,
-        &state.decisions,
+        &state.transfers.decisions,
     );
-    state.active_pair = new_pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    state.transfers.active = new_pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
 
     render_current_page(&state)
 }
@@ -344,7 +339,7 @@ mod tests {
 
         Arc::new(Mutex::new({
             let mut s = AppState::new(conn);
-            s.decisions = decisions;
+            s.transfers.decisions = decisions;
             s
         }))
     }
@@ -354,9 +349,9 @@ mod tests {
         let state = fixture_with_confirmed_pair();
         let _ = handle_apply(&state);
         let s = state.lock().unwrap();
-        assert_eq!(s.applied, 1, "applied counter should be 1 after applying 1 pair");
+        assert_eq!(s.transfers.applied, 1, "applied counter should be 1 after applying 1 pair");
         assert!(
-            !s.decisions.contains_key(&(1, 2)),
+            !s.transfers.decisions.contains_key(&(1, 2)),
             "in-memory Confirm for applied pair should be cleared"
         );
         let count: i64 = s.conn
@@ -375,6 +370,6 @@ mod tests {
         let state = Arc::new(Mutex::new(AppState::new(conn)));
         let _ = handle_apply(&state);
         let s = state.lock().unwrap();
-        assert_eq!(s.applied, 0);
+        assert_eq!(s.transfers.applied, 0);
     }
 }
