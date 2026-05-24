@@ -1,12 +1,11 @@
 mod css;
-mod handlers;
 mod helpers;
 mod js;
 mod normalise;
 mod render;
 mod state;
 mod tab;
-mod views;
+mod transfers;
 
 #[cfg(test)]
 mod smoke_tests;
@@ -19,9 +18,10 @@ use tiny_http::{Header, Method, Request, Response, Server};
 
 use pocketsmith_sync::db;
 
-use crate::helpers::{extract_param, parse_pair_id};
+use crate::helpers::extract_param;
 use crate::state::{AppState, Decision};
-use crate::views::{
+use crate::transfers::helpers::parse_pair_id;
+use crate::transfers::views::{
     render_bulk_buttons_fragment, render_bulk_prompt_fragment, render_current_page,
     render_detail_fragment, render_page_shell, render_queue_fragment,
 };
@@ -139,28 +139,28 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             let key = parse_pair_id(p, "/transfers/pair/");
             let verb = p.rsplit('/').next().unwrap_or("");
             match (key, verb) {
-                (Some(k), "confirm") => handlers::act(&state, k, Decision::Confirm),
-                (Some(k), "reject") => handlers::act(&state, k, Decision::Reject),
-                (Some(k), "skip") => handlers::act(&state, k, Decision::Skip),
-                (Some(k), "undo") | (Some(k), "unskip") => handlers::undo(&state, k),
+                (Some(k), "confirm") => transfers::handlers::act(&state, k, Decision::Confirm),
+                (Some(k), "reject") => transfers::handlers::act(&state, k, Decision::Reject),
+                (Some(k), "skip") => transfers::handlers::act(&state, k, Decision::Skip),
+                (Some(k), "undo") | (Some(k), "unskip") => transfers::handlers::undo(&state, k),
                 _ => return_invalid_action(),
             }
             render_current_page_locked(&state)
         }
         (Method::Post, "/transfers/bulk-confirm") => {
-            handlers::bulk_act(&state, Decision::Confirm);
+            transfers::handlers::bulk_act(&state, Decision::Confirm);
             render_current_page_locked(&state)
         }
         (Method::Post, "/transfers/bulk-reject") => {
-            handlers::bulk_act(&state, Decision::Reject);
+            transfers::handlers::bulk_act(&state, Decision::Reject);
             render_current_page_locked(&state)
         }
         (Method::Post, "/transfers/apply") => {
-            handlers::apply(&state);
+            transfers::handlers::apply(&state);
             render_current_page_locked(&state)
         }
         (Method::Post, "/transfers/clear-all-skipped") => {
-            handlers::clear_all_skipped(&state);
+            transfers::handlers::clear_all_skipped(&state);
             render_current_page_locked(&state)
         }
         _ => html! { p { "Not found" } },

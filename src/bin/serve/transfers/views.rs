@@ -43,36 +43,21 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup};
 
 use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
-use pocketsmith_sync::transfers::{self, Status};
+use pocketsmith_sync::review::Status;
+use pocketsmith_sync::transfers;
 
-use crate::helpers::{
+use super::helpers::{
     confidence_class, confidence_reason, count_confirmed_in_db, derive_decision,
-    format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
+    get_filtered_pairs, get_prior_pairs, pairs_eligible_for_bulk,
 };
+use crate::helpers::{format_dollars, format_short_date};
 use crate::render::render_actions;
 use crate::state::{AppState, Decision};
 use crate::tab::count_decisions;
 
-// Renders the complete HTML page including <head>, queue sidebar, detail panel, activity bar, and <script>.
-// Called by: render_current_page, render_page_shell.
-// Calls: render_queue, render_detail, render_activity, find_pair_index, get_prior_pairs.
-// Shared tab bar at the top of every page. `active` is the slug of the
-// current tab ("transfers" or "normalise"). The active tab is rendered
-// without a link.
-pub fn render_tab_bar(active: &str) -> Markup {
-    html! {
-        nav.tab-bar {
-            @for (slug, label, href) in [("transfers", "Transfers", "/transfers/"), ("normalise", "Normalise", "/normalise/")] {
-                @if slug == active {
-                    span.tab.active { (label) }
-                } @else {
-                    a.tab href=(href) { (label) }
-                }
-            }
-        }
-    }
-}
-
+// Renders the complete HTML page including <head>, queue sidebar, detail
+// panel, activity bar, and <script>. Delegates the doctype/head/body
+// scaffolding to `crate::render::render_page`.
 pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
     let selected = state.transfers.active
         .and_then(|id| pairs.iter().find(|p| (p.txn_id_a, p.txn_id_b) == id).map(|_| id))
@@ -179,7 +164,7 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                 }
             }
             div.bulk-actions #bulk-actions {
-                @let eligible_count = crate::helpers::pairs_eligible_for_bulk(pairs, decisions).len();
+                @let eligible_count = pairs_eligible_for_bulk(pairs, decisions).len();
                 (render_bulk_actions(eligible_count))
             }
         }
@@ -446,7 +431,7 @@ pub fn render_bulk_prompt_fragment(state: &Arc<Mutex<AppState>>, action: &str) -
         &state.confidence_filter,
         &state.transfers.decisions,
     );
-    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
+    let eligible = pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
     render_bulk_prompt(action, eligible.len())
 }
 
@@ -461,6 +446,6 @@ pub fn render_bulk_buttons_fragment(state: &Arc<Mutex<AppState>>) -> Markup {
         &state.confidence_filter,
         &state.transfers.decisions,
     );
-    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
+    let eligible = pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
     render_bulk_actions(eligible.len())
 }

@@ -60,7 +60,7 @@ fn contains_all(html: &str, expected: &[&str]) {
 #[test]
 fn transfers_page_renders_tab_bar_and_queue_and_actions() {
     let state = fresh_state();
-    let html = crate::views::render_page_shell(&state).into_string();
+    let html = crate::transfers::views::render_page_shell(&state).into_string();
 
     contains_all(
         &html,
