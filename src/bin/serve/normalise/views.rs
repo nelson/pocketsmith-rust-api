@@ -12,12 +12,12 @@ use pocketsmith_sync::transfers::Status;
 use crate::css::CSS;
 use crate::helpers::{format_dollars, format_short_date};
 use crate::js::JS;
-use crate::state::AppState;
+use crate::state::{AppState, Decision};
 use crate::views::render_tab_bar;
 
 use super::helpers::{
-    get_filtered_normalisations, matching_transactions, MatchingTxn, NormClassFilter,
-    NormStatusFilter,
+    any_skipped, count_norm_decisions, get_filtered_normalisations, matching_transactions,
+    MatchingTxn, NormClassFilter, NormStatusFilter,
 };
 
 /// Top-level page render: locks state, computes the filtered queue, picks
@@ -26,7 +26,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut st = state.lock().unwrap();
     let status = NormStatusFilter::parse(&st.norm_status_filter);
     let class = NormClassFilter::parse(&st.norm_class_filter);
-    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_skipped);
+    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_decisions);
 
     let active_slug = st
         .norm_active_slug
@@ -48,9 +48,9 @@ pub fn render_queue_fragment(
     st.norm_class_filter = class_str.to_string();
     let status = NormStatusFilter::parse(status_str);
     let class = NormClassFilter::parse(class_str);
-    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_skipped);
+    let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_decisions);
     let active = st.norm_active_slug.clone();
-    render_queue(&rows, active.as_deref(), status, class)
+    render_queue(&rows, active.as_deref(), status, class, &st.norm_decisions)
 }
 
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Markup {
@@ -59,7 +59,8 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Marku
     match pocketsmith_sync::db::payee_normalisations::get_by_slug(&st.conn, slug) {
         Ok(Some(row)) => {
             let txns = matching_transactions(&st.conn, &row.original_payee);
-            render_detail(&row, &txns, st.norm_skipped.contains_key(&row.original_payee))
+            let is_skipped = st.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
+            render_detail(&row, &txns, is_skipped)
         }
         _ => html! { div.empty-state { p { "Item not found." } } },
     }
@@ -91,11 +92,12 @@ fn render_full_page(
                 (render_tab_bar("normalise"))
                 div.layout {
                     div.queue-panel #norm-queue {
-                        (render_queue(rows, active_slug, status, class))
+                        (render_queue(rows, active_slug, status, class, &state.norm_decisions))
                     }
                     div.detail-panel #norm-detail {
                         @if let Some(row) = active_row {
-                            (render_detail(row, &active_txns, state.norm_skipped.contains_key(&row.original_payee)))
+                            @let is_skipped = state.norm_decisions.get(&row.original_payee) == Some(&Decision::Skip);
+                            (render_detail(row, &active_txns, is_skipped))
                         } @else {
                             div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } }
                         }
@@ -115,6 +117,7 @@ fn render_queue(
     active_slug: Option<&str>,
     status: NormStatusFilter,
     class: NormClassFilter,
+    decisions: &std::collections::HashMap<String, Decision>,
 ) -> Markup {
     html! {
         div.queue-header {
@@ -127,6 +130,13 @@ fn render_queue(
                         hx-target="#norm-queue"
                         hx-swap="innerHTML"
                     { (f.as_str().to_uppercase()) }
+                }
+                @let n_skipped = any_skipped(decisions);
+                @if n_skipped > 0 && status == NormStatusFilter::Skipped {
+                    button.filter-btn.clear-skipped-btn
+                        hx-post="/normalise/clear-all-skipped"
+                        hx-target="body"
+                    { "CLEAR SKIPPED (" (n_skipped) ")" }
                 }
             }
             div.filter-row {
@@ -143,16 +153,41 @@ fn render_queue(
         div.queue-list {
             @for row in rows {
                 @let is_active = active_slug == Some(row.slug.as_str());
+                @let session_decision = decisions.get(&row.original_payee).copied();
+                @let row_status = effective_status(row.status, session_decision);
                 div.queue-item
                     .(if is_active { "selected" } else { "" })
-                    .((status_css_class(row.status)))
+                    .((row_status_css(row_status)))
                     hx-get=(format!("/normalise/item/{}", row.slug))
                     hx-target="#norm-detail"
                     hx-swap="innerHTML"
                     data-detail-url=(format!("/normalise/item/{}", row.slug))
                     data-detail-target="#norm-detail"
                 {
-                    span.conf-badge { (row.txn_count) }
+                    @if session_decision == Some(Decision::Skip) {
+                        span.status-indicator.skip-indicator
+                            hx-post=(format!("/normalise/item/{}/unskip", row.slug))
+                            hx-target="body"
+                            title="Click to unskip"
+                            onclick="event.stopPropagation()"
+                        { "\u{2298}" }
+                    } @else if row_status == Some(Status::Confirmed) {
+                        span.status-indicator.confirm-indicator
+                            hx-post=(format!("/normalise/item/{}/undo", row.slug))
+                            hx-target="body"
+                            title="Click to undo"
+                            onclick="event.stopPropagation()"
+                        { "\u{2713}" }
+                    } @else if row_status == Some(Status::Rejected) {
+                        span.status-indicator.reject-indicator
+                            hx-post=(format!("/normalise/item/{}/undo", row.slug))
+                            hx-target="body"
+                            title="Click to undo"
+                            onclick="event.stopPropagation()"
+                        { "\u{2717}" }
+                    } @else {
+                        span.conf-badge { (row.txn_count) }
+                    }
                     span.payee { (row.proposed_payee) }
                     span.gap { (row.class.as_deref().unwrap_or("?")) }
                 }
@@ -161,11 +196,19 @@ fn render_queue(
     }
 }
 
-fn status_css_class(s: Status) -> &'static str {
+fn effective_status(stored: Status, session: Option<Decision>) -> Option<Status> {
+    match session {
+        Some(Decision::Confirm) => Some(Status::Confirmed),
+        Some(Decision::Reject) => Some(Status::Rejected),
+        _ => Some(stored),
+    }
+}
+
+fn row_status_css(s: Option<Status>) -> &'static str {
     match s {
-        Status::Pending => "",
-        Status::Confirmed => "decided-confirmed",
-        Status::Rejected => "decided-rejected",
+        Some(Status::Confirmed) => "decided-confirmed",
+        Some(Status::Rejected) => "decided-rejected",
+        _ => "",
     }
 }
 
@@ -216,20 +259,6 @@ fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: 
             }
         }
 
-        @if !features.is_empty() {
-            div.norm-features {
-                h3 { "Extracted features" }
-                div.norm-features-list {
-                    @for (k, v) in &features {
-                        div.norm-feature-row {
-                            span.norm-feature-key { (k) }
-                            span.norm-feature-val { (v) }
-                        }
-                    }
-                }
-            }
-        }
-
         div.actions data-action-base=(action_base) {
             button.btn.btn-confirm
                 hx-post=(format!("{action_base}/confirm"))
@@ -269,13 +298,24 @@ fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: 
                 }
             }
         }
+
+        @if !features.is_empty() {
+            div.norm-features {
+                h3 { "Extracted features" }
+                div.norm-features-list {
+                    @for (k, v) in &features {
+                        div.norm-feature-row {
+                            span.norm-feature-key { (k) }
+                            span.norm-feature-val { (v) }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-/// Minimal JSON-string-to-pairs parse for the features metadata. We don't
-/// need anything fancy: features_json is always a flat object of
-/// string/number/null values. Returns an empty list if parsing fails so
-/// the UI degrades gracefully.
+/// Minimal JSON-string-to-pairs parse for the features metadata.
 fn parse_features(s: &str) -> Vec<(String, String)> {
     let v: serde_json::Value = match serde_json::from_str(s) {
         Ok(v) => v,
@@ -298,19 +338,65 @@ fn parse_features(s: &str) -> Vec<(String, String)> {
             Some((k.clone(), s))
         })
         .collect();
-    // Stable order for the UI.
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
 }
 
 fn render_activity(state: &AppState) -> Markup {
+    let confirmed_in_db = count_confirmed_in_db(&state.conn);
     html! {
         div.activity-header {
+            span.stat { "Confirmed " span.count-confirmed { (count_norm_decisions(&state.norm_decisions, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (count_norm_decisions(&state.norm_decisions, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (count_norm_decisions(&state.norm_decisions, Decision::Skip)) } }
+            span.stat { "Undone " span.count-undone { (state.norm_undone) } }
             span.stat { "Applied " span.count-applied { (state.norm_applied) } }
             button.apply-btn
                 hx-post="/normalise/apply"
                 hx-target="body"
-            { "Apply confirmed" }
+                disabled[confirmed_in_db == 0]
+                title=(if confirmed_in_db == 0 { "No confirmed proposals to apply" } else { "Write transactions.payee for every confirmed proposal and drain the staging row" })
+            { "Apply confirmed (" (confirmed_in_db) ")" }
+        }
+        div.activity-list {
+            @for entry in state.norm_activity.iter().rev().take(20) {
+                div.activity-row {
+                    span.((match entry.decision {
+                        Decision::Confirm => "status-confirmed",
+                        Decision::Reject => "status-rejected",
+                        Decision::Skip => "status-skipped",
+                    })) {
+                        @match entry.decision {
+                            Decision::Confirm => { "\u{2713} confirmed" },
+                            Decision::Reject => { "\u{2717} rejected" },
+                            Decision::Skip => { "\u{2298} skipped" },
+                        }
+                    }
+                    span { (entry.proposed_payee) }
+                    span { (entry.txn_count) " txn" }
+                    @if entry.decision == Decision::Skip {
+                        button.undo-btn
+                            hx-post=(format!("/normalise/item/{}/unskip", entry.slug))
+                            hx-target="body"
+                        { "unskip" }
+                    } @else {
+                        button.undo-btn
+                            hx-post=(format!("/normalise/item/{}/undo", entry.slug))
+                            hx-target="body"
+                        { "undo" }
+                    }
+                }
+            }
         }
     }
+}
+
+/// Count confirmed proposals still in the DB (i.e. pending an apply).
+fn count_confirmed_in_db(conn: &rusqlite::Connection) -> i64 {
+    conn.query_row(
+        "SELECT COUNT(*) FROM payee_normalisations WHERE status = 1",
+        [],
+        |r| r.get(0),
+    )
+    .unwrap_or(0)
 }

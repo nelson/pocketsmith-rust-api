@@ -98,6 +98,15 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             normalise::handlers::skip(&state, slug);
             normalise::views::render_page_shell(&state)
         }
+        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/undo") => {
+            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/undo");
+            normalise::handlers::undo(&state, slug);
+            normalise::views::render_page_shell(&state)
+        }
+        (Method::Post, "/normalise/clear-all-skipped") => {
+            normalise::handlers::clear_all_skipped(&state);
+            normalise::views::render_page_shell(&state)
+        }
         (Method::Post, "/normalise/apply") => {
             normalise::handlers::apply(&state);
             normalise::views::render_page_shell(&state)
