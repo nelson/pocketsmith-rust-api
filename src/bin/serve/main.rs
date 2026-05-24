@@ -34,7 +34,7 @@ fn main() -> Result<()> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3141);
 
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
     let state = Arc::new(Mutex::new(AppState::new(conn)));
 
     let addr = format!("127.0.0.1:{port}");

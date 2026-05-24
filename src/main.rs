@@ -10,7 +10,7 @@ fn main() -> Result<()> {
         .context("POCKETSMITH_API_KEY environment variable not set")?;
 
     let client = PocketSmithClient::new(api_key);
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
 
     pocketsmith_sync::sync::pull(&client, &conn)
 }

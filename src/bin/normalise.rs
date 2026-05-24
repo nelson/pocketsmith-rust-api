@@ -37,7 +37,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
 
     if apply_mode {
         run_apply(&conn)

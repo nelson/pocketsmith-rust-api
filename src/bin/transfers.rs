@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 }
 
 fn detect(_args: &[String]) -> Result<()> {
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
 
     let pairs = transfers::find_pairs(&conn)?;
     if pairs.is_empty() {
@@ -54,14 +54,14 @@ fn annotate_existing(_args: &[String]) -> Result<()> {
     // memo doesn't already carry the marker. Idempotent across re-runs.
     // After this prints `Annotated N transactions.`, run `push` to send the
     // new memos upstream.
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
     let updated = transfers::annotate_existing_pairs(&conn)?;
     println!("Annotated {updated} transactions with paired-marker memos.");
     Ok(())
 }
 
 fn apply(_args: &[String]) -> Result<()> {
-    let conn = db::initialize("pocketsmith.db")?;
+    let conn = db::initialize(&db::path_from_env())?;
     let stats = transfers::apply_confirmed(&conn)?;
     if stats.rows_drained == 0 {
         println!("No confirmed pairs to apply.");
