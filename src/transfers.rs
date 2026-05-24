@@ -55,56 +55,10 @@ impl fmt::Display for Confidence {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Status {
-    Pending,
-    Confirmed,
-    Rejected,
-}
-
-impl Status {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Status::Pending => "pending",
-            Status::Confirmed => "confirmed",
-            Status::Rejected => "rejected",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Status> {
-        match s {
-            "pending" => Some(Status::Pending),
-            "confirmed" => Some(Status::Confirmed),
-            "rejected" => Some(Status::Rejected),
-            _ => None,
-        }
-    }
-
-    pub fn to_i32(self) -> i32 {
-        match self {
-            Status::Pending => 0,
-            Status::Confirmed => 1,
-            Status::Rejected => 2,
-        }
-    }
-
-    pub fn from_i32(v: i32) -> Option<Status> {
-        match v {
-            0 => Some(Status::Pending),
-            1 => Some(Status::Confirmed),
-            2 => Some(Status::Rejected),
-            _ => None,
-        }
-    }
-
-    pub const ALL: [Status; 3] = [Status::Pending, Status::Confirmed, Status::Rejected];
-}
-
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
+// `Status` and `ApplyStats` moved to `crate::review` (shared between the
+// transfer and normalise scan/apply flows). Re-exported here for
+// historical import compatibility.
+pub use crate::review::{ApplyStats, Status};
 
 #[derive(Debug, Clone)]
 pub struct TransferPair {
@@ -134,12 +88,6 @@ fn transfer_patterns() -> &'static RegexSet {
 
 pub fn is_transfer_like(payee: &str) -> bool {
     transfer_patterns().is_match(payee)
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ApplyStats {
-    pub pairs_applied: usize,
-    pub transactions_updated: usize,
 }
 
 /// Build the new memo value for one leg of a transfer pair: existing memo
@@ -206,8 +154,8 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
         )
         .map_err(|_| anyhow::anyhow!("No '_Transfer' category found in categories table"))?;
 
-    let pairs_applied = pairs.len();
-    let transactions_updated = pairs_applied * 2;
+    let rows_drained = pairs.len();
+    let transactions_updated = rows_drained * 2;
 
     with_operation(conn, "transfers", |conn| {
         for pair in &pairs {
@@ -239,7 +187,7 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
     })?;
 
     Ok(ApplyStats {
-        pairs_applied,
+        rows_drained,
         transactions_updated,
     })
 }
@@ -689,7 +637,7 @@ mod tests {
         .unwrap();
 
         let stats = apply_confirmed(&conn).unwrap();
-        assert_eq!(stats.pairs_applied, 1);
+        assert_eq!(stats.rows_drained, 1);
         assert_eq!(stats.transactions_updated, 2);
 
         // Transactions tagged.
@@ -881,7 +829,7 @@ mod tests {
     fn test_apply_confirmed_empty_returns_zero_stats() {
         let conn = crate::db::test_helpers::test_db();
         let stats = apply_confirmed(&conn).unwrap();
-        assert_eq!(stats.pairs_applied, 0);
+        assert_eq!(stats.rows_drained, 0);
         assert_eq!(stats.transactions_updated, 0);
     }
 

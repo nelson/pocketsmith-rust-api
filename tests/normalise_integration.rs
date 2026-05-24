@@ -65,7 +65,7 @@ fn scan_then_apply_round_trip_writes_payee_and_drains_staging() {
     pn::update_status(&conn, "WOOLWORTHS 1624 STRATHF", Status::Confirmed).unwrap();
     let apply_stats = norm_apply::apply_confirmed(&conn).unwrap();
     assert_eq!(apply_stats.transactions_updated, 3);
-    assert_eq!(apply_stats.staging_rows_drained, 1);
+    assert_eq!(apply_stats.rows_drained, 1);
 
     for id in 1..=3 {
         assert_eq!(payee_of(&conn, id).as_deref(), Some(staged.proposed_payee.as_str()));
@@ -108,7 +108,7 @@ fn rejected_row_persists_across_rescans_and_apply_leaves_payee_untouched() {
     // Apply does not touch transactions with a rejected staging row.
     let stats = norm_apply::apply_confirmed(&conn).unwrap();
     assert_eq!(stats.transactions_updated, 0);
-    assert_eq!(stats.staging_rows_drained, 0);
+    assert_eq!(stats.rows_drained, 0);
     assert_eq!(payee_of(&conn, 1).as_deref(), Some("COLES 0042"));
 
     // A second scan sees the existing row whose proposal still matches
