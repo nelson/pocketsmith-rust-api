@@ -99,11 +99,9 @@ pub fn clear_all_skipped(state: &Arc<Mutex<AppState>>) {
     st.norm_decisions.retain(|_, d| *d != Decision::Skip);
 }
 
-// Backwards-compatible thin wrappers used by the route table in main.rs.
-pub fn confirm(state: &Arc<Mutex<AppState>>, slug: &str) { act(state, slug, Decision::Confirm); }
-pub fn reject(state: &Arc<Mutex<AppState>>, slug: &str) { act(state, slug, Decision::Reject); }
-pub fn skip(state: &Arc<Mutex<AppState>>, slug: &str) { act(state, slug, Decision::Skip); }
-pub fn unskip(state: &Arc<Mutex<AppState>>, slug: &str) { undo(state, slug); }
+// `act` and `undo` are the only entry points the route table needs;
+// confirm/reject/skip are just `act(state, slug, Decision::*)` and
+// unskip is `undo` (clearing the session decision).
 
 /// Drain confirmed proposals: write `transactions.payee` and delete the
 /// staging row for each. Bumps `norm_applied`.
@@ -173,7 +171,7 @@ mod tests {
     fn confirm_records_decision_pushes_activity_and_flips_status() {
         let state = make_state();
         let slug = seed(&state, "WOOLIES", "Woolworths", Status::Pending, 7);
-        confirm(&state, &slug);
+        act(&state, &slug, Decision::Confirm);
         assert_eq!(current_status(&state, "WOOLIES"), Some(Status::Confirmed));
         let st = state.lock().unwrap();
         assert_eq!(st.norm_decisions.get("WOOLIES"), Some(&Decision::Confirm));
@@ -185,7 +183,7 @@ mod tests {
     fn reject_flips_status_to_rejected() {
         let state = make_state();
         let slug = seed(&state, "COLES", "Coles", Status::Pending, 1);
-        reject(&state, &slug);
+        act(&state, &slug, Decision::Reject);
         assert_eq!(current_status(&state, "COLES"), Some(Status::Rejected));
         assert_eq!(state.lock().unwrap().norm_decisions.get("COLES"), Some(&Decision::Reject));
     }
@@ -194,7 +192,7 @@ mod tests {
     fn skip_records_session_decision_without_db_status_change() {
         let state = make_state();
         let slug = seed(&state, "ALDI", "ALDI", Status::Pending, 1);
-        skip(&state, &slug);
+        act(&state, &slug, Decision::Skip);
         let st = state.lock().unwrap();
         assert_eq!(st.norm_decisions.get("ALDI"), Some(&Decision::Skip));
         drop(st);
@@ -211,7 +209,7 @@ mod tests {
         // Filter set to Pending so confirming A pushes us off A onto B.
         state.lock().unwrap().norm_status_filter = "pending".into();
         state.lock().unwrap().norm_active_slug = Some(a.clone());
-        confirm(&state, &a);
+        act(&state, &a, Decision::Confirm);
         let st = state.lock().unwrap();
         assert_eq!(st.norm_active_slug.as_deref(), Some(pn::slug_for("B")).as_deref());
     }
@@ -220,7 +218,7 @@ mod tests {
     fn undo_reverts_decision_and_status_and_clears_activity() {
         let state = make_state();
         let slug = seed(&state, "WOOLIES", "Woolworths", Status::Pending, 1);
-        confirm(&state, &slug);
+        act(&state, &slug, Decision::Confirm);
         undo(&state, &slug);
         assert_eq!(current_status(&state, "WOOLIES"), Some(Status::Pending));
         let st = state.lock().unwrap();
@@ -235,9 +233,9 @@ mod tests {
         let s1 = seed(&state, "X", "x", Status::Pending, 1);
         let s2 = seed(&state, "Y", "y", Status::Pending, 1);
         let s3 = seed(&state, "Z", "z", Status::Pending, 1);
-        skip(&state, &s1);
-        confirm(&state, &s2);
-        skip(&state, &s3);
+        act(&state, &s1, Decision::Skip);
+        act(&state, &s2, Decision::Confirm);
+        act(&state, &s3, Decision::Skip);
         clear_all_skipped(&state);
         let st = state.lock().unwrap();
         assert_eq!(st.norm_decisions.len(), 1);
@@ -257,7 +255,7 @@ mod tests {
     #[test]
     fn act_is_noop_for_unknown_slug() {
         let state = make_state();
-        confirm(&state, "0000000000000000");
+        act(&state, "0000000000000000", Decision::Confirm);
         assert!(state.lock().unwrap().norm_decisions.is_empty());
     }
 }

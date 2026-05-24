@@ -363,36 +363,6 @@ fn render_trace_entry(entry: &TraceEntry) -> Markup {
     }
 }
 
-/// Minimal JSON-string-to-pairs parse for the features metadata. Kept for
-/// reference / future use — the live UI now shows the per-stage trace
-/// from [`render_pipeline_trace`] instead.
-#[allow(dead_code)]
-fn parse_features(s: &str) -> Vec<(String, String)> {
-    let v: serde_json::Value = match serde_json::from_str(s) {
-        Ok(v) => v,
-        Err(_) => return Vec::new(),
-    };
-    let map = match v.as_object() {
-        Some(m) => m,
-        None => return Vec::new(),
-    };
-    let mut out: Vec<(String, String)> = map
-        .iter()
-        .filter_map(|(k, val)| {
-            let s = match val {
-                serde_json::Value::String(s) => s.clone(),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                serde_json::Value::Null => return None,
-                other => other.to_string(),
-            };
-            Some((k.clone(), s))
-        })
-        .collect();
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    out
-}
-
 fn render_activity(state: &AppState) -> Markup {
     let confirmed_in_db = count_confirmed_in_db(&state.conn);
     html! {

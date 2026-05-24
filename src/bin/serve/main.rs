@@ -79,30 +79,30 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
         (Method::Get, "/normalise/queue") => {
             normalise::views::render_queue_fragment(&state, "all", "all")
         }
-        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/confirm") => {
-            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/confirm");
-            normalise::handlers::confirm(&state, slug);
-            normalise::views::render_page_shell(&state)
-        }
-        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/reject") => {
-            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/reject");
-            normalise::handlers::reject(&state, slug);
-            normalise::views::render_page_shell(&state)
-        }
-        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/unskip") => {
-            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/unskip");
-            normalise::handlers::unskip(&state, slug);
-            normalise::views::render_page_shell(&state)
-        }
-        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/skip") => {
-            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/skip");
-            normalise::handlers::skip(&state, slug);
-            normalise::views::render_page_shell(&state)
-        }
-        (Method::Post, p) if p.starts_with("/normalise/item/") && p.ends_with("/undo") => {
-            let slug = p.trim_start_matches("/normalise/item/").trim_end_matches("/undo");
-            normalise::handlers::undo(&state, slug);
-            normalise::views::render_page_shell(&state)
+        // All five normalise item actions share the path shape
+        // `/normalise/item/<slug>/<action>`. Dispatch on the trailing
+        // verb and re-render the page shell on success.
+        (Method::Post, p) if p.starts_with("/normalise/item/") => {
+            let rest = &p["/normalise/item/".len()..];
+            match rest.rsplit_once('/') {
+                Some((slug, "confirm")) => {
+                    normalise::handlers::act(&state, slug, state::Decision::Confirm);
+                    normalise::views::render_page_shell(&state)
+                }
+                Some((slug, "reject")) => {
+                    normalise::handlers::act(&state, slug, state::Decision::Reject);
+                    normalise::views::render_page_shell(&state)
+                }
+                Some((slug, "skip")) => {
+                    normalise::handlers::act(&state, slug, state::Decision::Skip);
+                    normalise::views::render_page_shell(&state)
+                }
+                Some((slug, "undo")) | Some((slug, "unskip")) => {
+                    normalise::handlers::undo(&state, slug);
+                    normalise::views::render_page_shell(&state)
+                }
+                _ => html! { p { "Invalid normalise action" } },
+            }
         }
         (Method::Post, "/normalise/clear-all-skipped") => {
             normalise::handlers::clear_all_skipped(&state);
