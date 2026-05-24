@@ -13,7 +13,7 @@ mod smoke_tests;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use maud::{html, Markup};
+use maud::html;
 use tiny_http::{Header, Method, Request, Response, Server};
 
 use pocketsmith_sync::db;
@@ -21,10 +21,6 @@ use pocketsmith_sync::db;
 use crate::helpers::extract_param;
 use crate::state::{AppState, Decision};
 use crate::transfers::helpers::parse_pair_id;
-use crate::transfers::views::{
-    render_bulk_buttons_fragment, render_bulk_prompt_fragment, render_current_page,
-    render_detail_fragment, render_page_shell, render_queue_fragment,
-};
 
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -63,8 +59,8 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     }
 
     let response = match (method, path.as_str()) {
-        // --- Normalise tab (checked first so /normalise/... POST paths
-        // don't fall into the transfer-side /confirm contains-match).
+        // --- Normalise tab (matched first so /normalise/* POSTs don't
+        // fall into the transfer arms below.)
         (Method::Get, "/normalise" | "/normalise/") => normalise::views::render_page_shell(&state),
         (Method::Get, p) if p.starts_with("/normalise/item/") => {
             let slug = p.trim_start_matches("/normalise/item/");
@@ -76,33 +72,18 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             let class = extract_param(params, "class").unwrap_or("all".to_string());
             normalise::views::render_queue_fragment(&state, &filter, &class)
         }
-        (Method::Get, "/normalise/queue") => {
-            normalise::views::render_queue_fragment(&state, "all", "all")
-        }
-        // All five normalise item actions share the path shape
-        // `/normalise/item/<slug>/<action>`. Dispatch on the trailing
-        // verb and re-render the page shell on success.
+        (Method::Get, "/normalise/queue") => normalise::views::render_queue_fragment(&state, "all", "all"),
+        // Every /normalise/item/<slug>/<verb> POST.
         (Method::Post, p) if p.starts_with("/normalise/item/") => {
             let rest = &p["/normalise/item/".len()..];
             match rest.rsplit_once('/') {
-                Some((slug, "confirm")) => {
-                    normalise::handlers::act(&state, slug, state::Decision::Confirm);
-                    normalise::views::render_page_shell(&state)
-                }
-                Some((slug, "reject")) => {
-                    normalise::handlers::act(&state, slug, state::Decision::Reject);
-                    normalise::views::render_page_shell(&state)
-                }
-                Some((slug, "skip")) => {
-                    normalise::handlers::act(&state, slug, state::Decision::Skip);
-                    normalise::views::render_page_shell(&state)
-                }
-                Some((slug, "undo")) | Some((slug, "unskip")) => {
-                    normalise::handlers::undo(&state, slug);
-                    normalise::views::render_page_shell(&state)
-                }
-                _ => html! { p { "Invalid normalise action" } },
+                Some((slug, "confirm")) => normalise::handlers::act(&state, slug, Decision::Confirm),
+                Some((slug, "reject")) => normalise::handlers::act(&state, slug, Decision::Reject),
+                Some((slug, "skip")) => normalise::handlers::act(&state, slug, Decision::Skip),
+                Some((slug, "undo")) | Some((slug, "unskip")) => normalise::handlers::undo(&state, slug),
+                _ => return invalid_action_response(request),
             }
+            normalise::views::render_page_shell(&state)
         }
         (Method::Post, "/normalise/clear-all-skipped") => {
             normalise::handlers::clear_all_skipped(&state);
@@ -114,54 +95,66 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
         }
 
         // --- Transfers tab
-        (Method::Get, "/transfers" | "/transfers/") => render_page_shell(&state),
+        (Method::Get, "/transfers" | "/transfers/") => transfers::views::render_page_shell(&state),
         (Method::Get, p) if p.starts_with("/transfers/pair/") => {
-            let id = parse_pair_id(p, "/transfers/pair/");
-            id.map(|(a, b)| render_detail_fragment(&state, a, b))
-                .unwrap_or_else(|| html! { p { "Invalid pair ID" } })
+            let id_part = p.trim_start_matches("/transfers/pair/").split('/').next().unwrap_or("");
+            match parse_pair_id(id_part) {
+                Some((a, b)) => transfers::views::render_detail_fragment(&state, a, b),
+                None => html! { p { "Invalid pair ID" } },
+            }
         }
         (Method::Get, p) if p.starts_with("/transfers/queue?") => {
             let params = p.strip_prefix("/transfers/queue?").unwrap_or("");
             let filter = extract_param(params, "filter").unwrap_or("pending".to_string());
             let conf = extract_param(params, "conf").unwrap_or("all".to_string());
-            render_queue_fragment(&state, &filter, &conf)
+            transfers::views::render_queue_fragment(&state, &filter, &conf)
         }
-        (Method::Get, "/transfers/queue") => render_queue_fragment(&state, "all", "all"),
+        (Method::Get, "/transfers/queue") => transfers::views::render_queue_fragment(&state, "all", "all"),
         (Method::Get, p) if p.starts_with("/transfers/bulk-prompt?") => {
             let params = p.strip_prefix("/transfers/bulk-prompt?").unwrap_or("");
             let action = extract_param(params, "action").unwrap_or("confirm".to_string());
-            render_bulk_prompt_fragment(&state, &action)
+            transfers::views::render_bulk_prompt_fragment(&state, &action)
         }
-        (Method::Get, "/transfers/bulk-buttons") => render_bulk_buttons_fragment(&state),
-        // All five transfer pair actions share the path shape
-        // `/transfers/pair/<a>-<b>/<verb>`.
+        (Method::Get, "/transfers/bulk-buttons") => transfers::views::render_bulk_buttons_fragment(&state),
+        // Every /transfers/pair/<a>-<b>/<verb> POST.
         (Method::Post, p) if p.starts_with("/transfers/pair/") => {
-            let key = parse_pair_id(p, "/transfers/pair/");
-            let verb = p.rsplit('/').next().unwrap_or("");
-            match (key, verb) {
-                (Some(k), "confirm") => transfers::handlers::act(&state, k, Decision::Confirm),
-                (Some(k), "reject") => transfers::handlers::act(&state, k, Decision::Reject),
-                (Some(k), "skip") => transfers::handlers::act(&state, k, Decision::Skip),
-                (Some(k), "undo") | (Some(k), "unskip") => transfers::handlers::undo(&state, k),
-                _ => return_invalid_action(),
+            let rest = &p["/transfers/pair/".len()..];
+            match rest.rsplit_once('/') {
+                Some((id, "confirm")) => match parse_pair_id(id) {
+                    Some(k) => transfers::handlers::act(&state, k, Decision::Confirm),
+                    None => return invalid_action_response(request),
+                },
+                Some((id, "reject")) => match parse_pair_id(id) {
+                    Some(k) => transfers::handlers::act(&state, k, Decision::Reject),
+                    None => return invalid_action_response(request),
+                },
+                Some((id, "skip")) => match parse_pair_id(id) {
+                    Some(k) => transfers::handlers::act(&state, k, Decision::Skip),
+                    None => return invalid_action_response(request),
+                },
+                Some((id, "undo")) | Some((id, "unskip")) => match parse_pair_id(id) {
+                    Some(k) => transfers::handlers::undo(&state, k),
+                    None => return invalid_action_response(request),
+                },
+                _ => return invalid_action_response(request),
             }
-            render_current_page_locked(&state)
+            transfers::views::render_page_shell(&state)
         }
         (Method::Post, "/transfers/bulk-confirm") => {
             transfers::handlers::bulk_act(&state, Decision::Confirm);
-            render_current_page_locked(&state)
+            transfers::views::render_page_shell(&state)
         }
         (Method::Post, "/transfers/bulk-reject") => {
             transfers::handlers::bulk_act(&state, Decision::Reject);
-            render_current_page_locked(&state)
+            transfers::views::render_page_shell(&state)
         }
         (Method::Post, "/transfers/apply") => {
             transfers::handlers::apply(&state);
-            render_current_page_locked(&state)
+            transfers::views::render_page_shell(&state)
         }
         (Method::Post, "/transfers/clear-all-skipped") => {
             transfers::handlers::clear_all_skipped(&state);
-            render_current_page_locked(&state)
+            transfers::views::render_page_shell(&state)
         }
         _ => html! { p { "Not found" } },
     };
@@ -172,16 +165,12 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let _ = request.respond(resp);
 }
 
-/// Re-render the transfers page from the current AppState (locks state
-/// internally). Used after every mutating POST.
-fn render_current_page_locked(state: &Arc<Mutex<AppState>>) -> Markup {
-    let st = state.lock().unwrap();
-    render_current_page(&st)
-}
-
-/// Friendly response for malformed action URLs.
-fn return_invalid_action() {
-    // No-op placeholder: the caller still renders the page shell, which is
-    // the friendliest fallback. Reserved as a hook for future error
-    // surfacing in the UI.
+/// Send a 400 Bad Request with a plain HTML body. Used for action URLs
+/// the route table couldn't parse (malformed pair id, unknown verb).
+fn invalid_action_response(request: Request) {
+    let body = "<p>Invalid action</p>";
+    let resp = Response::from_data(body.as_bytes().to_vec())
+        .with_status_code(400)
+        .with_header(Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap());
+    let _ = request.respond(resp);
 }
