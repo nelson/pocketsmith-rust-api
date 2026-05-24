@@ -8,6 +8,9 @@ mod state;
 mod tab;
 mod views;
 
+#[cfg(test)]
+mod smoke_tests;
+
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
