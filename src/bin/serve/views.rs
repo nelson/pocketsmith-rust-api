@@ -40,17 +40,16 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use maud::{html, Markup, PreEscaped, DOCTYPE};
+use maud::{html, Markup};
 
 use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
 use pocketsmith_sync::transfers::{self, Status};
 
-use crate::css::CSS;
 use crate::helpers::{
     confidence_class, confidence_reason, count_confirmed_in_db, derive_decision,
     format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
 };
-use crate::js::JS;
+use crate::render::render_actions;
 use crate::state::{AppState, Decision};
 use crate::tab::count_decisions;
 
@@ -84,37 +83,14 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
         .map(|p| get_prior_pairs(&state.conn, &p.account_name_a, &p.account_name_b))
         .unwrap_or_default();
 
-    html! {
-        (DOCTYPE)
-        html lang="en" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1";
-                title { "Transfer Pairs" }
-                script src="https://unpkg.com/htmx.org@2.0.4" {}
-                style { (PreEscaped(CSS)) }
-            }
-            body {
-                (render_tab_bar("transfers"))
-                div.layout {
-                    div.queue-panel #queue {
-                        (render_queue(pairs, selected, status_filter, confidence_filter, &state.transfers.decisions))
-                    }
-                    div.detail-panel #detail {
-                        @if let Some(pair) = active {
-                            (render_detail(pair, &prior))
-                        } @else {
-                            div.empty-state { p { "No pairs to show" } }
-                        }
-                    }
-                }
-                div.activity-panel #activity {
-                    (render_activity(state))
-                }
-                script { (PreEscaped(JS)) }
-            }
-        }
-    }
+    let queue = render_queue(pairs, selected, status_filter, confidence_filter, &state.transfers.decisions);
+    let detail = match active {
+        Some(pair) => render_detail(pair, &prior),
+        None => html! { div.empty-state { p { "No pairs to show" } } },
+    };
+    let activity = render_activity(state);
+
+    crate::render::render_page("transfers", "Transfer Pairs", queue, detail, activity)
 }
 
 // Bulk-action buttons that sit under the filter rows. When idle, two buttons:
@@ -328,20 +304,7 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
                 }
             }
         }
-        div.actions data-pair-id=(pair_id) data-action-base=(format!("/transfers/pair/{pair_id}")) {
-            button.btn.btn-confirm
-                hx-post=(format!("/transfers/pair/{pair_id}/confirm"))
-                hx-target="body"
-            { "[Y] Confirm" }
-            button.btn.btn-reject
-                hx-post=(format!("/transfers/pair/{pair_id}/reject"))
-                hx-target="body"
-            { "[N] Reject" }
-            button.btn.btn-skip
-                hx-post=(format!("/transfers/pair/{pair_id}/skip"))
-                hx-target="body"
-            { "[S] Skip" }
-        }
+        (render_actions(&format!("/transfers/pair/{pair_id}"), false))
         @if !prior.is_empty() {
             div.prior-section {
                 h3 { "Prior: " (&pair.account_name_a) " \u{2194} " (&pair.account_name_b) }

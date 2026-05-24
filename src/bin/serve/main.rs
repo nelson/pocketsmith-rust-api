@@ -3,6 +3,7 @@ mod handlers;
 mod helpers;
 mod js;
 mod normalise;
+mod render;
 mod state;
 mod tab;
 mod views;

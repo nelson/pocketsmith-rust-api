@@ -4,23 +4,21 @@
 
 use std::sync::{Arc, Mutex};
 
-use maud::{html, Markup, PreEscaped, DOCTYPE};
+use maud::{html, Markup};
 
 use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
 use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, TraceEntry};
-use pocketsmith_sync::transfers::Status;
+use pocketsmith_sync::review::Status;
 
-use crate::css::CSS;
 use crate::helpers::{format_dollars, format_short_date};
-use crate::js::JS;
+use crate::render::render_actions;
 use crate::state::{AppState, Decision};
-use crate::views::render_tab_bar;
+use crate::tab::count_decisions;
 
 use super::helpers::{
     get_filtered_normalisations, matching_transactions, MatchingTxn, NormClassFilter,
     NormStatusFilter,
 };
-use crate::tab::count_decisions;
 
 /// Top-level page render: locks state, computes the filtered queue, picks
 /// an active row if needed, and delegates to [`render_full_page`].
@@ -81,39 +79,18 @@ fn render_full_page(
         .map(|r| matching_transactions(&state.conn, &r.original_payee))
         .unwrap_or_default();
 
-    html! {
-        (DOCTYPE)
-        html lang="en" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1";
-                title { "Payee Normalisations" }
-                script src="https://unpkg.com/htmx.org@2.0.4" {}
-                style { (PreEscaped(CSS)) }
-            }
-            body {
-                (render_tab_bar("normalise"))
-                div.layout {
-                    div.queue-panel #norm-queue {
-                        (render_queue(rows, active_slug, status, class, &state.normalise.decisions))
-                    }
-                    div.detail-panel #norm-detail {
-                        @if let Some(row) = active_row {
-                            @let is_skipped = state.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
-                            @let pipeline = run_normalise(&row.original_payee);
-                            (render_detail(row, &active_txns, is_skipped, &pipeline))
-                        } @else {
-                            div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } }
-                        }
-                    }
-                }
-                div.activity-panel #norm-activity {
-                    (render_activity(state))
-                }
-                script { (PreEscaped(JS)) }
-            }
+    let queue = render_queue(rows, active_slug, status, class, &state.normalise.decisions);
+    let detail = match active_row {
+        Some(row) => {
+            let is_skipped = state.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
+            let pipeline = run_normalise(&row.original_payee);
+            render_detail(row, &active_txns, is_skipped, &pipeline)
         }
-    }
+        None => html! { div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } } },
+    };
+    let activity = render_activity(state);
+
+    crate::render::render_page("normalise", "Payee Normalisations", queue, detail, activity)
 }
 
 fn render_queue(
@@ -131,7 +108,7 @@ fn render_queue(
                     button.filter-btn
                         .(if *f == status { "active" } else { "" })
                         hx-get=(format!("/normalise/queue?filter={}&class={}", f.as_str(), class.as_str()))
-                        hx-target="#norm-queue"
+                        hx-target="#queue"
                         hx-swap="innerHTML"
                     { (f.as_str().to_uppercase()) }
                 }
@@ -148,7 +125,7 @@ fn render_queue(
                     button.filter-btn
                         .(if *f == class { "active" } else { "" })
                         hx-get=(format!("/normalise/queue?filter={}&class={}", status.as_str(), f.as_str()))
-                        hx-target="#norm-queue"
+                        hx-target="#queue"
                         hx-swap="innerHTML"
                     { (f.as_str().to_uppercase()) }
                 }
@@ -163,10 +140,10 @@ fn render_queue(
                     .(if is_active { "selected" } else { "" })
                     .((row_status_css(row_status)))
                     hx-get=(format!("/normalise/item/{}", row.slug))
-                    hx-target="#norm-detail"
+                    hx-target="#detail"
                     hx-swap="innerHTML"
                     data-detail-url=(format!("/normalise/item/{}", row.slug))
-                    data-detail-target="#norm-detail"
+                    data-detail-target="#detail"
                 {
                     @if session_decision == Some(Decision::Skip) {
                         span.status-indicator.skip-indicator
@@ -269,27 +246,7 @@ fn render_detail(
 
         (render_pipeline_trace(pipeline))
 
-        div.actions data-action-base=(action_base) {
-            button.btn.btn-confirm
-                hx-post=(format!("{action_base}/confirm"))
-                hx-target="body"
-            { "[Y] Confirm" }
-            button.btn.btn-reject
-                hx-post=(format!("{action_base}/reject"))
-                hx-target="body"
-            { "[N] Reject" }
-            @if is_skipped {
-                button.btn.btn-skip
-                    hx-post=(format!("{action_base}/unskip"))
-                    hx-target="body"
-                { "[S] Unskip" }
-            } @else {
-                button.btn.btn-skip
-                    hx-post=(format!("{action_base}/skip"))
-                    hx-target="body"
-                { "[S] Skip" }
-            }
-        }
+        (render_actions(&action_base, is_skipped))
 
         @if !txns.is_empty() {
             div.prior-section {
