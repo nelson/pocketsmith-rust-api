@@ -4,7 +4,7 @@ use pocketsmith_sync::db::transfer_pairs;
 use pocketsmith_sync::review::Status;
 use pocketsmith_sync::transfers;
 
-use crate::helpers::{get_filtered_pairs, pairs_eligible_for_bulk};
+use super::helpers::{get_filtered_pairs, pairs_eligible_for_bulk};
 use crate::state::{ActivityEntry, AppState, Decision};
 use crate::tab::next_after;
 

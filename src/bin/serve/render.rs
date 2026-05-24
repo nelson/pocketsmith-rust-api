@@ -8,7 +8,23 @@ use maud::{html, Markup, PreEscaped, DOCTYPE};
 use crate::css::CSS;
 use crate::js::JS;
 use crate::state::AppState;
-use crate::views::render_tab_bar;
+
+/// Top-of-page navigation between the two tabs. `active` is the slug
+/// (`"transfers"` or `"normalise"`) of the tab being rendered; that tab
+/// gets a non-clickable label while the other is a link.
+pub fn render_tab_bar(active: &str) -> Markup {
+    html! {
+        nav.tab-bar {
+            @for (slug, label, href) in [("transfers", "Transfers", "/transfers/"), ("normalise", "Normalise", "/normalise/")] {
+                @if slug == active {
+                    span.tab.active { (label) }
+                } @else {
+                    a.tab href=(href) { (label) }
+                }
+            }
+        }
+    }
+}
 
 /// The three Y/N/S action buttons that sit in the detail panel of either
 /// tab. `action_base` is the URL prefix used for the HTMX POSTs (e.g.
