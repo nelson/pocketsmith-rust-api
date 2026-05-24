@@ -4,7 +4,7 @@ use std::env;
 use anyhow::Result;
 
 use pocketsmith_sync::db;
-use pocketsmith_sync::normalise::{self, PayeeClass};
+use pocketsmith_sync::normalise::{self, format_payee, PayeeClass};
 
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -81,22 +81,6 @@ fn main() -> Result<()> {
     print_summary(&formatted, total_txns, dry_run);
 
     Ok(())
-}
-
-fn format_payee(result: &normalise::NormalisationResult) -> String {
-    match result.class() {
-        Some(PayeeClass::Merchant) => {
-            match (
-                &result.features.entity_name,
-                &result.features.location,
-            ) {
-                (Some(name), Some(loc)) => format!("{} {}", name, loc),
-                (Some(name), None) => name.clone(),
-                _ => result.normalised.clone(),
-            }
-        }
-        _ => result.normalised.clone(),
-    }
 }
 
 fn print_summary(
@@ -243,42 +227,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_payee_merchant_with_both() {
-        let mut result = normalise::NormalisationResult::new("WOOLWORTHS STRATHFIELD");
-        result.normalised = "WOOLWORTHS STRATHFIELD".into();
-        result.set_class(PayeeClass::Merchant);
-        result.features.entity_name = Some("Woolworths".into());
-        result.features.location = Some("Strathfield".into());
-        assert_eq!(format_payee(&result), "Woolworths Strathfield");
-    }
-
-    #[test]
-    fn test_format_payee_merchant_entity_only() {
-        let mut result = normalise::NormalisationResult::new("VODAFONE");
-        result.normalised = "VODAFONE".into();
-        result.set_class(PayeeClass::Merchant);
-        result.features.entity_name = Some("Vodafone Australia".into());
-        assert_eq!(format_payee(&result), "Vodafone Australia");
-    }
-
-    #[test]
-    fn test_format_payee_merchant_no_entity() {
-        let mut result = normalise::NormalisationResult::new("SOME MERCHANT");
-        result.normalised = "Some Merchant".into();
-        result.set_class(PayeeClass::Merchant);
-        assert_eq!(format_payee(&result), "Some Merchant");
-    }
-
-    #[test]
-    fn test_format_payee_person() {
-        let mut result = normalise::NormalisationResult::new("JOHN SMITH");
-        result.normalised = "John Smith".into();
-        result.set_class(PayeeClass::Person);
-        assert_eq!(format_payee(&result), "John Smith");
-    }
-
-    #[test]
-    fn test_format_payee_unclassified() {
+    fn test_format_payee_unclassified_via_lib() {
+        // Local sanity: the binary delegates to the library's format_payee.
         let result = normalise::NormalisationResult::new("UNKNOWN");
         assert_eq!(format_payee(&result), "UNKNOWN");
     }

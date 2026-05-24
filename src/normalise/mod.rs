@@ -6,6 +6,7 @@ mod locations;
 mod merchants;
 mod persons;
 mod prefix;
+pub mod scan;
 mod suffix;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +105,49 @@ impl NormalisationResult {
         }
         self.class = Some(class);
     }
+}
+
+/// Format a normalised result into the payee string that should be written
+/// to `transactions.payee`. Merchant rows combine entity_name + location
+/// when both are present; otherwise we fall back to the normalised string.
+/// Non-merchant classes always use the normalised string verbatim.
+pub fn format_payee(result: &NormalisationResult) -> String {
+    match result.class() {
+        Some(PayeeClass::Merchant) => match (&result.features.entity_name, &result.features.location) {
+            (Some(name), Some(loc)) => format!("{} {}", name, loc),
+            (Some(name), None) => name.clone(),
+            _ => result.normalised.clone(),
+        },
+        _ => result.normalised.clone(),
+    }
+}
+
+/// Stable string tag for a [`PayeeClass`], used in DB columns and URL filters.
+pub fn class_tag(class: Option<&PayeeClass>) -> Option<&'static str> {
+    match class {
+        Some(PayeeClass::Merchant) => Some("merchant"),
+        Some(PayeeClass::Person) => Some("person"),
+        Some(PayeeClass::Employer) => Some("employer"),
+        Some(PayeeClass::Other) => Some("other"),
+        None => None,
+    }
+}
+
+/// Serialise [`Features`] to a compact JSON string suitable for storage in
+/// `payee_normalisations.features_json`. Only set fields are included.
+pub fn features_to_json(f: &Features) -> String {
+    let mut map = serde_json::Map::new();
+    if let Some(v) = &f.entity_name { map.insert("entity_name".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.location { map.insert("location".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.operation { map.insert("operation".into(), serde_json::Value::String(v.display_name().into())); }
+    if let Some(v) = &f.reason { map.insert("reason".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.institution { map.insert("institution".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.gateway { map.insert("gateway".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.account { map.insert("account".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.date { map.insert("date".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &f.currency_code { map.insert("currency_code".into(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = f.amount_in_cents { map.insert("amount_in_cents".into(), serde_json::Value::Number(v.into())); }
+    serde_json::Value::Object(map).to_string()
 }
 
 /// Run the full normalisation pipeline on a raw payee string.
@@ -253,5 +297,80 @@ mod tests {
         let result = normalise("BPAY PAYMENT");
         assert_eq!(result.class(), Some(&PayeeClass::Other));
         assert_eq!(result.features.operation, Some(BankingOperation::BPay));
+    }
+
+    // --- format_payee (moved from bin/normalise.rs) ---
+
+    #[test]
+    fn test_format_payee_merchant_with_both() {
+        let mut result = NormalisationResult::new("WOOLWORTHS STRATHFIELD");
+        result.normalised = "WOOLWORTHS STRATHFIELD".into();
+        result.set_class(PayeeClass::Merchant);
+        result.features.entity_name = Some("Woolworths".into());
+        result.features.location = Some("Strathfield".into());
+        assert_eq!(format_payee(&result), "Woolworths Strathfield");
+    }
+
+    #[test]
+    fn test_format_payee_merchant_entity_only() {
+        let mut result = NormalisationResult::new("VODAFONE");
+        result.normalised = "VODAFONE".into();
+        result.set_class(PayeeClass::Merchant);
+        result.features.entity_name = Some("Vodafone Australia".into());
+        assert_eq!(format_payee(&result), "Vodafone Australia");
+    }
+
+    #[test]
+    fn test_format_payee_merchant_no_entity() {
+        let mut result = NormalisationResult::new("SOME MERCHANT");
+        result.normalised = "Some Merchant".into();
+        result.set_class(PayeeClass::Merchant);
+        assert_eq!(format_payee(&result), "Some Merchant");
+    }
+
+    #[test]
+    fn test_format_payee_person() {
+        let mut result = NormalisationResult::new("JOHN SMITH");
+        result.normalised = "John Smith".into();
+        result.set_class(PayeeClass::Person);
+        assert_eq!(format_payee(&result), "John Smith");
+    }
+
+    #[test]
+    fn test_format_payee_unclassified() {
+        let result = NormalisationResult::new("UNKNOWN");
+        assert_eq!(format_payee(&result), "UNKNOWN");
+    }
+
+    #[test]
+    fn test_class_tag() {
+        assert_eq!(class_tag(Some(&PayeeClass::Merchant)), Some("merchant"));
+        assert_eq!(class_tag(Some(&PayeeClass::Person)), Some("person"));
+        assert_eq!(class_tag(Some(&PayeeClass::Employer)), Some("employer"));
+        assert_eq!(class_tag(Some(&PayeeClass::Other)), Some("other"));
+        assert_eq!(class_tag(None), None);
+    }
+
+    #[test]
+    fn test_features_to_json_empty() {
+        let f = Features::default();
+        assert_eq!(features_to_json(&f), "{}");
+    }
+
+    #[test]
+    fn test_features_to_json_with_fields() {
+        let mut f = Features::default();
+        f.entity_name = Some("Woolworths".into());
+        f.location = Some("Strathfield".into());
+        f.operation = Some(BankingOperation::DirectDebit);
+        f.amount_in_cents = Some(1234);
+        let s = features_to_json(&f);
+        // Order isn't guaranteed across serde versions, so just check it parses
+        // and contains the expected keys.
+        let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(v["entity_name"], "Woolworths");
+        assert_eq!(v["location"], "Strathfield");
+        assert_eq!(v["operation"], "Direct Debit");
+        assert_eq!(v["amount_in_cents"], 1234);
     }
 }
