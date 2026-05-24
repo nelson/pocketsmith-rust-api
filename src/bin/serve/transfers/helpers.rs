@@ -136,13 +136,16 @@ pub fn derive_decision(
     }
 }
 
-/// Parse `/<prefix>/<a>-<b>[/...]` into `(a, b)`.
-pub fn parse_pair_id(path: &str, prefix: &str) -> Option<(i64, i64)> {
-    let rest = path.strip_prefix(prefix)?;
-    let id_part = rest.split('/').next()?;
-    let mut parts = id_part.split('-');
+/// Parse `"<a>-<b>"` into `(a, b)`. Used by the route table to turn
+/// the slug portion of a `/transfers/pair/<a>-<b>/<verb>` URL into a
+/// typed pair identifier.
+pub fn parse_pair_id(id_str: &str) -> Option<(i64, i64)> {
+    let mut parts = id_str.split('-');
     let a: i64 = parts.next()?.parse().ok()?;
     let b: i64 = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
     Some((a, b))
 }
 
@@ -203,30 +206,17 @@ mod tests {
 
     #[test]
     fn parse_pair_id_valid() {
-        assert_eq!(parse_pair_id("/pair/123-456", "/pair/"), Some((123, 456)));
-        assert_eq!(parse_pair_id("/pair/1-2", "/pair/"), Some((1, 2)));
-    }
-
-    #[test]
-    fn parse_pair_id_with_trailing_action() {
-        assert_eq!(parse_pair_id("/pair/123-456/confirm", "/pair/"), Some((123, 456)));
-        assert_eq!(parse_pair_id("/pair/123-456/reject", "/pair/"), Some((123, 456)));
-        assert_eq!(parse_pair_id("/pair/123-456/skip", "/pair/"), Some((123, 456)));
-        assert_eq!(parse_pair_id("/pair/123-456/undo", "/pair/"), Some((123, 456)));
-        assert_eq!(parse_pair_id("/pair/123-456/unskip", "/pair/"), Some((123, 456)));
-    }
-
-    #[test]
-    fn parse_pair_id_missing_prefix() {
-        assert_eq!(parse_pair_id("/other/123-456", "/pair/"), None);
+        assert_eq!(parse_pair_id("123-456"), Some((123, 456)));
+        assert_eq!(parse_pair_id("1-2"), Some((1, 2)));
     }
 
     #[test]
     fn parse_pair_id_malformed() {
-        assert_eq!(parse_pair_id("/pair/", "/pair/"), None);
-        assert_eq!(parse_pair_id("/pair/abc-def", "/pair/"), None);
-        assert_eq!(parse_pair_id("/pair/123", "/pair/"), None);
-        assert_eq!(parse_pair_id("/pair/123-", "/pair/"), None);
+        assert_eq!(parse_pair_id(""), None);
+        assert_eq!(parse_pair_id("abc-def"), None);
+        assert_eq!(parse_pair_id("123"), None);
+        assert_eq!(parse_pair_id("123-"), None);
+        assert_eq!(parse_pair_id("1-2-3"), None);
     }
 
     #[test]

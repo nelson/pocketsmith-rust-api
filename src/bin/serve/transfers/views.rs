@@ -35,7 +35,7 @@
 //
 //   render_detail_fragment  (GET /pair/{id})   → swaps #detail only
 //   render_queue_fragment   (GET /queue?...)   → swaps #queue only
-//   render_current_page     (after mutations)  → full <body> replacement
+//   render_page_shell      (initial GET + after mutations) → full <body>
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -365,13 +365,6 @@ pub fn render_activity(state: &AppState) -> Markup {
 }
 
 // Re-fetches pairs with current filters and renders a full page replacement.
-// Called by: handle_action, handle_undo, handle_clear_all_skipped, handle_unskip (after every mutation).
-// Calls: get_filtered_pairs, render_full_page.
-pub fn render_current_page(state: &AppState) -> Markup {
-    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
-    render_full_page(state, &pairs, &state.status_filter, &state.confidence_filter)
-}
-
 // Renders the initial full page on GET /. Locks state, selects first pair if none active.
 // Called by: main::handle_request (GET /).
 // Calls: get_filtered_pairs, render_full_page.
