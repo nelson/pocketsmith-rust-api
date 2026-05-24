@@ -200,7 +200,7 @@ pub fn handle_apply(state: &Arc<Mutex<AppState>>) -> Markup {
             return render_current_page(&state);
         }
     };
-    state.applied += stats.pairs_applied;
+    state.applied += stats.rows_drained;
 
     // After apply, confirmed pairs are deleted from transfer_pairs. Clear any
     // in-memory Confirm decisions for pair-ids that no longer exist so the

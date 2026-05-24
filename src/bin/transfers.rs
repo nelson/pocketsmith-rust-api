@@ -63,12 +63,12 @@ fn annotate_existing(_args: &[String]) -> Result<()> {
 fn apply(_args: &[String]) -> Result<()> {
     let conn = db::initialize("pocketsmith.db")?;
     let stats = transfers::apply_confirmed(&conn)?;
-    if stats.pairs_applied == 0 {
+    if stats.rows_drained == 0 {
         println!("No confirmed pairs to apply.");
     } else {
         println!(
             "Applied {} pairs ({} transactions updated).",
-            stats.pairs_applied, stats.transactions_updated
+            stats.rows_drained, stats.transactions_updated
         );
     }
     print_status_summary(&conn)?;

@@ -7,16 +7,7 @@ use anyhow::Result;
 use rusqlite::{params, Connection};
 
 use crate::db::payee_normalisations as pn;
-use crate::transfers::Status;
-
-/// Counts returned from an apply run.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct ApplyStats {
-    /// Number of `transactions` rows whose `payee` was updated.
-    pub transactions_updated: usize,
-    /// Number of confirmed `payee_normalisations` rows drained.
-    pub staging_rows_drained: usize,
-}
+use crate::review::{ApplyStats, Status};
 
 /// Write confirmed proposals into `transactions.payee`, then delete the
 /// confirmed staging rows. Runs inside a single
@@ -42,7 +33,7 @@ pub fn apply_confirmed(conn: &Connection) -> Result<ApplyStats> {
             )?;
             stats.transactions_updated += n;
         }
-        stats.staging_rows_drained = pn::delete_confirmed(conn)?;
+        stats.rows_drained = pn::delete_confirmed(conn)?;
         Ok(())
     })?;
 
@@ -117,7 +108,7 @@ mod tests {
 
         let stats = apply_confirmed(&conn).unwrap();
         assert_eq!(stats.transactions_updated, 3);
-        assert_eq!(stats.staging_rows_drained, 1);
+        assert_eq!(stats.rows_drained, 1);
 
         // All three transactions now carry the proposed payee.
         for id in 1..=3 {
@@ -138,7 +129,7 @@ mod tests {
 
         let stats = apply_confirmed(&conn).unwrap();
         assert_eq!(stats.transactions_updated, 0);
-        assert_eq!(stats.staging_rows_drained, 0);
+        assert_eq!(stats.rows_drained, 0);
 
         // Transaction unchanged.
         assert_eq!(current_payee(&conn, 1).as_deref(), Some("COLES 0042"));

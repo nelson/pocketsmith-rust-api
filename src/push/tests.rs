@@ -704,7 +704,7 @@ fn end_to_end_pair_lifecycle_via_stub() {
     // --- Step 4: apply. Local UPDATEs set is_transfer=1 + category_id=99
     // and delete the confirmed pair row.
     let apply_stats = transfers::apply_confirmed(&conn).unwrap();
-    assert_eq!(apply_stats.pairs_applied, 1);
+    assert_eq!(apply_stats.rows_drained, 1);
     assert_eq!(apply_stats.transactions_updated, 2);
 
     // --- Step 5: push picks both txns up.

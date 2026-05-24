@@ -78,6 +78,6 @@ fn run_apply(conn: &rusqlite::Connection) -> Result<()> {
     let stats = apply::apply_confirmed(conn)?;
     println!("=== Normalise apply ===");
     println!("  transactions updated: {}", stats.transactions_updated);
-    println!("  staging rows drained: {}", stats.staging_rows_drained);
+    println!("  staging rows drained: {}", stats.rows_drained);
     Ok(())
 }
