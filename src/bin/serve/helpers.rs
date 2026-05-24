@@ -85,16 +85,6 @@ pub fn get_prior_pairs(
         .unwrap_or_default()
 }
 
-pub fn find_pair_index(pairs: &[TransferPairRow], id: (i64, i64)) -> Option<usize> {
-    pairs.iter().position(|p| (p.txn_id_a, p.txn_id_b) == id)
-}
-
-pub fn next_pair_after(pairs: &[TransferPairRow], current: (i64, i64)) -> Option<(i64, i64)> {
-    let idx = find_pair_index(pairs, current)?;
-    let next_idx = if idx + 1 < pairs.len() { idx + 1 } else { idx };
-    Some((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b))
-}
-
 pub fn get_filtered_pairs(conn: &rusqlite::Connection, status_filter: &str, confidence_filter: &str, decisions: &HashMap<(i64, i64), Decision>) -> Vec<TransferPairRow> {
     let pairs = match status_filter {
         "all" | "skipped" => transfer_pairs::get_all_pairs(conn, 2000).unwrap_or_default(),
@@ -128,10 +118,6 @@ pub fn extract_param(query: &str, key: &str) -> Option<String> {
             let v = parts.next()?;
             if k == key { Some(v.to_string()) } else { None }
         })
-}
-
-pub fn count_decisions(decisions: &HashMap<(i64, i64), Decision>, d: Decision) -> usize {
-    decisions.values().filter(|v| **v == d).count()
 }
 
 /// Count of rows in `transfer_pairs` with status = Confirmed. This is the
@@ -242,65 +228,16 @@ mod tests {
         ]
     }
 
-    #[test]
-    fn find_pair_index_returns_correct_position() {
-        let pairs = sample_pairs();
-        assert_eq!(find_pair_index(&pairs, (1, 2)), Some(0));
-        assert_eq!(find_pair_index(&pairs, (5, 6)), Some(2));
-        assert_eq!(find_pair_index(&pairs, (9, 10)), Some(4));
-    }
-
-    #[test]
-    fn find_pair_index_returns_none_for_missing() {
-        let pairs = sample_pairs();
-        assert_eq!(find_pair_index(&pairs, (99, 100)), None);
-    }
-
-    #[test]
-    fn next_pair_after_returns_next_in_list() {
-        let pairs = sample_pairs();
-        assert_eq!(next_pair_after(&pairs, (1, 2)), Some((3, 4)));
-        assert_eq!(next_pair_after(&pairs, (3, 4)), Some((5, 6)));
-        assert_eq!(next_pair_after(&pairs, (7, 8)), Some((9, 10)));
-    }
-
-    #[test]
-    fn next_pair_after_last_stays_on_last() {
-        let pairs = sample_pairs();
-        assert_eq!(next_pair_after(&pairs, (9, 10)), Some((9, 10)));
-    }
-
-    #[test]
-    fn next_pair_after_missing_returns_none() {
-        let pairs = sample_pairs();
-        assert_eq!(next_pair_after(&pairs, (99, 100)), None);
-    }
-
-    #[test]
-    fn next_pair_after_single_item_stays() {
-        let pairs = vec![make_pair(1, 2, Status::Pending, Confidence::High)];
-        assert_eq!(next_pair_after(&pairs, (1, 2)), Some((1, 2)));
-    }
-
-    #[test]
-    fn next_pair_after_empty_list_returns_none() {
-        let pairs: Vec<TransferPairRow> = vec![];
-        assert_eq!(next_pair_after(&pairs, (1, 2)), None);
-    }
-
-    #[test]
-    fn action_advances_to_next_not_first() {
-        let pairs = sample_pairs();
-        let current = (5, 6);
-        let next = next_pair_after(&pairs, current);
-        assert_eq!(next, Some((7, 8)));
-    }
+    // --- find_pair_index / next_pair_after / count_decisions moved to
+    // crate::tab::{next_after, count_decisions} with their own tests; we
+    // keep the higher-level filter-change UX assertions below because they
+    // describe behaviour rather than the helper API.
 
     #[test]
     fn filter_change_keeps_active_if_present() {
         let pairs = sample_pairs();
         let active = Some((5, 6));
-        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
+        let in_list = pairs.iter().any(|p| Some((p.txn_id_a, p.txn_id_b)) == active);
         assert!(in_list);
     }
 
@@ -308,7 +245,7 @@ mod tests {
     fn filter_change_resets_to_first_if_active_absent() {
         let pairs = sample_pairs();
         let active = Some((99, 100));
-        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
+        let in_list = pairs.iter().any(|p| Some((p.txn_id_a, p.txn_id_b)) == active);
         assert!(!in_list);
         let new_active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
         assert_eq!(new_active, Some((1, 2)));
@@ -317,92 +254,8 @@ mod tests {
     #[test]
     fn filter_change_empty_list_gives_none() {
         let pairs: Vec<TransferPairRow> = vec![];
-        let active = Some((1, 2));
-        let in_list = active.and_then(|id| find_pair_index(&pairs, id)).is_some();
-        assert!(!in_list);
         let new_active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
         assert_eq!(new_active, None);
-    }
-
-    #[test]
-    fn arrow_down_from_first_selects_second() {
-        let pairs = sample_pairs();
-        let current_idx = 0;
-        let next_idx = (current_idx + 1).min(pairs.len() - 1);
-        assert_eq!(next_idx, 1);
-        assert_eq!((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b), (3, 4));
-    }
-
-    #[test]
-    fn arrow_up_from_first_stays_at_first() {
-        let current_idx: usize = 0;
-        let next_idx = current_idx.saturating_sub(1);
-        assert_eq!(next_idx, 0);
-    }
-
-    #[test]
-    fn arrow_down_from_last_stays_at_last() {
-        let pairs = sample_pairs();
-        let current_idx = pairs.len() - 1;
-        let next_idx = (current_idx + 1).min(pairs.len() - 1);
-        assert_eq!(next_idx, 4);
-        assert_eq!((pairs[next_idx].txn_id_a, pairs[next_idx].txn_id_b), (9, 10));
-    }
-
-    #[test]
-    fn click_sets_active_to_clicked_pair() {
-        let pairs = sample_pairs();
-        let clicked = (7, 8);
-        assert!(find_pair_index(&pairs, clicked).is_some());
-    }
-
-    #[test]
-    fn action_on_last_item_stays_on_last() {
-        let pairs = sample_pairs();
-        let current = (9, 10);
-        let next = next_pair_after(&pairs, current);
-        assert_eq!(next, Some((9, 10)));
-        // After item removed from new list, fall back to new last
-        let new_pairs = &pairs[..4];
-        let in_new = find_pair_index(new_pairs, next.unwrap()).is_some();
-        assert!(!in_new);
-        let fallback = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));
-        assert_eq!(fallback, Some((7, 8)));
-    }
-
-    #[test]
-    fn action_does_not_overflow_past_end() {
-        let pairs = vec![
-            make_pair(1, 2, Status::Pending, Confidence::High),
-            make_pair(3, 4, Status::Pending, Confidence::High),
-            make_pair(5, 6, Status::Pending, Confidence::High),
-        ];
-        let next = next_pair_after(&pairs, (5, 6));
-        assert_eq!(next, Some((5, 6)));
-    }
-
-    #[test]
-    fn action_does_not_loop_back() {
-        let pairs = sample_pairs();
-        let next = next_pair_after(&pairs, (9, 10));
-        assert_eq!(next, Some((9, 10)));
-        assert_ne!(next, Some((1, 2)));
-    }
-
-    #[test]
-    fn navigation_order_matches_sidebar_display_order() {
-        let pairs = sample_pairs();
-        let order: Vec<(i64, i64)> = pairs.iter().map(|p| (p.txn_id_a, p.txn_id_b)).collect();
-        assert_eq!(order, vec![(1, 2), (3, 4), (5, 6), (7, 8), (9, 10)]);
-
-        let mut current = order[0];
-        for expected in &order[1..] {
-            let next = next_pair_after(&pairs, current).unwrap();
-            assert_eq!(next, *expected);
-            current = next;
-        }
-        let next = next_pair_after(&pairs, current).unwrap();
-        assert_eq!(next, *order.last().unwrap());
     }
 
     // --- format_dollars tests ---
@@ -738,26 +591,7 @@ mod tests {
         assert_eq!(derive_decision(&pair, &decisions), None);
     }
 
-    // --- count_decisions tests ---
-
-    #[test]
-    fn count_decisions_variants() {
-        let mut decisions = HashMap::new();
-        decisions.insert((1, 2), Decision::Confirm);
-        decisions.insert((3, 4), Decision::Confirm);
-        decisions.insert((5, 6), Decision::Reject);
-        decisions.insert((7, 8), Decision::Skip);
-
-        assert_eq!(count_decisions(&decisions, Decision::Confirm), 2);
-        assert_eq!(count_decisions(&decisions, Decision::Reject), 1);
-        assert_eq!(count_decisions(&decisions, Decision::Skip), 1);
-    }
-
-    #[test]
-    fn count_decisions_empty() {
-        let decisions = HashMap::new();
-        assert_eq!(count_decisions(&decisions, Decision::Confirm), 0);
-    }
+    // count_decisions moved to crate::tab; tests there cover the generic.
 
     // --- Decision css_class tests ---
 

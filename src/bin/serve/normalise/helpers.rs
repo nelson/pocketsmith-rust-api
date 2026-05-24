@@ -189,25 +189,9 @@ pub fn get_filtered_normalisations(
         .collect()
 }
 
-/// Find the slug that follows `current` in the filtered list. Mirrors
-/// `next_pair_after` for the transfers tab. Stays on the last element if
-/// `current` is the tail.
-pub fn next_slug_after(rows: &[PayeeNormalisationRow], current: &str) -> Option<String> {
-    let idx = rows.iter().position(|r| r.slug == current)?;
-    let next_idx = (idx + 1).min(rows.len().saturating_sub(1));
-    rows.get(next_idx).map(|r| r.slug.clone())
-}
-
-/// Count session decisions of a particular kind on the normalise tab.
-pub fn count_norm_decisions(decisions: &HashMap<String, Decision>, d: Decision) -> usize {
-    decisions.values().filter(|v| **v == d).count()
-}
-
-/// True iff the session has any active Skip decision — used by the
-/// "Clear skipped" affordance in the queue header.
-pub fn any_skipped(decisions: &HashMap<String, Decision>) -> usize {
-    count_norm_decisions(decisions, Decision::Skip)
-}
+// next_slug_after / count_norm_decisions / any_skipped moved to
+// crate::tab::{next_after, count_decisions} (generic). Callers in
+// this crate import directly from crate::tab.
 
 #[cfg(test)]
 mod tests {
@@ -314,23 +298,5 @@ mod tests {
         assert_eq!(skipped_view[0].original_payee, "W");
     }
 
-    #[test]
-    fn next_slug_after_returns_following_row_or_stays_on_tail() {
-        let conn = initialize_in_memory().unwrap();
-        upsert(&conn, "A", Some("merchant"), Status::Pending, 10);
-        upsert(&conn, "B", Some("merchant"), Status::Pending, 5);
-        upsert(&conn, "C", Some("merchant"), Status::Pending, 1);
-        let decisions: HashMap<String, Decision> = HashMap::new();
-        let rows = get_filtered_normalisations(&conn, NormStatusFilter::All, NormClassFilter::All, &decisions);
-        // ordered by txn_count DESC -> A, B, C.
-        let a_slug = pn::slug_for("A");
-        let b_slug = pn::slug_for("B");
-        let c_slug = pn::slug_for("C");
-        assert_eq!(next_slug_after(&rows, &a_slug), Some(b_slug.clone()));
-        assert_eq!(next_slug_after(&rows, &b_slug), Some(c_slug.clone()));
-        // Tail stays on tail (matches transfer next_pair_after semantics).
-        assert_eq!(next_slug_after(&rows, &c_slug), Some(c_slug));
-        // Unknown slug returns None.
-        assert_eq!(next_slug_after(&rows, "deadbeefdeadbeef"), None);
-    }
+    // next_after generic tests live in crate::tab; nothing to retest here.
 }
