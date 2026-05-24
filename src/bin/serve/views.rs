@@ -47,11 +47,12 @@ use pocketsmith_sync::transfers::{self, Status};
 
 use crate::css::CSS;
 use crate::helpers::{
-    confidence_class, confidence_reason, count_confirmed_in_db, count_decisions, derive_decision,
-    find_pair_index, format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
+    confidence_class, confidence_reason, count_confirmed_in_db, derive_decision,
+    format_dollars, format_short_date, get_filtered_pairs, get_prior_pairs,
 };
 use crate::js::JS;
 use crate::state::{AppState, Decision};
+use crate::tab::count_decisions;
 
 // Renders the complete HTML page including <head>, queue sidebar, detail panel, activity bar, and <script>.
 // Called by: render_current_page, render_page_shell.
@@ -75,10 +76,10 @@ pub fn render_tab_bar(active: &str) -> Markup {
 
 pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
     let selected = state.active_pair
-        .and_then(|id| find_pair_index(pairs, id).map(|_| id))
+        .and_then(|id| pairs.iter().find(|p| (p.txn_id_a, p.txn_id_b) == id).map(|_| id))
         .or_else(|| pairs.first().map(|p| (p.txn_id_a, p.txn_id_b)));
 
-    let active = selected.and_then(|id| find_pair_index(pairs, id)).map(|i| &pairs[i]);
+    let active = selected.and_then(|id| pairs.iter().find(|p| (p.txn_id_a, p.txn_id_b) == id));
     let prior = active
         .map(|p| get_prior_pairs(&state.conn, &p.account_name_a, &p.account_name_b))
         .unwrap_or_default();
@@ -461,7 +462,7 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, 
     state.confidence_filter = confidence_filter.to_string();
     let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.decisions);
     let current = state.active_pair;
-    let in_new_list = current.and_then(|id| find_pair_index(&pairs, id)).is_some();
+    let in_new_list = current.and_then(|id| pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == id).then_some(())).is_some();
     if !in_new_list {
         state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
     }

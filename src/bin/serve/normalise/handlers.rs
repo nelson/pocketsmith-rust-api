@@ -14,8 +14,9 @@ use pocketsmith_sync::transfers::Status;
 use crate::state::{AppState, Decision, NormActivityEntry};
 
 use super::helpers::{
-    get_filtered_normalisations, next_slug_after, NormClassFilter, NormStatusFilter,
+    get_filtered_normalisations, NormClassFilter, NormStatusFilter,
 };
+use crate::tab::next_after;
 
 /// Look up the [`pn::PayeeNormalisationRow`] for a slug. Returns None if no
 /// row is staged under that slug (e.g. the user is replaying a stale URL).
@@ -43,7 +44,7 @@ pub fn act(state: &Arc<Mutex<AppState>>, slug: &str, decision: Decision) {
 
     // Compute the next slug *before* mutating, against the current view.
     let current_view = refilter(&st);
-    let next = next_slug_after(&current_view, slug);
+    let next = next_after(&current_view, |r| r.slug == slug).map(|r| r.slug.clone());
 
     match decision {
         Decision::Confirm => {

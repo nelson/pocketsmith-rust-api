@@ -6,9 +6,10 @@ use pocketsmith_sync::db::transfer_pairs;
 use pocketsmith_sync::transfers::{self, Status};
 
 use crate::helpers::{
-    find_pair_index, get_filtered_pairs, next_pair_after, pairs_eligible_for_bulk, parse_pair_id,
+    get_filtered_pairs, pairs_eligible_for_bulk, parse_pair_id,
 };
 use crate::state::{ActivityEntry, AppState, Decision};
+use crate::tab::next_after;
 use crate::views::render_current_page;
 
 // Handles confirm/reject/skip actions on a pair. Parses pair ID from path, updates DB status
@@ -29,7 +30,8 @@ pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> 
         };
 
         let current_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
-        let next = next_pair_after(&current_pairs, (a, b));
+        let next = next_after(&current_pairs, |p| (p.txn_id_a, p.txn_id_b) == (a, b))
+            .map(|p| (p.txn_id_a, p.txn_id_b));
 
         let pair_info = transfer_pairs::get_pair_by_id(&state.conn, a, b)
             .ok()
@@ -62,7 +64,7 @@ pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> 
 
         let new_pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
         if let Some(next_id) = next {
-            if find_pair_index(&new_pairs, next_id).is_some() {
+            if new_pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == next_id) {
                 state.active_pair = Some(next_id);
             } else {
                 state.active_pair = new_pairs.last().map(|p| (p.txn_id_a, p.txn_id_b));

@@ -17,9 +17,10 @@ use crate::state::{AppState, Decision};
 use crate::views::render_tab_bar;
 
 use super::helpers::{
-    any_skipped, count_norm_decisions, get_filtered_normalisations, matching_transactions,
-    MatchingTxn, NormClassFilter, NormStatusFilter,
+    get_filtered_normalisations, matching_transactions, MatchingTxn, NormClassFilter,
+    NormStatusFilter,
 };
+use crate::tab::count_decisions;
 
 /// Top-level page render: locks state, computes the filtered queue, picks
 /// an active row if needed, and delegates to [`render_full_page`].
@@ -134,7 +135,7 @@ fn render_queue(
                         hx-swap="innerHTML"
                     { (f.as_str().to_uppercase()) }
                 }
-                @let n_skipped = any_skipped(decisions);
+                @let n_skipped = count_decisions(decisions, Decision::Skip);
                 @if n_skipped > 0 && status == NormStatusFilter::Skipped {
                     button.filter-btn.clear-skipped-btn
                         hx-post="/normalise/clear-all-skipped"
@@ -396,9 +397,9 @@ fn render_activity(state: &AppState) -> Markup {
     let confirmed_in_db = count_confirmed_in_db(&state.conn);
     html! {
         div.activity-header {
-            span.stat { "Confirmed " span.count-confirmed { (count_norm_decisions(&state.norm_decisions, Decision::Confirm)) } }
-            span.stat { "Rejected " span.count-rejected { (count_norm_decisions(&state.norm_decisions, Decision::Reject)) } }
-            span.stat { "Skipped " span.count-skipped { (count_norm_decisions(&state.norm_decisions, Decision::Skip)) } }
+            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.norm_decisions, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.norm_decisions, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.norm_decisions, Decision::Skip)) } }
             span.stat { "Undone " span.count-undone { (state.norm_undone) } }
             span.stat { "Applied " span.count-applied { (state.norm_applied) } }
             button.apply-btn

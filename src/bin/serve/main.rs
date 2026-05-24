@@ -4,6 +4,7 @@ mod helpers;
 mod js;
 mod normalise;
 mod state;
+mod tab;
 mod views;
 
 use std::sync::{Arc, Mutex};
