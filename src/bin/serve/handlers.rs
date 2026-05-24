@@ -17,7 +17,7 @@ use crate::views::render_current_page;
 // Calls: parse_pair_id, get_filtered_pairs, next_pair_after, find_pair_index,
 //        transfer_pairs::get_pair_by_id, transfer_pairs::update_status, render_current_page.
 pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> Markup {
-    let id = parse_pair_id(path, "/pair/");
+    let id = parse_pair_id(path, "/transfers/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
 
@@ -82,7 +82,7 @@ pub fn handle_action(state: &Arc<Mutex<AppState>>, path: &str, action: &str) -> 
 // Called by: main::handle_request (POST /pair/{id}/undo).
 // Calls: parse_pair_id, transfer_pairs::update_status, render_current_page.
 pub fn handle_undo(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
-    let id = parse_pair_id(path, "/pair/");
+    let id = parse_pair_id(path, "/transfers/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
         let _ = transfer_pairs::update_status(&state.conn, a, b, Status::Pending);
@@ -167,7 +167,7 @@ pub fn handle_bulk_action(state: &Arc<Mutex<AppState>>, action: &str) -> Markup 
 // Called by: main::handle_request (POST /pair/{id}/unskip).
 // Calls: parse_pair_id, render_current_page.
 pub fn handle_unskip(state: &Arc<Mutex<AppState>>, path: &str) -> Markup {
-    let id = parse_pair_id(path, "/pair/");
+    let id = parse_pair_id(path, "/transfers/pair/");
     if let Some((a, b)) = id {
         let mut state = state.lock().unwrap();
         state.decisions.remove(&(a, b));

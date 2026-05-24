@@ -61,33 +61,42 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let path = request.url().to_string();
     let method = request.method().clone();
 
+    // `/` redirects to the transfers tab. Each tab is its own page tree.
+    if method == Method::Get && (path == "/" || path.is_empty()) {
+        let resp = Response::from_data(Vec::new())
+            .with_status_code(302)
+            .with_header(Header::from_bytes("Location", "/transfers/").unwrap());
+        let _ = request.respond(resp);
+        return;
+    }
+
     let response = match (method, path.as_str()) {
-        (Method::Get, "/") => render_page_shell(&state),
-        (Method::Get, p) if p.starts_with("/pair/") => {
-            let id = parse_pair_id(p, "/pair/");
+        (Method::Get, "/transfers" | "/transfers/") => render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/transfers/pair/") => {
+            let id = parse_pair_id(p, "/transfers/pair/");
             id.map(|(a, b)| render_detail_fragment(&state, a, b))
                 .unwrap_or_else(|| html! { p { "Invalid pair ID" } })
         }
-        (Method::Get, p) if p.starts_with("/queue?") => {
-            let params = p.strip_prefix("/queue?").unwrap_or("");
+        (Method::Get, p) if p.starts_with("/transfers/queue?") => {
+            let params = p.strip_prefix("/transfers/queue?").unwrap_or("");
             let filter = extract_param(params, "filter").unwrap_or("pending".to_string());
             let conf = extract_param(params, "conf").unwrap_or("all".to_string());
             render_queue_fragment(&state, &filter, &conf)
         }
-        (Method::Get, "/queue") => render_queue_fragment(&state, "all", "all"),
-        (Method::Get, p) if p.starts_with("/bulk-prompt?") => {
-            let params = p.strip_prefix("/bulk-prompt?").unwrap_or("");
+        (Method::Get, "/transfers/queue") => render_queue_fragment(&state, "all", "all"),
+        (Method::Get, p) if p.starts_with("/transfers/bulk-prompt?") => {
+            let params = p.strip_prefix("/transfers/bulk-prompt?").unwrap_or("");
             let action = extract_param(params, "action").unwrap_or("confirm".to_string());
             render_bulk_prompt_fragment(&state, &action)
         }
-        (Method::Get, "/bulk-buttons") => render_bulk_buttons_fragment(&state),
+        (Method::Get, "/transfers/bulk-buttons") => render_bulk_buttons_fragment(&state),
         (Method::Post, p) if p.contains("/confirm") => handle_action(&state, p, "confirm"),
         (Method::Post, p) if p.contains("/reject") => handle_action(&state, p, "reject"),
         (Method::Post, p) if p.contains("/skip") => handle_action(&state, p, "skip"),
-        (Method::Post, "/bulk-confirm") => handle_bulk_action(&state, "confirm"),
-        (Method::Post, "/bulk-reject") => handle_bulk_action(&state, "reject"),
-        (Method::Post, "/apply") => handle_apply(&state),
-        (Method::Post, "/clear-all-skipped") => handle_clear_all_skipped(&state),
+        (Method::Post, "/transfers/bulk-confirm") => handle_bulk_action(&state, "confirm"),
+        (Method::Post, "/transfers/bulk-reject") => handle_bulk_action(&state, "reject"),
+        (Method::Post, "/transfers/apply") => handle_apply(&state),
+        (Method::Post, "/transfers/clear-all-skipped") => handle_clear_all_skipped(&state),
         (Method::Post, p) if p.contains("/unskip") => handle_unskip(&state, p),
         (Method::Post, p) if p.contains("/undo") => handle_undo(&state, p),
         _ => html! { p { "Not found" } },

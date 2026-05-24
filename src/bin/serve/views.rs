@@ -56,6 +56,23 @@ use crate::state::{AppState, Decision};
 // Renders the complete HTML page including <head>, queue sidebar, detail panel, activity bar, and <script>.
 // Called by: render_current_page, render_page_shell.
 // Calls: render_queue, render_detail, render_activity, find_pair_index, get_prior_pairs.
+// Shared tab bar at the top of every page. `active` is the slug of the
+// current tab ("transfers" or "normalise"). The active tab is rendered
+// without a link.
+pub fn render_tab_bar(active: &str) -> Markup {
+    html! {
+        nav.tab-bar {
+            @for (slug, label, href) in [("transfers", "Transfers", "/transfers/"), ("normalise", "Normalise", "/normalise/")] {
+                @if slug == active {
+                    span.tab.active { (label) }
+                } @else {
+                    a.tab href=(href) { (label) }
+                }
+            }
+        }
+    }
+}
+
 pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
     let selected = state.active_pair
         .and_then(|id| find_pair_index(pairs, id).map(|_| id))
@@ -77,6 +94,7 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
                 style { (PreEscaped(CSS)) }
             }
             body {
+                (render_tab_bar("transfers"))
                 div.layout {
                     div.queue-panel #queue {
                         (render_queue(pairs, selected, status_filter, confidence_filter, &state.decisions))
@@ -110,13 +128,13 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
 pub fn render_bulk_actions(visible_count: usize) -> Markup {
     html! {
         button.bulk-btn.bulk-confirm-btn
-            hx-get="/bulk-prompt?action=confirm"
+            hx-get="/transfers/bulk-prompt?action=confirm"
             hx-target="#bulk-actions"
             hx-swap="innerHTML"
             disabled[visible_count == 0]
         { "Confirm all (" (visible_count) ")" }
         button.bulk-btn.bulk-reject-btn
-            hx-get="/bulk-prompt?action=reject"
+            hx-get="/transfers/bulk-prompt?action=reject"
             hx-target="#bulk-actions"
             hx-swap="innerHTML"
             disabled[visible_count == 0]
@@ -133,7 +151,7 @@ pub fn render_bulk_actions(visible_count: usize) -> Markup {
 pub fn render_bulk_prompt(action: &str, visible_count: usize) -> Markup {
     let verb = match action { "reject" => "reject", _ => "confirm" };
     let yes_label = format!("Yes, {verb} {visible_count}");
-    let post_url = format!("/bulk-{verb}");
+    let post_url = format!("/transfers/bulk-{verb}");
     let yes_class = if verb == "reject" { "bulk-yes bulk-reject-btn" } else { "bulk-yes bulk-confirm-btn" };
     html! {
         span.bulk-prompt-text { "Apply to " (visible_count) " visible pair" @if visible_count != 1 { "s" } "?" }
@@ -142,7 +160,7 @@ pub fn render_bulk_prompt(action: &str, visible_count: usize) -> Markup {
             hx-target="body"
         { (yes_label) }
         button.bulk-btn.bulk-cancel-btn
-            hx-get="/bulk-buttons"
+            hx-get="/transfers/bulk-buttons"
             hx-target="#bulk-actions"
             hx-swap="innerHTML"
         { "Cancel" }
@@ -160,7 +178,7 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                 @for f in &["all", "pending", "confirmed", "rejected", "skipped"] {
                     button.filter-btn
                         .(if *f == status_filter { "active" } else { "" })
-                        hx-get=(format!("/queue?filter={f}&conf={confidence_filter}"))
+                        hx-get=(format!("/transfers/queue?filter={f}&conf={confidence_filter}"))
                         hx-target="#queue"
                         hx-swap="innerHTML"
                     { (f.to_uppercase()) }
@@ -170,7 +188,7 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                 @for f in &["all", "high", "medium", "low"] {
                     button.filter-btn.conf-filter
                         .(if *f == confidence_filter { "active" } else { "" })
-                        hx-get=(format!("/queue?filter={status_filter}&conf={f}"))
+                        hx-get=(format!("/transfers/queue?filter={status_filter}&conf={f}"))
                         hx-target="#queue"
                         hx-swap="innerHTML"
                     { (f.to_uppercase()) }
@@ -178,7 +196,7 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                 @let num_skipped = decisions.values().filter(|v| **v == Decision::Skip).count();
                 @if num_skipped > 0 && status_filter == "skipped" {
                     button.filter-btn.clear-skipped-btn
-                        hx-post="/clear-all-skipped"
+                        hx-post="/transfers/clear-all-skipped"
                         hx-target="body"
                     { "CLEAR SKIPPED (" (num_skipped) ")" }
                 }
@@ -197,28 +215,28 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                     .(if is_selected { "selected" } else { "" })
                     .(confidence_class(&pair.confidence))
                     .(decision.map(|d| d.css_class()).unwrap_or(""))
-                    hx-get=(format!("/pair/{pair_id}"))
+                    hx-get=(format!("/transfers/pair/{pair_id}"))
                     hx-target="#detail"
                     hx-swap="innerHTML"
                     data-pair-id=(pair_id)
                 {
                     @if let Some(Decision::Skip) = decision {
                         span.status-indicator.skip-indicator
-                            hx-post=(format!("/pair/{pair_id}/unskip"))
+                            hx-post=(format!("/transfers/pair/{pair_id}/unskip"))
                             hx-target="body"
                             title="Click to unskip"
                             onclick="event.stopPropagation()"
                         { "\u{2298}" }
                     } @else if let Some(Decision::Confirm) = decision {
                         span.status-indicator.confirm-indicator
-                            hx-post=(format!("/pair/{pair_id}/undo"))
+                            hx-post=(format!("/transfers/pair/{pair_id}/undo"))
                             hx-target="body"
                             title="Click to undo"
                             onclick="event.stopPropagation()"
                         { "\u{2713}" }
                     } @else if let Some(Decision::Reject) = decision {
                         span.status-indicator.reject-indicator
-                            hx-post=(format!("/pair/{pair_id}/undo"))
+                            hx-post=(format!("/transfers/pair/{pair_id}/undo"))
                             hx-target="body"
                             title="Click to undo"
                             onclick="event.stopPropagation()"
@@ -325,15 +343,15 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
         }
         div.actions data-pair-id=(pair_id) {
             button.btn.btn-confirm
-                hx-post=(format!("/pair/{pair_id}/confirm"))
+                hx-post=(format!("/transfers/pair/{pair_id}/confirm"))
                 hx-target="body"
             { "[Y] Confirm" }
             button.btn.btn-reject
-                hx-post=(format!("/pair/{pair_id}/reject"))
+                hx-post=(format!("/transfers/pair/{pair_id}/reject"))
                 hx-target="body"
             { "[N] Reject" }
             button.btn.btn-skip
-                hx-post=(format!("/pair/{pair_id}/skip"))
+                hx-post=(format!("/transfers/pair/{pair_id}/skip"))
                 hx-target="body"
             { "[S] Skip" }
         }
@@ -354,7 +372,7 @@ pub fn render_activity(state: &AppState) -> Markup {
             span.stat { "Applied " span.count-applied { (state.applied) } }
             @let confirmed_in_db = count_confirmed_in_db(&state.conn);
             button.apply-btn
-                hx-post="/apply"
+                hx-post="/transfers/apply"
                 hx-target="body"
                 disabled[confirmed_in_db == 0]
                 title=(if confirmed_in_db == 0 { "No confirmed pairs to apply" } else { "Tag both transactions of every confirmed pair as _Transfer and remove the pair row" })
@@ -380,12 +398,12 @@ pub fn render_activity(state: &AppState) -> Markup {
                     span { (&entry.account_a) " \u{2192} " (&entry.account_b) }
                     @if entry.decision == Decision::Skip {
                         button.undo-btn
-                            hx-post=(format!("/pair/{pair_id}/unskip"))
+                            hx-post=(format!("/transfers/pair/{pair_id}/unskip"))
                             hx-target="body"
                         { "unskip" }
                     } @else {
                         button.undo-btn
-                            hx-post=(format!("/pair/{pair_id}/undo"))
+                            hx-post=(format!("/transfers/pair/{pair_id}/undo"))
                             hx-target="body"
                         { "undo" }
                     }
