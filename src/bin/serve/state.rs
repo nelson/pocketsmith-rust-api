@@ -65,7 +65,7 @@ impl AppState {
             active_pair: None,
             norm_skipped: HashMap::new(),
             norm_applied: 0,
-            norm_status_filter: "pending".to_string(),
+            norm_status_filter: "all".to_string(),
             norm_class_filter: "all".to_string(),
             norm_active_slug: None,
         }

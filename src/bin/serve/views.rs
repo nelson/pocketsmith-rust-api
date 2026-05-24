@@ -219,6 +219,8 @@ pub fn render_queue(pairs: &[TransferPairRow], selected: Option<(i64, i64)>, sta
                     hx-target="#detail"
                     hx-swap="innerHTML"
                     data-pair-id=(pair_id)
+                    data-detail-url=(format!("/transfers/pair/{pair_id}"))
+                    data-detail-target="#detail"
                 {
                     @if let Some(Decision::Skip) = decision {
                         span.status-indicator.skip-indicator
@@ -341,7 +343,7 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
                 }
             }
         }
-        div.actions data-pair-id=(pair_id) {
+        div.actions data-pair-id=(pair_id) data-action-base=(format!("/transfers/pair/{pair_id}")) {
             button.btn.btn-confirm
                 hx-post=(format!("/transfers/pair/{pair_id}/confirm"))
                 hx-target="body"

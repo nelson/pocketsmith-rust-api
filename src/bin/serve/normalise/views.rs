@@ -10,11 +10,15 @@ use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
 use pocketsmith_sync::transfers::Status;
 
 use crate::css::CSS;
+use crate::helpers::{format_dollars, format_short_date};
 use crate::js::JS;
 use crate::state::AppState;
 use crate::views::render_tab_bar;
 
-use super::helpers::{get_filtered_normalisations, NormClassFilter, NormStatusFilter};
+use super::helpers::{
+    get_filtered_normalisations, matching_transactions, MatchingTxn, NormClassFilter,
+    NormStatusFilter,
+};
 
 /// Top-level page render: locks state, computes the filtered queue, picks
 /// an active row if needed, and delegates to [`render_full_page`].
@@ -24,8 +28,6 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let class = NormClassFilter::parse(&st.norm_class_filter);
     let rows = get_filtered_normalisations(&st.conn, status, class, &st.norm_skipped);
 
-    // Auto-select the first visible row if the active slug isn't in the
-    // current view.
     let active_slug = st
         .norm_active_slug
         .clone()
@@ -36,7 +38,6 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     render_full_page(&st, &rows, status, class, active_slug.as_deref())
 }
 
-/// Returns the queue fragment only (HTMX swap target `#norm-queue`).
 pub fn render_queue_fragment(
     state: &Arc<Mutex<AppState>>,
     status_str: &str,
@@ -52,13 +53,14 @@ pub fn render_queue_fragment(
     render_queue(&rows, active.as_deref(), status, class)
 }
 
-/// Returns the detail fragment for a single row (HTMX swap target
-/// `#norm-detail`).
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Markup {
     let mut st = state.lock().unwrap();
     st.norm_active_slug = Some(slug.to_string());
     match pocketsmith_sync::db::payee_normalisations::get_by_slug(&st.conn, slug) {
-        Ok(Some(row)) => render_detail(&row, st.norm_skipped.contains_key(&row.original_payee)),
+        Ok(Some(row)) => {
+            let txns = matching_transactions(&st.conn, &row.original_payee);
+            render_detail(&row, &txns, st.norm_skipped.contains_key(&row.original_payee))
+        }
         _ => html! { div.empty-state { p { "Item not found." } } },
     }
 }
@@ -71,6 +73,9 @@ fn render_full_page(
     active_slug: Option<&str>,
 ) -> Markup {
     let active_row = active_slug.and_then(|s| rows.iter().find(|r| r.slug == s));
+    let active_txns = active_row
+        .map(|r| matching_transactions(&state.conn, &r.original_payee))
+        .unwrap_or_default();
 
     html! {
         (DOCTYPE)
@@ -90,7 +95,7 @@ fn render_full_page(
                     }
                     div.detail-panel #norm-detail {
                         @if let Some(row) = active_row {
-                            (render_detail(row, state.norm_skipped.contains_key(&row.original_payee)))
+                            (render_detail(row, &active_txns, state.norm_skipped.contains_key(&row.original_payee)))
                         } @else {
                             div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } }
                         }
@@ -139,30 +144,34 @@ fn render_queue(
             @for row in rows {
                 @let is_active = active_slug == Some(row.slug.as_str());
                 div.queue-item
-                    .(if is_active { "active" } else { "" })
+                    .(if is_active { "selected" } else { "" })
+                    .((status_css_class(row.status)))
                     hx-get=(format!("/normalise/item/{}", row.slug))
                     hx-target="#norm-detail"
                     hx-swap="innerHTML"
+                    data-detail-url=(format!("/normalise/item/{}", row.slug))
+                    data-detail-target="#norm-detail"
                 {
-                    span.amount { (row.txn_count) "\u{00a0}txn" }
+                    span.conf-badge { (row.txn_count) }
                     span.payee { (row.proposed_payee) }
                     span.gap { (row.class.as_deref().unwrap_or("?")) }
-                    span.conf-badge { (status_label(row.status)) }
                 }
             }
         }
     }
 }
 
-fn status_label(s: Status) -> &'static str {
+fn status_css_class(s: Status) -> &'static str {
     match s {
-        Status::Pending => "P",
-        Status::Confirmed => "C",
-        Status::Rejected => "R",
+        Status::Pending => "",
+        Status::Confirmed => "decided-confirmed",
+        Status::Rejected => "decided-rejected",
     }
 }
 
-fn render_detail(row: &PayeeNormalisationRow, is_skipped: bool) -> Markup {
+fn render_detail(row: &PayeeNormalisationRow, txns: &[MatchingTxn], is_skipped: bool) -> Markup {
+    let action_base = format!("/normalise/item/{}", row.slug);
+    let features = parse_features(&row.features_json);
     html! {
         div.detail-header {
             h2 {
@@ -186,9 +195,10 @@ fn render_detail(row: &PayeeNormalisationRow, is_skipped: bool) -> Markup {
             }
             div.confidence-reason {
                 "class: " (row.class.as_deref().unwrap_or("unclassified"))
-                " \u{00b7} " (row.txn_count) " transaction(s)"
+                " \u{00b7} " (row.txn_count) " transaction(s) sharing this original_payee"
             }
         }
+
         div.comparison {
             div.txn-cards {
                 div.txn-card {
@@ -205,34 +215,98 @@ fn render_detail(row: &PayeeNormalisationRow, is_skipped: bool) -> Markup {
                 }
             }
         }
-        div.action-buttons {
-            button.action-btn.confirm-btn
-                hx-post=(format!("/normalise/item/{}/confirm", row.slug))
+
+        @if !features.is_empty() {
+            div.norm-features {
+                h3 { "Extracted features" }
+                div.norm-features-list {
+                    @for (k, v) in &features {
+                        div.norm-feature-row {
+                            span.norm-feature-key { (k) }
+                            span.norm-feature-val { (v) }
+                        }
+                    }
+                }
+            }
+        }
+
+        div.actions data-action-base=(action_base) {
+            button.btn.btn-confirm
+                hx-post=(format!("{action_base}/confirm"))
                 hx-target="body"
-            { "Confirm" }
-            button.action-btn.reject-btn
-                hx-post=(format!("/normalise/item/{}/reject", row.slug))
+            { "[Y] Confirm" }
+            button.btn.btn-reject
+                hx-post=(format!("{action_base}/reject"))
                 hx-target="body"
-            { "Reject" }
+            { "[N] Reject" }
             @if is_skipped {
-                button.action-btn
-                    hx-post=(format!("/normalise/item/{}/unskip", row.slug))
+                button.btn.btn-skip
+                    hx-post=(format!("{action_base}/unskip"))
                     hx-target="body"
-                { "Unskip" }
+                { "[S] Unskip" }
             } @else {
-                button.action-btn
-                    hx-post=(format!("/normalise/item/{}/skip", row.slug))
+                button.btn.btn-skip
+                    hx-post=(format!("{action_base}/skip"))
                     hx-target="body"
-                { "Skip" }
+                { "[S] Skip" }
+            }
+        }
+
+        @if !txns.is_empty() {
+            div.prior-section {
+                h3 { "Matching transactions (" (txns.len()) ")" }
+                div.prior-list.norm-txn-list {
+                    @for t in txns {
+                        div.prior-row {
+                            span { (format_short_date(&t.date)) }
+                            span { (t.payee.as_deref().unwrap_or("\u{2014}")) }
+                            span.((if t.amount_cents >= 0 { "amount-positive" } else { "amount-negative" })) {
+                                (format_dollars(t.amount_cents))
+                            }
+                            span.norm-txn-acct { (t.account_name.as_deref().unwrap_or("?")) }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+/// Minimal JSON-string-to-pairs parse for the features metadata. We don't
+/// need anything fancy: features_json is always a flat object of
+/// string/number/null values. Returns an empty list if parsing fails so
+/// the UI degrades gracefully.
+fn parse_features(s: &str) -> Vec<(String, String)> {
+    let v: serde_json::Value = match serde_json::from_str(s) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let map = match v.as_object() {
+        Some(m) => m,
+        None => return Vec::new(),
+    };
+    let mut out: Vec<(String, String)> = map
+        .iter()
+        .filter_map(|(k, val)| {
+            let s = match val {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Number(n) => n.to_string(),
+                serde_json::Value::Bool(b) => b.to_string(),
+                serde_json::Value::Null => return None,
+                other => other.to_string(),
+            };
+            Some((k.clone(), s))
+        })
+        .collect();
+    // Stable order for the UI.
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 fn render_activity(state: &AppState) -> Markup {
     html! {
         div.activity-header {
-            span { "Applied this session: " (state.norm_applied) " transactions" }
+            span.stat { "Applied " span.count-applied { (state.norm_applied) } }
             button.apply-btn
                 hx-post="/normalise/apply"
                 hx-target="body"
