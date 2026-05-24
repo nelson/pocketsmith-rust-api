@@ -191,6 +191,29 @@ CREATE TABLE IF NOT EXISTS transfer_pairs (
     UNIQUE(txn_id_b)
 );
 
+CREATE TABLE IF NOT EXISTS payee_normalisations (
+    original_payee  TEXT PRIMARY KEY,
+    proposed_payee  TEXT NOT NULL,
+    slug            TEXT NOT NULL UNIQUE,
+    class           TEXT,
+    features_json   TEXT NOT NULL,
+    txn_count       INTEGER NOT NULL,
+    status          INTEGER NOT NULL DEFAULT 0 REFERENCES statuses(id),
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_payee_normalisations_status ON payee_normalisations(status);
+
+CREATE TRIGGER IF NOT EXISTS payee_normalisations_updated_at
+AFTER UPDATE ON payee_normalisations
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE payee_normalisations
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE original_payee = NEW.original_payee;
+END;
+
 CREATE TRIGGER IF NOT EXISTS transfer_pairs_updated_at
 AFTER UPDATE ON transfer_pairs
 FOR EACH ROW
