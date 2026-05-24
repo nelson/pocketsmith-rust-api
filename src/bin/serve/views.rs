@@ -75,7 +75,7 @@ pub fn render_tab_bar(active: &str) -> Markup {
 }
 
 pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filter: &str, confidence_filter: &str) -> Markup {
-    let selected = state.active_pair
+    let selected = state.transfers.active
         .and_then(|id| pairs.iter().find(|p| (p.txn_id_a, p.txn_id_b) == id).map(|_| id))
         .or_else(|| pairs.first().map(|p| (p.txn_id_a, p.txn_id_b)));
 
@@ -98,7 +98,7 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
                 (render_tab_bar("transfers"))
                 div.layout {
                     div.queue-panel #queue {
-                        (render_queue(pairs, selected, status_filter, confidence_filter, &state.decisions))
+                        (render_queue(pairs, selected, status_filter, confidence_filter, &state.transfers.decisions))
                     }
                     div.detail-panel #detail {
                         @if let Some(pair) = active {
@@ -368,11 +368,11 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
 pub fn render_activity(state: &AppState) -> Markup {
     html! {
         div.activity-header {
-            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.decisions, Decision::Confirm)) } }
-            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.decisions, Decision::Reject)) } }
-            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.decisions, Decision::Skip)) } }
-            span.stat { "Undone " span.count-undone { (state.undone) } }
-            span.stat { "Applied " span.count-applied { (state.applied) } }
+            span.stat { "Confirmed " span.count-confirmed { (count_decisions(&state.transfers.decisions, Decision::Confirm)) } }
+            span.stat { "Rejected " span.count-rejected { (count_decisions(&state.transfers.decisions, Decision::Reject)) } }
+            span.stat { "Skipped " span.count-skipped { (count_decisions(&state.transfers.decisions, Decision::Skip)) } }
+            span.stat { "Undone " span.count-undone { (state.transfers.undone) } }
+            span.stat { "Applied " span.count-applied { (state.transfers.applied) } }
             @let confirmed_in_db = count_confirmed_in_db(&state.conn);
             button.apply-btn
                 hx-post="/transfers/apply"
@@ -382,7 +382,7 @@ pub fn render_activity(state: &AppState) -> Markup {
             { "Apply all changes (" (confirmed_in_db) ")" }
         }
         div.activity-list {
-            @for entry in state.activity.iter().rev().take(20) {
+            @for entry in state.transfers.activity.iter().rev().take(20) {
                 @let pair_id = format!("{}-{}", entry.pair_id.0, entry.pair_id.1);
                 div.activity-row {
                     span.((match entry.decision {
@@ -420,7 +420,7 @@ pub fn render_activity(state: &AppState) -> Markup {
 // Called by: handle_action, handle_undo, handle_clear_all_skipped, handle_unskip (after every mutation).
 // Calls: get_filtered_pairs, render_full_page.
 pub fn render_current_page(state: &AppState) -> Markup {
-    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
     render_full_page(state, &pairs, &state.status_filter, &state.confidence_filter)
 }
 
@@ -429,9 +429,9 @@ pub fn render_current_page(state: &AppState) -> Markup {
 // Calls: get_filtered_pairs, render_full_page.
 pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut state = state.lock().unwrap();
-    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.decisions);
-    if state.active_pair.is_none() {
-        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+    let pairs = get_filtered_pairs(&state.conn, &state.status_filter, &state.confidence_filter, &state.transfers.decisions);
+    if state.transfers.active.is_none() {
+        state.transfers.active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
     }
     render_full_page(&state, &pairs, &state.status_filter, &state.confidence_filter)
 }
@@ -442,7 +442,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
 // Calls: transfer_pairs::get_pair_by_id, get_prior_pairs, render_detail.
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_a: i64, txn_b: i64) -> Markup {
     let mut state = state.lock().unwrap();
-    state.active_pair = Some((txn_a, txn_b));
+    state.transfers.active = Some((txn_a, txn_b));
     match transfer_pairs::get_pair_by_id(&state.conn, txn_a, txn_b) {
         Ok(Some(pair)) => {
             let prior = get_prior_pairs(&state.conn, &pair.account_name_a, &pair.account_name_b);
@@ -460,14 +460,14 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, status_filter: &str, 
     let mut state = state.lock().unwrap();
     state.status_filter = status_filter.to_string();
     state.confidence_filter = confidence_filter.to_string();
-    let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.decisions);
-    let current = state.active_pair;
+    let pairs = get_filtered_pairs(&state.conn, status_filter, confidence_filter, &state.transfers.decisions);
+    let current = state.transfers.active;
     let in_new_list = current.and_then(|id| pairs.iter().any(|p| (p.txn_id_a, p.txn_id_b) == id).then_some(())).is_some();
     if !in_new_list {
-        state.active_pair = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
+        state.transfers.active = pairs.first().map(|p| (p.txn_id_a, p.txn_id_b));
     }
-    let selected = state.active_pair;
-    render_queue(&pairs, selected, status_filter, confidence_filter, &state.decisions)
+    let selected = state.transfers.active;
+    render_queue(&pairs, selected, status_filter, confidence_filter, &state.transfers.decisions)
 }
 
 // Returns the inline confirmation prompt for a bulk action. The visible-count
@@ -481,9 +481,9 @@ pub fn render_bulk_prompt_fragment(state: &Arc<Mutex<AppState>>, action: &str) -
         &state.conn,
         &state.status_filter,
         &state.confidence_filter,
-        &state.decisions,
+        &state.transfers.decisions,
     );
-    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.decisions);
+    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
     render_bulk_prompt(action, eligible.len())
 }
 
@@ -496,8 +496,8 @@ pub fn render_bulk_buttons_fragment(state: &Arc<Mutex<AppState>>) -> Markup {
         &state.conn,
         &state.status_filter,
         &state.confidence_filter,
-        &state.decisions,
+        &state.transfers.decisions,
     );
-    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.decisions);
+    let eligible = crate::helpers::pairs_eligible_for_bulk(&pairs, &state.transfers.decisions);
     render_bulk_actions(eligible.len())
 }
