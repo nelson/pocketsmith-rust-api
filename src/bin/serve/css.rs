@@ -268,6 +268,9 @@ body {
     background: var(--bg);
     border: 1px solid var(--border);
     padding: 12px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 .txn-card:first-child { border-radius: 6px 0 0 6px; }
 .txn-card:last-child { border-radius: 0 6px 6px 0; }
@@ -309,9 +312,11 @@ body {
     align-items: baseline;
     font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
     font-size: 12px;
+    min-width: 0;
+    gap: 8px;
 }
-.field-label { color: var(--fg-dim); }
-.field-value { color: var(--fg); text-align: right; max-width: 60%; overflow-wrap: anywhere; word-break: break-word; }
+.field-label { color: var(--fg-dim); flex-shrink: 0; }
+.field-value { color: var(--fg); text-align: right; min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; }
 .amount-positive { color: var(--green) !important; font-weight: 600; }
 .amount-negative { color: var(--red) !important; font-weight: 600; }
 
@@ -386,6 +391,7 @@ body {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    margin-bottom: 16px;
 }
 
 .btn {

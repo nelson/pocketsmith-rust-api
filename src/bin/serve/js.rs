@@ -45,6 +45,21 @@ document.addEventListener('click', function(e) {
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+    // Tab / Shift+Tab cycles between top-level tabs (Transfers / Normalise).
+    if (e.key === 'Tab') {
+        const tabs = Array.from(document.querySelectorAll('.tab-bar .tab'));
+        if (tabs.length < 2) return;
+        e.preventDefault();
+        const activeIdx = tabs.findIndex(t => t.classList.contains('active'));
+        const dir = e.shiftKey ? -1 : 1;
+        const nextIdx = ((activeIdx === -1 ? 0 : activeIdx) + dir + tabs.length) % tabs.length;
+        const next = tabs[nextIdx];
+        // Inactive tabs are <a> with href; active is <span>. Navigate via href.
+        const href = next.getAttribute('href');
+        if (href) window.location.href = href;
+        return;
+    }
+
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const items = document.querySelectorAll('.queue-item');

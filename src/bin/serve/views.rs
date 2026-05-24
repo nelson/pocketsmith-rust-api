@@ -327,6 +327,20 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
                 }
             }
         }
+        div.actions data-pair-id=(pair_id) data-action-base=(format!("/transfers/pair/{pair_id}")) {
+            button.btn.btn-confirm
+                hx-post=(format!("/transfers/pair/{pair_id}/confirm"))
+                hx-target="body"
+            { "[Y] Confirm" }
+            button.btn.btn-reject
+                hx-post=(format!("/transfers/pair/{pair_id}/reject"))
+                hx-target="body"
+            { "[N] Reject" }
+            button.btn.btn-skip
+                hx-post=(format!("/transfers/pair/{pair_id}/skip"))
+                hx-target="body"
+            { "[S] Skip" }
+        }
         @if !prior.is_empty() {
             div.prior-section {
                 h3 { "Prior: " (&pair.account_name_a) " \u{2194} " (&pair.account_name_b) }
@@ -342,20 +356,6 @@ pub fn render_detail(pair: &TransferPairRow, prior: &[(String, i64, Status)]) ->
                     }
                 }
             }
-        }
-        div.actions data-pair-id=(pair_id) data-action-base=(format!("/transfers/pair/{pair_id}")) {
-            button.btn.btn-confirm
-                hx-post=(format!("/transfers/pair/{pair_id}/confirm"))
-                hx-target="body"
-            { "[Y] Confirm" }
-            button.btn.btn-reject
-                hx-post=(format!("/transfers/pair/{pair_id}/reject"))
-                hx-target="body"
-            { "[N] Reject" }
-            button.btn.btn-skip
-                hx-post=(format!("/transfers/pair/{pair_id}/skip"))
-                hx-target="body"
-            { "[S] Skip" }
         }
     }
 }
