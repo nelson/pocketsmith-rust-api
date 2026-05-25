@@ -1,14 +1,21 @@
-# Plan: Transactions & Dashboard tabs
+# Plan: Dashboard, Transactions & Review tabs
 
 Status: **planning / ideation only — no implementation yet.**
 Branch: `plan/transactions-and-dashboard-tabs`
 Mockups: `/tmp/pocketsmith-mockups/` (open `index.html` for the index)
 
-The user wants two new top-level tabs in the serve UI alongside the existing
-`Transfers` and `Normalise` tabs. The new tabs share the visual vocabulary,
-keyboard shortcuts, and HTMX swap conventions established by the existing
-tabs. Their job is to **make data-cleaning progress visible** and to surface
-the next most valuable cleaning work.
+Three new top-level tabs in the serve UI alongside the existing `Transfers`
+and `Normalise` tabs:
+
+- **Dashboard** — monthly financial picture (sankey + small multiples + cumulative net).
+- **Transactions** — reverse-chronological river with cleaning state visible at a glance.
+- **Review** — the data-quality workbench (formerly "hygiene"). Tells you what to clean next.
+
+Final tab order, left-to-right: **Dashboard · Transactions · Review · Transfers · Normalise.**
+The `/` redirect goes to **Dashboard** (was: Transfers).
+
+Name for the third tab: **Review** — chosen by the user from the
+shortlist (Curate, Refine, Polish, Tidy, Workshop, Backlog).
 
 ---
 
@@ -18,8 +25,8 @@ These are non-negotiable so the new tabs feel native:
 
 - `render::render_page(tab_slug, title, queue, detail, activity)` — the
   same three-pane shell (`#queue`, `#detail`, `#activity`).
-- `render::render_tab_bar` — extended to four entries:
-  `Transfers / Normalise / Transactions / Dashboard`.
+- `render::render_tab_bar` — extended to five entries in this order:
+  `Dashboard / Transactions / Review / Transfers / Normalise`.
 - `render::render_actions(action_base, is_skipped)` — only used on the
   Transactions tab, where confirm/reject/skip continue to make sense.
 - `js::JS` keyboard model — extended in-place, no replacement:
@@ -40,16 +47,17 @@ These are non-negotiable so the new tabs feel native:
   | `G` / `Sh-G` | jump to first / last queue item                          |
   | `1`–`5` | activate the n-th filter button in the queue header          |
   | `[` / `]` | Dashboard: previous / next month                            |
-  | `R` | Transactions: jump to next row needing review (most useful chord) |
+  | `R` | Transactions / Review: jump to next row needing review (priority order: pending norm → orphan transfer → uncategorised → pending pair) |
+  | `/` | focus the search input (Transactions only)                        |
 
 - `tab::next_after` and `tab::count_decisions` — reused as-is on
   Transactions.
 - CSS variables (`--bg`, `--accent`, `--green`, `--red`, `--yellow`,
   `--magenta`, `--cyan`) — reused; new chart colours derive from them so
   the palette stays cohesive.
-- `state::AppState` gets two new optional sub-states:
-  `transactions: TxnTabState` and `dashboard: DashTabState` — same
-  pattern as the existing `transfers` / `normalise` fields.
+- `state::AppState` gets three new optional sub-states:
+  `dashboard: DashTabState`, `transactions: TxnTabState`, `review: ReviewTabState`
+  — same pattern as the existing `transfers` / `normalise` fields.
 
 ---
 
@@ -64,6 +72,48 @@ From `pocketsmith.db`:
   Status 0 pending / 1 confirmed / 2 rejected.
 - `transfer_pairs` — populated by the pairing pipeline; status & confidence.
 - `categories`, `transaction_accounts`.
+
+### Visual vocabulary (locked)
+
+A transaction has up to **three** dimension slots, one per cleaning
+pillar:
+
+- **Slot 1** = pair state (transfer pairing)
+- **Slot 2** = normalisation-rule state
+- **Slot 3** = category state (reserved — becomes the third pillar later)
+
+Each pillar has a coherent shape-family so the emoji itself encodes
+*both* dimension and state. There is no positional memory burden, and
+because every glyph is shape-distinct from every other glyph, the
+vocabulary is readable regardless of colour vision.
+
+| State        | Pair (links)              | Normalise (labels)     | Categorise (files)        |
+|--------------|---------------------------|------------------------|---------------------------|
+| confirmed    | 🔗 paired                 | 🏷️ rule confirmed       | 📁 categorised             |
+| pending      | 🔁 pair proposed          | 📝 rule pending review   | 🗂️ category pending       |
+| needs you    | ⚠️ orphan transfer        | ❓ no rule             | 📦 uncategorised           |
+| rejected     | ✂️ pair rejected          | 🚫 rule rejected        | 🗑️ category rejected      |
+| n/a          | · not a transfer          | · already normalised   | · —                       |
+
+Mnemonic: **Pair = links** (chain, scissors, cycle, warning).
+**Normalise = labels** (tag, memo, prohibition, question).
+**Categorise = filing** (folder, card index, parcel, bin).
+
+Examples reading the vocabulary:
+- `· ❓ 📦` — not a transfer, no normalisation rule, uncategorised
+- `🔁 🏷️ 📁` — transfer pair pending, normalisation confirmed, categorised
+- `⚠️ 📝 📦` — orphan transfer, normalisation pending, uncategorised
+
+**Implementation note for v1:** the Categorise slot is rendered now (`📁`
+or `📦` based on whether `category_id` is null), but no Categorise
+actions are wired up in v1. Decision verbs and a category staging table
+are deferred to the same v2 milestone as editable normalisation rules
+(§6). The slot exists so users start associating the position with
+the pillar before the actions land.
+
+The Dashboard's three-dot hygiene meter on each month row uses the same
+three pillars: dot 1 = pair coverage, dot 2 = norm coverage, dot 3 =
+category coverage. Hover labels expose what each dot is.
 
 Derived signals we can compute cheaply (per-transaction):
 
@@ -90,6 +140,20 @@ both simple counts/joins over the table above.
 Goal: **a reverse-chronological transaction river with cleaning-state
 visible at a glance.** Side panel = list, detail panel = full transaction
 view, activity panel = cleaning progress for the current filter.
+
+**Mutation policy: staging-only, read-only otherwise.** The Transactions
+tab does not directly write to `transactions.payee`, `category_id`, etc.
+Any cleaning action goes through one of the existing staging tables
+(`payee_normalisations`, `transfer_pairs`) or the new
+`transfer_decisions` table (§8). The Transactions tab is therefore an
+*entry point* into the same workflows the Normalise/Transfers tabs
+expose, just sliced by "the txn I'm currently looking at" rather than
+"the next thing in the queue". Same endpoints, different lens.
+
+A practical consequence: there is no "Apply category" button on a row.
+Category mutations are out of scope for v1 (open question 2 in the
+original plan, now closed: staging-only). If you want to recategorise,
+you do it in PocketSmith and re-sync.
 
 ### 3.1 Queue panel (`#queue`)
 
@@ -139,6 +203,13 @@ Keyboard-numbered chips (so `1`–`5` activate them):
 Plus a date-range pill ("last 30d / 90d / YTD / all"), an account
 multi-select, and a free-text search over `original_payee`/`payee`/`memo`.
 
+**Layout consistency rule:** every filter view uses the same template
+— the queue panel always shows the same row shape (date · two glyphs ·
+payee · amount), and the detail panel always shows: header → cleaning-
+state cards → pipeline trace (if relevant) → sibling/related rows. The
+"Needs rule" view's grouping by `original_payee` (where date column
+becomes a count) is the only deliberate exception, called out visually.
+
 ### 3.3 Detail panel (`#detail`)
 
 Same card-style as the existing tabs:
@@ -177,6 +248,25 @@ Three live counts, scoped to the current filter:
 - A "next priority" hint: link to the most common original_payee with no
   rule (highest leverage — fix one rule, cleans many rows).
 
+### 3.5 Endpoints — reuse, don't duplicate
+
+The Transactions tab does **not** introduce new mutation endpoints. It
+calls into existing routes:
+
+- Confirming/rejecting a normalisation proposal from the Transactions
+  detail panel POSTs to `/normalise/item/<slug>/{confirm,reject,skip,undo}`.
+  These are the same endpoints the Normalise tab uses; the response
+  re-renders the *Transactions* page (not Normalise) by pointing
+  `hx-target` at the right shell.
+- Confirming/rejecting a transfer pair POSTs to
+  `/transfers/pair/<a>-<b>/{confirm,reject,skip,undo}` similarly.
+- Orphan-transfer decisions go to `/transfer-decisions/<txn_id>/...`
+  (new — see §8).
+
+This means the Transactions tab is, in code terms, mostly a *view*
+layer over data the existing handlers already know how to mutate.
+Keeps the implementation small and avoids drift.
+
 ---
 
 ## 4. New tab: **Dashboard**
@@ -189,6 +279,13 @@ a great fit for this domain:
 - `#detail` = charts for the selected month
 - `#activity` = data-hygiene scorecard for the selected month + global
   "what to clean next" hints
+
+### 4.0 Granularity — Month and Year only
+
+Monthly is the primary view. Yearly is a secondary view (12 months at
+a glance for one year, with `[`/`]` stepping years). Weekly and
+quarterly are not implemented — if needed they can be added later, but
+start minimal.
 
 ### 4.1 Queue panel: months strip
 
@@ -211,6 +308,8 @@ Columns:
 - **bar fill** = % of month already reviewed.
 
 Selecting a month swaps the detail panel (HTMX). `[` / `]` step months.
+A toggle at the top switches between **Month** view and **Year**
+overview (12 monthly cells side-by-side; same `[`/`]` keys step years).
 
 ### 4.2 Detail panel: charts for the selected month
 
@@ -223,31 +322,37 @@ applied throughout:
 - Same colour vocabulary as the Transactions tab (green=confirmed/income,
   red=needs-attention/outflow, yellow=pending, dim grey=neutral).
 
-**Chart 1 — Income → Spending Sankey** (the headline chart)
+**Chart 1 — Money-flow Sankey** (the headline chart)
+
+Three-column symmetric layout (sources → month → destinations):
 
 ```
-   Salary   ─────────╮
-   Refunds  ──╮      │
-   Interest ─╮│      ├──► Mortgage
-             ╰┴──────┼──► Groceries
-                     ├──► Eating Out
-                     ├──► Bills
-                     ├──► Transport
-                     ╰──► Surplus / Deficit
+   Salary    ─────────╮               ╭─── Mortgage
+   Refunds   ───╮      │               ├─── Eating Out
+   Interest  ──╮│      ├─── April ───├─── Groceries
+   PayID-in  ─╮││      │   "in"  │    ├─── Bills
+            ╰┴┴┴───────┼          │    ├─── Shopping
+                    │ (refund)←─┤    ├─── Transport
+                    │         │    ├─── PayID-out
+                    │         │    ╰─── Uncategorised ⚠
+                    ╰──── deficit → offset/credit (yellow back-ribbon)
 ```
 
-Three columns: income sources (left) → "this month" (middle) → category
-spend (right). Surplus/deficit appears as a flow into a fourth node so
-positive months balance visually. Width = $; node order = $-descending.
+- Width = $.
+- Backflows (refunds, transfers between accounts) drawn as thin upward
+  ribbons from category column back to centre. They're usually small
+  but make exceptions easy to spot.
+- An **Uncategorised** node on the right is rendered yellow, not red,
+  to signal "data quality" rather than "a category". Cleaning
+  reapportions it into the red wedges.
+- The **deficit** flow (centre → offset/credit) closes the loop
+  visually so positive vs negative months read symmetrically.
 
-**Chart 2 — Category share (pie)**
+**Chart 2 — Category share (horizontal bar)**
 
-A pie chart for outflow only. Tufte was famously unenthusiastic about
-pies; we hedge by:
-- showing only top 6 slices, rest as "Other" with a sub-list below,
-- direct-labelling each slice with `name $amount (%)`,
-- pairing it with a *bar chart twin* to its right showing the same
-  data but easier to compare ("small multiples of presentation").
+No pie. Just a horizontal bar list:
+`Mortgage  ██████████  $40,000  56%`. Sorted descending. Top 8 named, rest
+folded into "Other" with a sub-list. (Tufte, satisfied.)
 
 **Chart 3 — Daily cashflow strip** (Tufte-favourite)
 
@@ -274,55 +379,199 @@ data points, no chartjunk, instant comparability.
 Stacked line per account showing balance over the month. Useful for
 spotting "money pooled in offset" vs "credit card racked up".
 
-### 4.3 Activity panel: hygiene scorecard
+### 4.3 Activity panel: month summary, not hygiene
 
-This is the bridge between Dashboard and Transactions. For the selected
-month:
+The full hygiene scorecard moves to its own top-level **Review** tab
+(§5). The Dashboard's activity panel keeps only a single condensed line:
+"Apr 2026: 68% clean by $-weight (337 txns) · [open in Review]".
 
-```
-Cleanliness 78%   ████████░░
-  Categorised      94%   ███████████░
-  Norm-rules       72%   ████████░░░░
-  Pairs reviewed  100%   ████████████
-
-Top leverage right now:
-  ▸ "POS AUTHORISATION XS ESPRESSO ..."  43 txns, no rule  → [Add rule]
-  ▸ "AMAZON MARKETPLACE"                 28 txns, rule pending → [Review]
-  ▸ 3 orphan transfers between Smart Access ⇄ Offset → [Pair them]
-```
-
-Each link deep-links to the Transactions tab pre-filtered to the relevant
-slice. That's the loop: dashboard tells you *where* the work is,
-Transactions tab is *where you do* it.
+Reasoning: Dashboard is for **insights**. Review is for **improving the
+data so insights become more accurate**. They're different jobs and
+shouldn't share the bottom of the screen.
 
 ---
 
-## 5. Routing / file layout
+## 5. Review tab
+
+A dedicated top-level tab whose only job is to surface the next most
+valuable cleaning work. Same three-pane shell:
+
+- `#queue` — a prioritised list of "things to clean", **scored by
+  $-weighted impact**: how much would the cleanliness % move if you
+  decided this one item? High-dollar uncategorised txns score above
+  low-dollar ones; high-count merchants without a rule score above
+  one-offs. Each row also shows transaction count in brackets so the
+  $-weight isn't blind to volume:
+
+  ```
+  +12.4% ($)  POS AUTHORISATION XS ESPRESSO ...   (43 txns)   needs rule
+   +8.1% ($)  AMAZON MARKETPLACE                  (28 txns)   pending review
+   +5.9% ($)  3 orphan transfers Smart Access ⇄ Offset (3)   needs pairing
+   +3.7% ($)  142 uncategorised txns over $100    (142)       needs cat-fix
+  ```
+
+- `#detail` — the *same* detail view as the corresponding source tab.
+  E.g. clicking a "needs rule" row shows the Normalise tab's detail
+  fragment in-place; clicking an "orphan transfer" row shows the
+  Transactions detail with the candidate-counterparts table. We're
+  literally embedding existing fragments — zero new view code beyond
+  the queue ranking.
+
+- `#activity` — the global hygiene scorecard:
+  ```
+  Cleanliness $-weighted: 64% · by-count: 71%
+    Categorised       42% ($)   /   78% (count)
+    Norm rules        72% ($)   /   80% (count)
+    Pairs reviewed   100% ($)   /  100% (count)
+  Streak: 4 days  ·  Goal: 90% by 2026-12 (on track)
+  ```
+
+This is the page where you start your morning of data-cleaning. The
+Dashboard tells you *what's happening with the money*; Review tells you
+*what's blocking the truth of that picture*.
+
+## 6. Editable normalisation rules — design options
+
+Status: **out of scope for v1**, but the user wants a path to
+editability. The current pipeline is baked into Rust. Below are the
+options for moving toward UI-editable rules, with pros and cons. v1 of
+the new tabs is read-only-plus-staging; v2 picks one of these.
+
+### Option A — DB-backed dictionaries, baked-in pipeline
+
+The pipeline stages stay in Rust. The *data* each stage consumes moves
+to SQLite tables. Examples:
+
+- A `merchant_aliases` table: `(pattern, replacement, class)`.
+- A `suburb_suffixes` table: list of strings to strip from the tail.
+- A `pos_prefixes` table: list of bank-prefix strings to strip from the head.
+- A `known_merchants` table for the classifier dictionary.
+
+The UI lets you add/edit rows in those tables. The pipeline reads them
+at startup (or on every run — cheap).
+
+**Pros**
+- Pipeline determinism preserved. The *shape* of transformation is in
+  code; only the *vocabulary* is in the database.
+- Easy to test: pipeline tests stay pure (load fixture dicts).
+- Versioned: dictionary tables get the same `_changes` treatment as
+  transactions.
+- Limited blast radius. A user can't accidentally add a stage that
+  breaks everything; they can only extend dictionaries.
+- Plays well with multi-user: the rule changes are durable artefacts.
+
+**Cons**
+- Doesn't cover "I want a one-off regex for this weird payee". You'd
+  need a special escape hatch, which leads to Option C.
+- Adding a new *kind* of rule (e.g. "strip emoji") still requires code.
+
+### Option B — Override list (one-off table)
+
+A single `payee_overrides` table: `original_payee → forced_payee`.
+Applied as the very last pipeline stage; if a row matches, it wins
+unconditionally.
+
+**Pros**
+- Trivial to implement (≈ 1 SQL table, ≈ 1 pipeline stage).
+- Captures the long tail of weirdos cheaply.
+- Easy mental model: "if the pipeline gets it wrong, force the answer".
+
+**Cons**
+- Doesn't generalise: each override is a manual one-off, paid for
+  forever. No leverage.
+- The override table just keeps growing. After a few thousand entries
+  it becomes its own data-quality problem.
+- Misses the point of having a pipeline: encodes facts as exceptions
+  rather than as rules.
+- Specifically called out by the user as a concern.
+
+### Option C — Hybrid: dictionaries + tiny override list
+
+Do Option A for the dictionaries. Keep an Option-B-style override table
+*as a last resort*, with a UI surface that nudges you toward generalising
+overrides into dictionary entries (e.g. "this override has matched 5
+rows; want to promote it to a `merchant_aliases` row?").
+
+**Pros**
+- Best of both worlds: most cleaning happens by general rule; the
+  long-tail escape hatch is acknowledged but kept honest.
+- The "promote override → dictionary entry" nudge is a nice UX moment
+  and a kind of self-correcting feature.
+
+**Cons**
+- Two mental models for the user.
+- Slightly more code than A or B alone.
+
+### Option D — Scripted rules (embedded language)
+
+Rules become small expressions in DB rows, evaluated by an embedded
+interpreter (Rhai, Lua, etc.).
+
+**Pros**
+- Maximum flexibility. New rule *kinds* can be added without code
+  changes.
+
+**Cons**
+- Significant security surface (sandboxing).
+- Hard to debug a year from now. "Why did this rule fire?" needs a
+  mini-debugger.
+- Big maintenance burden for a single-user tool.
+- Pure Rust testing of the pipeline becomes much harder.
+- Almost certainly overkill.
+
+### Recommendation
+
+**v1**: do nothing. Pipeline stays in Rust. New tabs are staging-only,
+as planned.
+
+**v2 (someday)**: Option C — dictionaries in DB plus a small overrides
+escape hatch with a "promote to rule" nudge. This gets us most of the
+way to editable without going off the deep end.
+
+The nice property of choosing C *later* is that v1 doesn't constrain
+it — we add new tables, stages still match against them, no breaking
+changes needed.
+
+## 7. Routing / file layout
 
 Mirrors the existing `transfers/` and `normalise/` modules:
 
 ```
 src/bin/serve/
-  main.rs              + new route arms for /transactions/* and /dashboard/*
+  main.rs              + new route arms for the three new tabs;
+                       + redirect / → /dashboard/
   tab.rs               (unchanged)
-  render.rs            extend render_tab_bar to 4 entries
-  js.rs                add J/K/G/[/]/R bindings
-  css.rs               add .chart, .sparkline, .pie, .sankey, .small-mult, .hygiene-bar styles
-
-  transactions/
-    mod.rs
-    handlers.rs        – act/undo/skip (delegates into transfers / normalise)
-    helpers.rs         – TxnQueueRow, TxnFilter, status derivation, signals
-    views.rs           – render_page_shell / queue / detail / activity
+  render.rs            extend render_tab_bar to 5 entries, new order
+  js.rs                add J/K/G/[/]/R/  bindings
+  css.rs               add .chart, .sparkline, .sankey, .small-mult,
+                       .hygiene-bar, .heatmap styles
 
   dashboard/
     mod.rs
-    handlers.rs        – mostly GETs; selecting a month is the only real action
-    helpers.rs         – month aggregations, sankey/pie data, sparkline data
-    views.rs           – render_page_shell / months_queue / month_detail / hygiene
+    handlers.rs        – mostly GETs; selecting a month is the only action
+    helpers.rs         – month aggregations, sankey ribbons, sparklines
+    views.rs           – render_page_shell / months_queue / month_detail / activity
     charts.rs          – pure SVG chart functions (no JS chart library;
-                         we draw SVG server-side from `maud`, htmx-friendly,
-                         deterministic, easy to test)
+                         server-side maud, deterministic, easy to test)
+
+  transactions/
+    mod.rs
+    handlers.rs        – thin: routes act/undo/skip to existing
+                         /normalise/* and /transfers/* endpoints; plus
+                         the /transfer-decisions/* endpoints (§8)
+    helpers.rs         – TxnQueueRow, TxnFilter, status derivation,
+                         search, the priority-of-cleaning-need rule for `R`
+    views.rs           – render_page_shell / queue / detail / activity
+
+  review/
+    mod.rs
+    handlers.rs        – GET-only; ranking happens in helpers
+    helpers.rs         – leverage scoring (% impact on $-weighted
+                         hygiene if this row's decision flips), priority
+                         queue assembly
+    views.rs           – render_page_shell / leverage_queue / scorecard;
+                         detail panel embeds existing /normalise/item/...
+                         and /transactions/... fragments by HTMX swap
 ```
 
 ### Why server-side SVG (no Chart.js / d3)
@@ -355,7 +604,57 @@ pub struct DashTabState {
 
 ---
 
-## 6. Suggested build order
+## 8. "Not a transfer" handling — `transfer_decisions` staging
+
+The orphan-transfer flow has a wrinkle: `is_transfer` is a sync-owned
+column (the trigger `_transactions_protect_sync_owned_columns` enforces
+this). We can't flip it. So when the user says "this isn't actually a
+transfer", we record a *decision* without mutating the source-of-truth
+row.
+
+New table:
+
+```sql
+CREATE TABLE transfer_decisions (
+    txn_id      INTEGER PRIMARY KEY REFERENCES transactions(id),
+    decision    TEXT NOT NULL CHECK (decision IN ('not_a_transfer', 'snoozed', 'manual_paired')),
+    snooze_until TEXT,           -- ISO date; only meaningful for 'snoozed'
+    note         TEXT,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at   TEXT NOT NULL
+);
+```
+
+Semantics, ordered most-aggressive first:
+
+- **`not_a_transfer`**: persistent. The orphan filter excludes this txn
+  permanently. Review scorecard counts it as resolved.
+- **`snoozed`** (with `snooze_until`): hide from the orphan filter
+  until that date. Re-surfaces afterward. The user's example — "its
+  twin may appear later in a future sync" — is exactly what `snoozed`
+  is for: "I don't see the counterpart yet; check back in 30 days".
+- **`manual_paired`**: rare; user has manually declared a pair that the
+  pairing pipeline didn't propose. Records the txn as paired in
+  `transfer_pairs` with confidence='manual'. The decision row exists so
+  we know the human (not the pipeline) made it.
+
+UI surface (Mockup 4):
+
+- Detail panel for an orphan offers three buttons:
+  - **[Y] Pair with selected candidate** (becomes a `transfer_pairs`
+    insert; if no auto-suggested candidate, sets `manual_paired`)
+  - **[N] Not a transfer** (persistent decision)
+  - **[S] Snooze 30 days** (deferred; reappears later)
+  - **[U] Undo** (delete the decision row)
+
+Resurfacing logic: a daily/manual `review-recheck` task scans
+`transfer_decisions` and clears expired snoozes. Cheap.
+
+Integration with existing `transfer_pairs`: clean. Pair confirmation
+remains the primary signal for "yes paired". `transfer_decisions`
+handles the negatives and deferrals that don't fit the pair table.
+
+## 9. Suggested build order
 
 1. **Plumbing**: extend tab bar, route table, AppState; stub
    `/transactions/` and `/dashboard/` returning placeholder pages. Smoke
@@ -379,56 +678,71 @@ pub struct DashTabState {
 Each step is independently shippable behind the new tab, so we can stop
 at any point and still have value.
 
+Updated step list reflecting the three tabs:
+
+0. Tab-bar + landing change: extend `render_tab_bar` to 5 entries in
+   the new order; redirect `/` → `/dashboard/`. Stub Dashboard,
+   Transactions, Review as placeholder pages. Smoke-test tab cycling.
+1. Dashboard months strip + month summary line in activity panel.
+2. Dashboard charts in this order: sparkline → daily cashflow strip →
+   category bar (no pie) → cumulative net → small multiples → sankey.
+3. Dashboard yearly view (12 months side-by-side, single scroll).
+4. Transactions queue + detail (read-only). Adopt the consistent layout
+   (date · glyphs · payee · amount; detail = header → cleaning cards →
+   trace → siblings).
+5. Transactions filter chips, search, account multi-select.
+6. Transactions actions: route Y/N/S/U to existing /normalise and
+   /transfers endpoints based on the row's primary cleaning need.
+7. `transfer_decisions` table + endpoints; orphan-transfer detail panel
+   exposes Pair / Not-a-transfer / Snooze.
+8. Review tab: leverage scoring, ranked queue, embed existing detail
+   fragments. $-weighted hygiene scorecard.
+9. Polish: keyboard hints overlay (`?`), URL-deep-linking from Review
+   into pre-filtered Transactions.
+
 ---
 
-## 7. Open questions for you
+## 10. Decisions locked from review round 1
 
-These shape the implementation and the user wants to weigh in before we
-build:
+- Default landing: **Dashboard**.
+- Tab order: **Dashboard · Transactions · Review · Transfers · Normalise**.
+- Mutation policy: **staging-only** for v1. Editable normalisation
+  rules deferred (see §6 design options; recommend Option C for v2).
+- Pie chart: **dropped**. Use horizontal bars only.
+- Sankey: **symmetric three-column with backflows** (the user picked
+  E and asked for it to be redrawn for readability — see redrawn
+  Mockup E).
+- Hygiene metric: **$-weighted primary, with txn-count in brackets**
+  for context ("+12.4% · 43 txns").
+- Account scope: **all accounts** for now.
+- Granularity: **Month + Year only**. No week, no quarter.
+- Hygiene tab name: **Review**.
+- `R` priority order: pending norm → orphan transfer → uncategorised →
+  pending pair (locked).
+- `is_transfer=1` orphans handled via new `transfer_decisions` staging
+  table with `not_a_transfer` / `snoozed` / `manual_paired`.
 
-1. **Default landing tab.** Currently `/` redirects to `/transfers/`.
-   When these new tabs ship, should `/` redirect to **Dashboard** (the
-   "where to start today" page) or stay on Transfers?
-2. **Transactions tab — scope of mutation.** The existing tabs only
-   *propose* changes (apply is a separate step). Should the Transactions
-   tab let you **edit category / payee / labels directly**, or stay
-   strictly read-only and route all mutation through the staging tables?
-   I lean read-only-plus-deep-links to keep the data model honest.
-3. **"Add rule from this txn."** When you click this on a row with no
-   norm rule, do you want:
-   (a) auto-create a `payee_normalisations` row in `pending` status
-       using the pipeline's current proposal, then jump to the Normalise
-       tab focused on it; or
-   (b) open a small inline editor on the Transactions tab to author the
-       rule by hand?
-4. **Multi-currency.** You have one USD account (PayPal USD). Charts
-   currently use `amount_in_base_currency`. OK to draw everything in
-   AUD-equivalents and add a small footer "values in AUD"? Or keep
-   per-currency split?
-5. **Date range default for Transactions tab.** Last 90 days, or all?
-   (All = 22k rows, fine for SQLite + virtual scroll, but may feel slow
-   on first paint.)
-6. **Sankey direction.** Left-to-right "income → spend"? Or two-sided
-   ("sources → middle → destinations") with refunds/transfers visible
-   as crossing flows? I went with the simple LTR for the mockups but
-   the symmetric one is more truthful.
-7. **Pie chart at all?** I included one for completeness but Tufte
-   would skip it. If you agree, the bar-chart twin replaces it entirely.
-8. **Granularity.** Months, weeks, or both? Weekly view aligns better
-   with paycheck cadence; monthly aligns with bills. I'd ship monthly
-   first and add a toggle.
-9. **Hygiene metric weighting.** "Cleanliness 78%" — should it weigh
-   transactions by absolute amount (so cleaning a $5k txn moves the
-   needle more than a $5 txn), by count (each txn equal), or both
-   (show two numbers)?
-10. **Keyboard chord `R`** ("jump to next row needing review"). Does
-    "needing review" mean only norm rules, or any cleaning state? I'd
-    have it cycle: pending norm → orphan transfer → uncategorised →
-    pending pair, in that priority order.
-11. **Dashboard charts: SVG vs canvas.** I'm proposing server-rendered
-    SVG. Is that OK or do you want interactivity (hover tooltips, slice
-    drill-down)? Hover tooltips work fine with pure SVG + a tiny bit
-    of JS; drill-down would push us toward client charts.
-12. **Account scope on Dashboard.** Default = all accounts collapsed
-    into one cashflow? Or default = exclude offset/loan/stocks accounts
-    so the picture matches "spending money"?
+## 11. Open questions still on the table
+
+1. **Multi-currency.** You have one USD account (PayPal USD). Charts
+   would use `amount_in_base_currency` (AUD). OK to label everything
+   AUD with a footer disclaimer, or split per-currency?
+2. **Default date range on Transactions tab.** Last 90 days, or all
+   (22k rows)? My preference: all, with a virtual-scroll-style "load
+   older" pagination. SQLite + a date index handles this easily.
+3. **Charts: SVG only, or SVG + small bit of JS for hover tooltips?**
+   Pure-SVG is simpler and snapshot-testable. Hover tooltips would
+   improve the sankey and small multiples — worth ~30 LoC of JS?
+4. **Yearly view on Dashboard.** 12 monthly cells side-by-side as a
+   single scroll, or 12 cells stacked vertically with each cell
+   reusing the monthly detail layout? The first is denser; the second
+   is honest about how much screen each month deserves. (Mockup F
+   shows option 1 — see how it reads.)
+5. **Review scoring formula.** "+12.4% impact" can be defined as:
+   (a) what fraction of $-weight this single decision unblocks, or
+   (b) the same divided by the *time-to-decide* (how clear-cut the
+   decision is). Option (b) prioritises easy wins; option (a) is
+   honest. I'd start with (a).
+6. **Snooze duration.** Default 30 days for an orphan transfer? Or
+   should it be configurable per-decision (with quick chips for
+   7/30/90 days)?
