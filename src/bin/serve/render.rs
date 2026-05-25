@@ -88,7 +88,7 @@ pub fn render_page(
                 script src="https://unpkg.com/htmx.org@2.0.4" {}
                 style { (PreEscaped(CSS)) }
             }
-            body {
+            body class=(format!("tab-{tab_slug}")) {
                 (render_tab_bar(tab_slug))
                 div.layout {
                     div.queue-panel #queue { (queue) }
@@ -174,6 +174,36 @@ mod tests {
             assert_eq!(
                 count, 1,
                 "expected exactly one active tab when active={active:?}, got {count} in: {html}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod page_tests {
+    use super::*;
+    use maud::html;
+
+    /// The full page must tag its <body> with the active tab slug as a
+    /// class so per-tab CSS rules can scope themselves without
+    /// duplicating selectors. Without this hook, every tab shares the
+    /// same .queue-item layout and the new tabs collide with the
+    /// old tabs' grid-template-columns.
+    #[test]
+    fn render_page_tags_body_with_tab_slug_class() {
+        for slug in ["dashboard", "transactions", "review", "transfers", "normalise"] {
+            let html = render_page(
+                slug,
+                "x",
+                html! {},
+                html! {},
+                html! {},
+            )
+            .into_string();
+            let needle = format!("class=\"tab-{slug}\"");
+            assert!(
+                html.contains(&needle),
+                "expected body to carry {needle:?} so per-tab CSS can scope; html:\n{html}"
             );
         }
     }
