@@ -539,4 +539,106 @@ body {
     color: var(--fg-dim);
     font-size: 16px;
 }
+"/* ===========================================================
+ * Per-pillar status emojis (Pair / Norm / Cat) used by the
+ * Transactions tab's queue rows. Shape-distinct glyphs encode
+ * dimension and state without relying on colour, so the
+ * vocabulary is readable regardless of colour vision.
+ * Mnemonic shape families: Pair = links, Norm = labels, Cat = filing.
+ * =========================================================== */
+.g-pair-confirmed::before { content: "\1F517"; }      /* chain link */
+.g-pair-pending::before   { content: "\1F501"; }      /* repeat / cycle */
+.g-pair-orphan::before    { content: "\26A0\FE0F"; }  /* warning triangle */
+.g-pair-rejected::before  { content: "\2702\FE0F"; }  /* scissors */
+.g-norm-confirmed::before { content: "\1F3F7\FE0F"; } /* tag/label */
+.g-norm-pending::before   { content: "\1F4DD"; }      /* memo */
+.g-norm-missing::before   { content: "\2753"; }       /* red question mark */
+.g-norm-rejected::before  { content: "\1F6AB"; }      /* prohibited */
+.g-cat-confirmed::before  { content: "\1F5C4\FE0F"; } /* file cabinet */
+.g-cat-pending::before    { content: "\1F4C1"; }      /* folder */
+.g-cat-missing::before    { content: "\1F4E6"; }      /* package */
+.g-cat-rejected::before   { content: "\1F5D1\FE0F"; } /* wastebasket */
+.g-none::before           { content: "\B7"; opacity: 0.4; }
+.g-pair-confirmed, .g-pair-pending, .g-pair-rejected, .g-pair-orphan,
+.g-norm-confirmed, .g-norm-pending, .g-norm-rejected, .g-norm-missing,
+.g-cat-confirmed, .g-cat-pending, .g-cat-rejected, .g-cat-missing,
+.g-none {
+    display: inline-block;
+    min-width: 1.4em;
+    text-align: center;
+    font-style: normal;
+    font-weight: normal;
+}
+
+/* ===========================================================
+ * Transactions tab — queue row layout.
+ *
+ * The Transactions row shape is different from the Transfers /
+ * Normalise rows (date column, three-emoji glyph stack, payee,
+ * signed amount), so we override the shared .queue-item grid
+ * just for this tab. Body element carries class="tab-transactions"
+ * (set by render::render_page) so the override is scoped.
+ * =========================================================== */
+.tab-transactions .queue-item {
+    grid-template-columns: 56px 70px 1fr 100px;
+    align-items: center;
+    padding: 6px 12px;
+}
+.tab-transactions .queue-item .date {
+    color: var(--fg-dim);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+}
+.tab-transactions .queue-item .glyphs {
+    display: inline-flex;
+    gap: 3px;
+    font-size: 14px;
+    line-height: 1;
+    justify-content: flex-start;
+}
+.tab-transactions .queue-item .payee {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg);
+}
+.tab-transactions .queue-item .amount {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.tab-transactions .queue-item .amount-positive { color: var(--green); }
+.tab-transactions .queue-item .amount-negative { color: var(--fg); }
+
+/* Detail panel — cleaning state cards (one per pillar that needs
+ * the user's attention). Bordered cards, dimension-coloured left edge,
+ * inline glyph + title + sub. */
+.tab-transactions .detail-header { padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tab-transactions .detail-header .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.tab-transactions .detail-header h2 { font-size: 16px; font-weight: 500; }
+.tab-transactions .detail-header .amount-big { font-size: 18px; font-variant-numeric: tabular-nums; }
+.tab-transactions .detail-header .amount-big.amount-positive { color: var(--green); }
+.tab-transactions .detail-header .amount-big.amount-negative { color: var(--fg); }
+.tab-transactions .detail-header .meta { color: var(--fg-dim); font-size: 12px; margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+.tab-transactions .chip {
+    display: inline-block; padding: 1px 8px;
+    border: 1px solid var(--border); border-radius: 999px;
+    font-size: 11px; color: var(--fg-dim);
+}
+.tab-transactions .cleaning-card {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; margin: 6px 0;
+    background: var(--bg-highlight);
+    display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center;
+}
+.tab-transactions .cleaning-card.bad  { border-left: 3px solid var(--red);    }
+.tab-transactions .cleaning-card.warn { border-left: 3px solid var(--yellow); }
+.tab-transactions .cleaning-card.ok   { border-left: 3px solid var(--green);  }
+.tab-transactions .cleaning-card .glyph { font-size: 20px; line-height: 1; }
+.tab-transactions .cleaning-card .title { font-size: 13px; }
+.tab-transactions .cleaning-card .sub { font-size: 11px; color: var(--fg-dim); }
+.tab-transactions .note {
+    background: var(--bg-highlight); border-left: 3px solid var(--accent);
+    padding: 8px 12px; font-size: 11px; color: var(--fg-dim);
+    margin: 12px 0; border-radius: 0 6px 6px 0;
+}
 "#;
