@@ -111,6 +111,28 @@ enum Outcome {
     DeletedUpstream,
 }
 
+impl Outcome {
+    /// One-character status glyph for progress output. Kept short so the
+    /// per-txn line stays under ~80 chars even with long error messages.
+    fn glyph(&self) -> &'static str {
+        match self {
+            Outcome::Pushed => "\u{2713}",                // ✓
+            Outcome::WouldPush => "\u{2192}",             // → (would-push, dry-run)
+            Outcome::SkippedChangedUpstream => "\u{21BB}", // ↻ (remote moved on)
+            Outcome::DeletedUpstream => "\u{2717}",       // ✗ (deleted upstream)
+        }
+    }
+
+    fn label(&self) -> &'static str {
+        match self {
+            Outcome::Pushed => "pushed",
+            Outcome::WouldPush => "would-push",
+            Outcome::SkippedChangedUpstream => "skipped (remote changed)",
+            Outcome::DeletedUpstream => "deleted upstream",
+        }
+    }
+}
+
 /// Entry point. Wraps the whole batch in `with_operation("push", ...)` so the
 /// (one) `transactions.updated_at` UPDATE per successful PUT lands as a
 /// `_transaction_changes` row with `reason='push'` — easy to filter out of
@@ -119,16 +141,46 @@ pub fn push<A: PushApi>(api: &A, conn: &Connection, opts: &PushOpts) -> Result<P
     let mut stats = PushStats::default();
 
     let pending = pending_txn_ids(conn, opts.limit)?;
+    let total = pending.len();
+    // Width for the [i/N] counter so the column stays aligned.
+    let width = total.to_string().len();
+
+    if total == 0 {
+        eprintln!("push: nothing pending");
+    } else {
+        eprintln!(
+            "push: {total} transaction{s} pending{mode}",
+            s = if total == 1 { "" } else { "s" },
+            mode = if opts.dry_run { " (dry-run)" } else { "" },
+        );
+    }
 
     db::with_operation(conn, "push", |conn| {
-        for txn_id in pending {
+        for (i, txn_id) in pending.into_iter().enumerate() {
             match run_one_txn(api, conn, txn_id, opts) {
-                Ok(Outcome::Pushed) => stats.pushed += 1,
-                Ok(Outcome::WouldPush) => stats.would_push += 1,
-                Ok(Outcome::SkippedChangedUpstream) => stats.skipped_changed_upstream += 1,
-                Ok(Outcome::DeletedUpstream) => stats.deleted_upstream += 1,
+                Ok(outcome) => {
+                    eprintln!(
+                        "  [{idx:>w$}/{total}] {glyph} {label:<24} txn {txn_id}",
+                        idx = i + 1,
+                        w = width,
+                        glyph = outcome.glyph(),
+                        label = outcome.label(),
+                    );
+                    match outcome {
+                        Outcome::Pushed => stats.pushed += 1,
+                        Outcome::WouldPush => stats.would_push += 1,
+                        Outcome::SkippedChangedUpstream => stats.skipped_changed_upstream += 1,
+                        Outcome::DeletedUpstream => stats.deleted_upstream += 1,
+                    }
+                }
                 Err(e) => {
-                    eprintln!("txn={txn_id} failed: {e:#}");
+                    eprintln!(
+                        "  [{idx:>w$}/{total}] \u{2620} {label:<24} txn {txn_id}: {err:#}",
+                        idx = i + 1,
+                        w = width,
+                        label = "failed",
+                        err = e,
+                    );
                     stats.failed += 1;
                 }
             }
