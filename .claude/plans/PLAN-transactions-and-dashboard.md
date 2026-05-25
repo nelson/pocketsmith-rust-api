@@ -89,8 +89,8 @@ vocabulary is readable regardless of colour vision.
 
 | State        | Pair (links)              | Normalise (labels)     | Categorise (files)        |
 |--------------|---------------------------|------------------------|---------------------------|
-| confirmed    | 🔗 paired                 | 🏷️ rule confirmed       | 📁 categorised             |
-| pending      | 🔁 pair proposed          | 📝 rule pending review   | 🗂️ category pending       |
+| confirmed    | 🔗 paired                 | 🏷️ rule confirmed       | 🗄️ categorised            |
+| pending      | 🔁 pair proposed          | 📝 rule pending review   | 📁 category pending        |
 | needs you    | ⚠️ orphan transfer        | ❓ no rule             | 📦 uncategorised           |
 | rejected     | ✂️ pair rejected          | 🚫 rule rejected        | 🗑️ category rejected      |
 | n/a          | · not a transfer          | · already normalised   | · —                       |
@@ -101,7 +101,7 @@ Mnemonic: **Pair = links** (chain, scissors, cycle, warning).
 
 Examples reading the vocabulary:
 - `· ❓ 📦` — not a transfer, no normalisation rule, uncategorised
-- `🔁 🏷️ 📁` — transfer pair pending, normalisation confirmed, categorised
+- `🔁 🏷️ 🗄️` — transfer pair pending, normalisation confirmed, categorised
 - `⚠️ 📝 📦` — orphan transfer, normalisation pending, uncategorised
 
 **Implementation note for v1:** the Categorise slot is rendered now (`📁`
