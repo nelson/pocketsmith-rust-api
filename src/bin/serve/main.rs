@@ -5,6 +5,7 @@ mod normalise;
 mod render;
 mod state;
 mod tab;
+mod transactions;
 mod transfers;
 
 #[cfg(test)]
