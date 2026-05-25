@@ -20,7 +20,6 @@ use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
 use pocketsmith_sync::transfers::{Confidence, TransferPair};
 
 use crate::state::AppState;
-
 fn fresh_state() -> Arc<Mutex<AppState>> {
     let conn = initialize_in_memory().unwrap();
     seed_account(&conn, 1, "Cheque").unwrap();
@@ -127,4 +126,40 @@ fn normalise_default_filters_are_all_all() {
     // the active filter button (look for the active class adjacent to the
     // ALL-label hx-get URLs the queue fragment serves).
     assert!(html.contains("filter-btn active\" hx-get=\"/normalise/queue?filter=all&amp;class=all\""));
+}
+
+#[test]
+fn transactions_page_renders_tab_bar_and_three_panes() {
+    let state = fresh_state();
+    let html = crate::transactions::views::render_page_shell(&state).into_string();
+
+    contains_all(
+        &html,
+        &[
+            // Tab bar with the right active tab.
+            "class=\"tab-bar\"",
+            "class=\"tab active\">Transactions",
+            // Other tabs render as links.
+            "href=\"/dashboard/\"",
+            "href=\"/review/\"",
+            "href=\"/transfers/\"",
+            "href=\"/normalise/\"",
+            // Layout panel ids that the JS and HTMX swap targets rely on.
+            "id=\"queue\"",
+            "id=\"detail\"",
+            "id=\"activity\"",
+        ],
+    );
+}
+
+#[test]
+fn transactions_page_lists_transactions_tab_as_active_only_once() {
+    // Guards the canonical tab bar behaviour for the new tab.
+    let state = fresh_state();
+    let html = crate::transactions::views::render_page_shell(&state).into_string();
+    let active_count = html.matches("class=\"tab active\"").count();
+    assert_eq!(
+        active_count, 1,
+        "exactly one active tab expected, got {active_count}"
+    );
 }
