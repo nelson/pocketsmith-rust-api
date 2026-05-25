@@ -295,3 +295,301 @@ mod tests {
         assert!(html.contains("$12.34"), "html:\n{html}");
     }
 }
+
+/// Render the per-transaction detail fragment served by
+/// `GET /transactions/txn/<id>`. Static for now: just the header,
+/// account, amount, and three cleaning-state cards (one per pillar
+/// that needs the user's attention). Action buttons in the cards are
+/// rendered but not wired up; the action plumbing lands in a later
+/// commit.
+pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Markup {
+    let st = state.lock().unwrap();
+    let row_opt: Option<TxnQueueRow> = super::helpers::recent_transactions(&st.conn, 100_000)
+        .ok()
+        .and_then(|rows| rows.into_iter().find(|r| r.id == txn_id));
+
+    let Some(row) = row_opt else {
+        return html! {
+            div.empty-state { p { "Transaction not found." } }
+        };
+    };
+
+    let pair = super::state::derive_pair_state(&st.conn, row.id, row.is_transfer)
+        .unwrap_or(PairState::NotApplicable);
+    let norm = super::state::derive_norm_state(&st.conn, row.original_payee.as_deref())
+        .unwrap_or(NormState::Missing);
+    let cat = super::state::derive_cat_state(row.category_id);
+    render_detail(&row, pair, norm, cat)
+}
+
+/// Pure rendering of the detail panel content. Split out so tests can
+/// drive it without database setup.
+fn render_detail(row: &TxnQueueRow, pair: PairState, norm: NormState, cat: CatState) -> Markup {
+    let amount_class = if row.amount_cents >= 0 { "amount-positive" } else { "amount-negative" };
+    let signed = if row.amount_cents >= 0 {
+        format!("+{}", format_dollars(row.amount_cents))
+    } else {
+        format!("-{}", format_dollars(row.amount_cents))
+    };
+    html! {
+        div.detail-header {
+            div.row {
+                h2 {
+                    (row.payee)
+                    " "
+                    span.glyphs {
+                        (pair_glyph(pair))
+                        (norm_glyph(norm))
+                        (cat_glyph(cat))
+                    }
+                }
+                span.amount-big.(amount_class) { (signed) }
+            }
+            div.meta {
+                span { (format_short_date(&row.date)) }
+                @if let Some(name) = &row.account_name {
+                    span { (name) }
+                }
+                @if row.original_payee.as_deref() != Some(row.payee.as_str())
+                    && row.original_payee.is_some()
+                {
+                    span.chip { "raw: " (row.original_payee.as_deref().unwrap_or("")) }
+                }
+            }
+        }
+
+        (render_pair_card(pair))
+        (render_norm_card(norm, row.original_payee.as_deref()))
+        (render_cat_card(cat))
+
+        div.note {
+            "Action wiring (Y / N / S) lands in a follow-up commit. For now the cards are read-only."
+        }
+    }
+}
+
+fn render_pair_card(s: PairState) -> Markup {
+    let (cls, title, sub) = match s {
+        PairState::Confirmed => (
+            "ok",
+            "Pair confirmed",
+            "This transaction is paired with its counterpart.",
+        ),
+        PairState::Pending => (
+            "warn",
+            "Pair proposed",
+            "The pairing pipeline proposed a counterpart \u{2014} your call to confirm.",
+        ),
+        PairState::Orphan => (
+            "bad",
+            "Looks like a transfer, no pair found",
+            "Either the counterpart hasn't synced yet, this isn't a real internal transfer, or the pairing pipeline missed it.",
+        ),
+        PairState::Rejected => (
+            "ok",
+            "Pair rejected",
+            "You've decided this is not a transfer.",
+        ),
+        PairState::NotApplicable => return html! {},
+    };
+    html! {
+        div.cleaning-card.(cls) {
+            span.glyph.(pair_glyph_class(s)) { }
+            div {
+                div.title { (title) }
+                div.sub { (sub) }
+            }
+        }
+    }
+}
+
+fn render_norm_card(s: NormState, original_payee: Option<&str>) -> Markup {
+    let (cls, title, sub) = match s {
+        NormState::Confirmed => (
+            "ok",
+            "Normalisation rule confirmed",
+            "Payee has a confirmed normalisation rule.",
+        ),
+        NormState::Pending => (
+            "warn",
+            "Normalisation rule pending review",
+            "The pipeline produced a proposal \u{2014} your call to confirm.",
+        ),
+        NormState::Missing => (
+            "bad",
+            "No normalisation rule",
+            "The pipeline has nothing to say about this payee. Either teach it a rule, or ignore.",
+        ),
+        NormState::Rejected => (
+            "ok",
+            "Normalisation rule rejected",
+            "You've decided this payee should not be normalised.",
+        ),
+    };
+    let _ = original_payee; // for future commits when we link to /normalise/item/<slug>
+    html! {
+        div.cleaning-card.(cls) {
+            span.glyph.(norm_glyph_class(s)) { }
+            div {
+                div.title { (title) }
+                div.sub { (sub) }
+            }
+        }
+    }
+}
+
+fn render_cat_card(s: CatState) -> Markup {
+    let (cls, title, sub) = match s {
+        CatState::Confirmed => (
+            "ok",
+            "Categorised",
+            "This transaction has a category.",
+        ),
+        CatState::Missing => (
+            "bad",
+            "Uncategorised",
+            "This transaction has no category. Mutation is out of scope for v1 \u{2014} fix it in PocketSmith and re-sync.",
+        ),
+    };
+    html! {
+        div.cleaning-card.(cls) {
+            span.glyph.(cat_glyph_class(s)) { }
+            div {
+                div.title { (title) }
+                div.sub { (sub) }
+            }
+        }
+    }
+}
+
+// Class-only variants of the glyph fns so the detail panel can use
+// them inside .cleaning-card .glyph wrappers (rather than a span).
+fn pair_glyph_class(s: PairState) -> &'static str {
+    match s {
+        PairState::Confirmed => "g-pair-confirmed",
+        PairState::Pending => "g-pair-pending",
+        PairState::Orphan => "g-pair-orphan",
+        PairState::Rejected => "g-pair-rejected",
+        PairState::NotApplicable => "g-none",
+    }
+}
+fn norm_glyph_class(s: NormState) -> &'static str {
+    match s {
+        NormState::Confirmed => "g-norm-confirmed",
+        NormState::Pending => "g-norm-pending",
+        NormState::Missing => "g-norm-missing",
+        NormState::Rejected => "g-norm-rejected",
+    }
+}
+fn cat_glyph_class(s: CatState) -> &'static str {
+    match s {
+        CatState::Confirmed => "g-cat-confirmed",
+        CatState::Missing => "g-cat-missing",
+    }
+}
+
+#[cfg(test)]
+mod detail_tests {
+    use super::*;
+    use crate::transactions::helpers::TxnQueueRow;
+
+    fn row(amount_cents: i64) -> TxnQueueRow {
+        TxnQueueRow {
+            id: 1,
+            date: "2026-04-15".to_string(),
+            payee: "Amazon Marketplace".to_string(),
+            amount_cents,
+            account_name: Some("Amex Platinum".to_string()),
+            original_payee: Some("AMAZON MARKETPLACE".to_string()),
+            category_id: None,
+            is_transfer: false,
+        }
+    }
+
+    #[test]
+    fn render_detail_emits_three_cleaning_cards_for_a_messy_row() {
+        let html = render_detail(
+            &row(-1699),
+            PairState::Orphan,
+            NormState::Missing,
+            CatState::Missing,
+        )
+        .into_string();
+        // Three distinct cards, one per pillar.
+        assert_eq!(
+            html.matches("class=\"cleaning-card").count(),
+            3,
+            "expected 3 cleaning cards, html:\n{html}"
+        );
+        // Each pillar's "needs you" glyph class is present.
+        for cls in ["g-pair-orphan", "g-norm-missing", "g-cat-missing"] {
+            assert!(
+                html.contains(cls),
+                "expected {cls} in detail html"
+            );
+        }
+    }
+
+    #[test]
+    fn render_detail_omits_pair_card_when_not_applicable() {
+        // A non-transfer row with confirmed norm + cat: only the
+        // norm+cat cards should render, both with .ok class. No pair
+        // card at all (PairState::NotApplicable returns empty markup).
+        let html = render_detail(
+            &row(-1234),
+            PairState::NotApplicable,
+            NormState::Confirmed,
+            CatState::Confirmed,
+        )
+        .into_string();
+        assert_eq!(
+            html.matches("class=\"cleaning-card").count(),
+            2,
+            "expected 2 cleaning cards (no pair card), html:\n{html}"
+        );
+        assert!(
+            !html.contains("g-pair-"),
+            "no pair-* class expected for not-applicable row, html:\n{html}"
+        );
+    }
+
+    #[test]
+    fn render_detail_shows_amount_signed_and_coloured() {
+        let html = render_detail(
+            &row(-1699),
+            PairState::NotApplicable,
+            NormState::Missing,
+            CatState::Missing,
+        )
+        .into_string();
+        assert!(html.contains("amount-negative"), "html:\n{html}");
+        assert!(html.contains("$16.99"), "html:\n{html}");
+
+        let html = render_detail(
+            &row(2500),
+            PairState::NotApplicable,
+            NormState::Missing,
+            CatState::Missing,
+        )
+        .into_string();
+        assert!(html.contains("amount-positive"), "html:\n{html}");
+        assert!(html.contains("$25.00"), "html:\n{html}");
+    }
+
+    #[test]
+    fn render_detail_shows_raw_payee_chip_when_normalised_differs() {
+        // payee "Amazon Marketplace" vs original "AMAZON MARKETPLACE"
+        // differs => raw chip should render.
+        let html = render_detail(
+            &row(-1699),
+            PairState::NotApplicable,
+            NormState::Confirmed,
+            CatState::Confirmed,
+        )
+        .into_string();
+        assert!(
+            html.contains("AMAZON MARKETPLACE"),
+            "expected raw original_payee chip, html:\n{html}"
+        );
+    }
+}

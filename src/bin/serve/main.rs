@@ -62,6 +62,13 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let response = match (method, path.as_str()) {
         // --- Transactions tab (read-only shell for now)
         (Method::Get, "/transactions" | "/transactions/") => transactions::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/transactions/txn/") => {
+            let id_str = p.trim_start_matches("/transactions/txn/").split('/').next().unwrap_or("");
+            match id_str.parse::<i64>() {
+                Ok(id) => transactions::views::render_detail_fragment(&state, id),
+                Err(_) => html! { p { "Invalid transaction id" } },
+            }
+        }
 
         // --- Normalise tab (matched first so /normalise/* POSTs don't
         // fall into the transfer arms below.)
