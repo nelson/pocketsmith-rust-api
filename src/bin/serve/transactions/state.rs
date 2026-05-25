@@ -37,7 +37,7 @@ pub enum PairState {
     /// Row participates in a rejected `transfer_pairs` row.
     Rejected,
     /// `is_transfer = 1` but no row exists in `transfer_pairs`. The
-    /// pairing pipeline has not (yet) found a counterpart â either it
+    /// pairing pipeline has not (yet) found a counterpart — either it
     /// will be paired in a future sync, or the user will mark it
     /// "not_a_transfer" / "snoozed" via `transfer_decisions` (Â§8 of plan).
     Orphan,
@@ -54,7 +54,7 @@ pub enum NormState {
     /// `payee_normalisations` row exists with `status = rejected`.
     Rejected,
     /// No `payee_normalisations` row exists for this `original_payee`.
-    /// Reading: "the pipeline has nothing to say about this payee yet â
+    /// Reading: "the pipeline has nothing to say about this payee yet —
     /// either teach it a new rule, or the payee is so unique it doesn't
     /// merit one."
     Missing,
@@ -69,7 +69,7 @@ pub enum CatState {
 /// Derive the pair state for one transaction. The query checks both
 /// sides of `transfer_pairs` because either side carries the same
 /// status. `is_transfer` is supplied by the caller because it's
-/// already in `TxnQueueRow` â saves a redundant SELECT.
+/// already in `TxnQueueRow` — saves a redundant SELECT.
 pub fn derive_pair_state(conn: &Connection, txn_id: i64, is_transfer: bool) -> Result<PairState> {
     // Single SELECT covers both halves of the pair via OR.
     let status: Option<i32> = conn
@@ -96,7 +96,7 @@ pub fn derive_pair_state(conn: &Connection, txn_id: i64, is_transfer: bool) -> R
 
 /// Derive the normalisation state for one transaction by looking up
 /// its `original_payee` in `payee_normalisations`. Pass `None` for a
-/// row whose `original_payee` is NULL â such a row can never have a
+/// row whose `original_payee` is NULL — such a row can never have a
 /// rule, so the answer is always `Missing`.
 pub fn derive_norm_state(conn: &Connection, original_payee: Option<&str>) -> Result<NormState> {
     let Some(op) = original_payee else {
@@ -121,7 +121,7 @@ pub fn derive_norm_state(conn: &Connection, original_payee: Option<&str>) -> Res
 }
 
 /// Derive the category state. Pure function of the supplied
-/// `category_id` â `None` means uncategorised. V1 doesn't model
+/// `category_id` — `None` means uncategorised. V1 doesn't model
 /// pending/rejected category decisions; the staging flow for those
 /// lives in the future v2 milestone.
 pub fn derive_cat_state(category_id: Option<i64>) -> CatState {

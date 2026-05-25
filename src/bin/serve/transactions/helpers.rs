@@ -16,7 +16,7 @@ pub struct TxnQueueRow {
     pub id: i64,
     /// Calendar date as stored (`YYYY-MM-DD`).
     pub date: String,
-    /// Display payee â prefer `transactions.payee` if non-null, otherwise
+    /// Display payee — prefer `transactions.payee` if non-null, otherwise
     /// fall back to `original_payee` so the row is never blank.
     pub payee: String,
     /// Amount in cents (signed). Positive = inflow, negative = outflow.
@@ -25,15 +25,15 @@ pub struct TxnQueueRow {
     /// Account display name; may be missing if the row's
     /// `transaction_account_id` is unknown to the join.
     pub account_name: Option<String>,
-    /// Original payee string â the input to the normalise pipeline.
+    /// Original payee string — the input to the normalise pipeline.
     /// Needed by the queue row to derive normalisation state without a
     /// second round-trip.
     pub original_payee: Option<String>,
-    /// The transaction's `category_id`. None means uncategorised â
+    /// The transaction's `category_id`. None means uncategorised —
     /// drives the categorise slot in the three-emoji status stack.
     pub category_id: Option<i64>,
     /// `is_transfer` flag from the source row. Drives orphan detection
-    /// (this is_transfer=1 + no `transfer_pairs` row â orphan).
+    /// (this is_transfer=1 + no `transfer_pairs` row ⇒ orphan).
     pub is_transfer: bool,
 }
 
@@ -42,7 +42,7 @@ pub struct TxnQueueRow {
 /// large value to fetch everything.
 ///
 /// This is the queue panel's primary data source. Filters and search
-/// will narrow this set later â for now it returns "the last N rows"
+/// will narrow this set later — for now it returns "the last N rows"
 /// unconditionally so the very first version of the queue can render.
 pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueueRow>> {
     let mut stmt = conn.prepare(
@@ -150,7 +150,7 @@ mod tests {
     fn recent_transactions_breaks_date_ties_by_id_desc() {
         let conn = initialize_in_memory().unwrap();
         seed_account(&conn, 1, "Cheque").unwrap();
-        // Same date, different ids â highest id should come first.
+        // Same date, different ids — highest id should come first.
         insert_txn(&conn, 100, 1, "2026-04-01", -10.0, "A", None, None, false);
         insert_txn(&conn, 200, 1, "2026-04-01", -20.0, "B", None, None, false);
         insert_txn(&conn, 150, 1, "2026-04-01", -30.0, "C", None, None, false);
@@ -240,7 +240,7 @@ mod tests {
         let conn = initialize_in_memory().unwrap();
         seed_account(&conn, 1, "Cheque").unwrap();
         seed_category(&conn, 42, "_Bills");
-        // category_id set + is_transfer=true â both should round-trip.
+        // category_id set + is_transfer=true — both should round-trip.
         insert_txn(
             &conn,
             1,

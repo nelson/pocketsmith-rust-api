@@ -1,4 +1,4 @@
-//! The `Transactions` tab â a reverse-chronological river of every
+//! The `Transactions` tab — a reverse-chronological river of every
 //! transaction with cleaning-state visible at a glance. See
 //! `.claude/plans/PLAN-transactions-and-dashboard.md` (\u00a73) for the
 //! design.
