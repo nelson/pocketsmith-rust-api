@@ -60,6 +60,9 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     }
 
     let response = match (method, path.as_str()) {
+        // --- Transactions tab (read-only shell for now)
+        (Method::Get, "/transactions" | "/transactions/") => transactions::views::render_page_shell(&state),
+
         // --- Normalise tab (matched first so /normalise/* POSTs don't
         // fall into the transfer arms below.)
         (Method::Get, "/normalise" | "/normalise/") => normalise::views::render_page_shell(&state),
