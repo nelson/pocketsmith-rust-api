@@ -555,8 +555,8 @@ body {
 .g-pair-pending::before   { content: "\1F501"; }      /* repeat / cycle */
 .g-pair-orphan::before    { content: "\26A0\FE0F"; }  /* warning triangle */
 .g-pair-rejected::before  { content: "\2702\FE0F"; }  /* scissors */
-.g-norm-confirmed::before { content: "\1F3F7\FE0F"; } /* tag/label */
-.g-norm-pending::before   { content: "\1F4DD"; }      /* memo */
+.g-norm-confirmed::before { content: "\2705"; }       /* white heavy check mark */
+.g-norm-pending::before   { content: "\1F50D"; }      /* magnifying glass */
 .g-norm-missing::before   { content: "\2753"; }       /* red question mark */
 .g-norm-rejected::before  { content: "\1F6AB"; }      /* prohibited */
 .g-cat-confirmed::before  { content: "\1F5C4\FE0F"; } /* file cabinet */
@@ -585,7 +585,10 @@ body {
  * (set by render::render_page) so the override is scoped.
  * =========================================================== */
 .tab-transactions .queue-item {
-    grid-template-columns: 56px 70px 1fr 100px;
+    /* Round-3 layout: norm-glyph | date | payee | pair-glyph? | cat-tag | amount
+       Pair glyph is optional content but the column is always present
+       (collapses to ~0 when empty). */
+    grid-template-columns: 24px 56px 1fr 24px auto 100px;
     align-items: center;
     padding: 6px 12px;
 }
@@ -593,13 +596,6 @@ body {
     color: var(--fg-dim);
     font-variant-numeric: tabular-nums;
     font-size: 11px;
-}
-.tab-transactions .queue-item .glyphs {
-    display: inline-flex;
-    gap: 3px;
-    font-size: 14px;
-    line-height: 1;
-    justify-content: flex-start;
 }
 .tab-transactions .queue-item .payee {
     overflow: hidden;
@@ -613,6 +609,26 @@ body {
 }
 .tab-transactions .queue-item .amount-positive { color: var(--green); }
 .tab-transactions .queue-item .amount-negative { color: var(--fg); }
+.tab-transactions .queue-item .pair-empty { display: inline-block; min-width: 1px; }
+
+/* Category tag (pill) used in queue rows and detail header. */
+.tab-transactions .cat-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}
+.tab-transactions .cat-tag-confirmed { color: var(--fg); border-color: var(--fg-dark); }
+.tab-transactions .cat-tag-pending   { color: var(--yellow); border-color: var(--yellow); }
+.tab-transactions .cat-tag-missing   { color: var(--red); border-color: var(--red); font-weight: 600; }
+.tab-transactions .cat-tag-rejected  { color: var(--fg-dim); border-color: var(--fg-dim); }
 
 /* Detail panel — cleaning state cards (one per pillar that needs
  * the user's attention). Bordered cards, dimension-coloured left edge,
