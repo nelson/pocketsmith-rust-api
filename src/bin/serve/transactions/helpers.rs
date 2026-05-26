@@ -32,6 +32,10 @@ pub struct TxnQueueRow {
     /// The transaction's `category_id`. None means uncategorised —
     /// drives the categorise slot in the three-emoji status stack.
     pub category_id: Option<i64>,
+    /// The category's `title`, joined from `categories`. Populated when
+    /// `category_id` is Some and the join hits; the queue's category
+    /// tag renders this string (e.g. "Eating Out").
+    pub category_title: Option<String>,
     /// `is_transfer` flag from the source row. Drives orphan detection
     /// (this is_transfer=1 + no `transfer_pairs` row ⇒ orphan).
     pub is_transfer: bool,
@@ -53,17 +57,20 @@ pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueue
                 ta.name,
                 t.original_payee,
                 t.category_id,
+                c.title,
                 COALESCE(t.is_transfer, 0)
          FROM transactions t
          LEFT JOIN transaction_accounts ta
            ON ta.id = t.transaction_account_id
+         LEFT JOIN categories c
+           ON c.id = t.category_id
          ORDER BY t.date DESC, t.id DESC
          LIMIT ?1",
     )?;
     let rows = stmt
         .query_map(rusqlite::params![limit], |row| {
             let amount: f64 = row.get(3)?;
-            let is_transfer_int: i64 = row.get(7)?;
+            let is_transfer_int: i64 = row.get(8)?;
             let payee: Option<String> = row.get(2)?;
             let original_payee: Option<String> = row.get(5)?;
             // Display payee falls back to original_payee so the queue
@@ -81,6 +88,7 @@ pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueue
                 account_name: row.get(4)?,
                 original_payee,
                 category_id: row.get(6)?,
+                category_title: row.get(7)?,
                 is_transfer: is_transfer_int != 0,
             })
         })?
@@ -257,8 +265,10 @@ mod tests {
         let rows = recent_transactions(&conn, 10).unwrap();
         // Newest first: id=2 (no category, not transfer), then id=1.
         assert_eq!(rows[0].category_id, None);
+        assert_eq!(rows[0].category_title, None);
         assert!(!rows[0].is_transfer);
         assert_eq!(rows[1].category_id, Some(42));
+        assert_eq!(rows[1].category_title.as_deref(), Some("_Bills"));
         assert!(rows[1].is_transfer);
     }
 }
