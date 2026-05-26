@@ -16,7 +16,10 @@ use rusqlite::Connection;
 
 use pocketsmith_sync::normalise::slug_for;
 
-use crate::state::{AppState, Decision};
+use crate::state::{AppState, Decision, TxnActionPillar, TxnActivityEntry};
+use crate::tab::next_after;
+
+use super::helpers::{filtered_transactions, TxnFilter, TxnQueueRow};
 
 /// Look up the `original_payee` for a transaction, then compute the
 /// pn slug. Returns `None` if the txn doesn't exist or its
@@ -47,17 +50,66 @@ fn pair_key_for_txn(conn: &Connection, txn_id: i64) -> Option<(i64, i64)> {
     .ok()
 }
 
+/// Look up the (id, payee, amount, original_payee) snapshot of a txn
+/// for the activity log. Returns None for an unknown txn id.
+fn txn_snapshot(conn: &Connection, txn_id: i64) -> Option<(String, i64, Option<String>)> {
+    conn.query_row(
+        "SELECT t.payee, t.amount, t.original_payee FROM transactions t WHERE t.id = ?1",
+        rusqlite::params![txn_id],
+        |row| {
+            let payee: Option<String> = row.get(0)?;
+            let amount: f64 = row.get(1)?;
+            let original: Option<String> = row.get(2)?;
+            let display = payee.or_else(|| original.clone()).unwrap_or_default();
+            Ok((display, (amount * 100.0).round() as i64, original))
+        },
+    )
+    .ok()
+}
+
+/// Compute the next visible txn id after `current_id` against the
+/// active filter. Used to advance `txn_active` after a Y/N/S so the
+/// keyboard-driven flow keeps moving through the queue.
+fn next_txn_id(conn: &Connection, filter: TxnFilter, current_id: i64) -> Option<i64> {
+    let rows = filtered_transactions(conn, filter, 1000).unwrap_or_default();
+    next_after(&rows, |r: &TxnQueueRow| r.id == current_id).map(|r| r.id)
+}
+
 /// Confirm/reject/skip the normalisation proposal that owns this txn.
 /// Delegates straight into `normalise::handlers::act`. No-op if the
 /// txn has no `original_payee` (and hence no slug to act on).
 pub fn act_norm(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
-    let slug = {
+    let (slug, snapshot, next, filter) = {
         let st = state.lock().unwrap();
-        slug_for_txn(&st.conn, txn_id)
+        let filter = TxnFilter::parse(&st.txn_filter);
+        let slug = slug_for_txn(&st.conn, txn_id);
+        let snapshot = txn_snapshot(&st.conn, txn_id);
+        // Compute next BEFORE the action while the row is still visible.
+        let next = next_txn_id(&st.conn, filter, txn_id);
+        (slug, snapshot, next, filter)
     };
-    if let Some(slug) = slug {
-        crate::normalise::handlers::act(state, &slug, decision);
+    let Some(slug) = slug else { return };
+    crate::normalise::handlers::act(state, &slug, decision);
+
+    // After the action, push to the activity log and advance txn_active.
+    let mut st = state.lock().unwrap();
+    if let Some((payee, amount_cents, _orig)) = snapshot {
+        st.push_txn_activity(TxnActivityEntry {
+            txn_id,
+            payee,
+            amount_cents,
+            decision,
+            pillar: TxnActionPillar::Norm,
+        });
     }
+    // Re-resolve next against the post-action filter result. The
+    // pre-computed `next` is the preferred candidate; fall back to
+    // tail of the visible queue if it's no longer present (e.g. the
+    // filter was 'rule-pending' and `next` was just confirmed too).
+    let visible = filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
+    st.txn_active = next
+        .filter(|n| visible.iter().any(|r| r.id == *n))
+        .or_else(|| visible.last().map(|r| r.id));
 }
 
 /// Undo the previous normalisation decision for the txn's slug.
@@ -69,19 +121,42 @@ pub fn undo_norm(state: &Arc<Mutex<AppState>>, txn_id: i64) {
     if let Some(slug) = slug {
         crate::normalise::handlers::undo(state, &slug);
     }
+    // Drop the activity entry for this txn (whichever pillar) so the
+    // user doesn't see a stale row in the activity panel.
+    let mut st = state.lock().unwrap();
+    st.txn_activity.retain(|e| e.txn_id != txn_id);
+    st.txn_undone += 1;
 }
 
 /// Confirm/reject/skip the transfer pair this txn participates in.
 /// Delegates into `transfers::handlers::act`. No-op if the txn has no
 /// pair row.
 pub fn act_pair(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
-    let key = {
+    let (key, snapshot, next, filter) = {
         let st = state.lock().unwrap();
-        pair_key_for_txn(&st.conn, txn_id)
+        let filter = TxnFilter::parse(&st.txn_filter);
+        let key = pair_key_for_txn(&st.conn, txn_id);
+        let snapshot = txn_snapshot(&st.conn, txn_id);
+        let next = next_txn_id(&st.conn, filter, txn_id);
+        (key, snapshot, next, filter)
     };
-    if let Some(k) = key {
-        crate::transfers::handlers::act(state, k, decision);
+    let Some(k) = key else { return };
+    crate::transfers::handlers::act(state, k, decision);
+
+    let mut st = state.lock().unwrap();
+    if let Some((payee, amount_cents, _orig)) = snapshot {
+        st.push_txn_activity(TxnActivityEntry {
+            txn_id,
+            payee,
+            amount_cents,
+            decision,
+            pillar: TxnActionPillar::Pair,
+        });
     }
+    let visible = filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
+    st.txn_active = next
+        .filter(|n| visible.iter().any(|r| r.id == *n))
+        .or_else(|| visible.last().map(|r| r.id));
 }
 
 /// Undo the previous pair decision for the txn's pair.
@@ -93,6 +168,9 @@ pub fn undo_pair(state: &Arc<Mutex<AppState>>, txn_id: i64) {
     if let Some(k) = key {
         crate::transfers::handlers::undo(state, k);
     }
+    let mut st = state.lock().unwrap();
+    st.txn_activity.retain(|e| e.txn_id != txn_id);
+    st.txn_undone += 1;
 }
 
 #[cfg(test)]
@@ -194,6 +272,62 @@ mod tests {
         undo_norm(&state, 10);
         // Status returns to pending after undo.
         assert_eq!(pn_status(&state, &slug), Status::Pending.to_i32());
+    }
+
+    #[test]
+    fn act_norm_advances_txn_active_to_next_visible_row() {
+        let state = fresh();
+        // Seed an additional txn with its own pending pn so there are
+        // two rows the queue can navigate between. The fresh fixture
+        // uses date='2026-01-01' for all seeded rows, so order is
+        // id DESC: 30, 21, 20, 10.
+        {
+            let st = state.lock().unwrap();
+            seed_txn(&st.conn, 30, 1, "COLES NORTH", "COLES NORTH").unwrap();
+            seed_pn(&st.conn, "COLES NORTH", "Coles", Status::Pending, 1).unwrap();
+        }
+        // Mark txn 30 (the head) as active. Acting on it should advance
+        // to txn 21 (the next-newest in the unfiltered queue).
+        state.lock().unwrap().txn_active = Some(30);
+
+        act_norm(&state, 30, Decision::Confirm);
+
+        let active = state.lock().unwrap().txn_active;
+        assert_eq!(active, Some(21), "txn_active should advance to id=21");
+    }
+
+    #[test]
+    fn act_norm_pushes_an_activity_entry() {
+        let state = fresh();
+        act_norm(&state, 10, Decision::Confirm);
+        let st = state.lock().unwrap();
+        assert_eq!(st.txn_activity.len(), 1);
+        let entry = &st.txn_activity[0];
+        assert_eq!(entry.txn_id, 10);
+        assert_eq!(entry.decision, Decision::Confirm);
+        assert_eq!(entry.pillar, crate::state::TxnActionPillar::Norm);
+    }
+
+    #[test]
+    fn undo_norm_drops_the_activity_entry_and_bumps_undone() {
+        let state = fresh();
+        act_norm(&state, 10, Decision::Confirm);
+        assert_eq!(state.lock().unwrap().txn_activity.len(), 1);
+
+        undo_norm(&state, 10);
+
+        let st = state.lock().unwrap();
+        assert_eq!(st.txn_activity.len(), 0, "activity entry removed");
+        assert_eq!(st.txn_undone, 1, "undone counter incremented");
+    }
+
+    #[test]
+    fn act_pair_pushes_an_activity_entry_with_pair_pillar() {
+        let state = fresh();
+        act_pair(&state, 20, Decision::Confirm);
+        let st = state.lock().unwrap();
+        assert_eq!(st.txn_activity.len(), 1);
+        assert_eq!(st.txn_activity[0].pillar, crate::state::TxnActionPillar::Pair);
     }
 
     #[test]

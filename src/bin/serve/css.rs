@@ -635,6 +635,8 @@ body {
 .tab-transactions .cat-tag-confirmed { color: var(--fg-dim); border-color: var(--fg-dark); }
 .tab-transactions .cat-tag-pending   { color: var(--yellow); border-color: var(--yellow); }
 .tab-transactions .cat-tag-rejected  { color: var(--fg-dim); border-color: var(--fg-dim); }
+.tab-transactions .clickable { cursor: pointer; }
+.tab-transactions .clickable:hover { transform: scale(1.15); transition: transform 0.1s; }
 
 /* Detail panel — cleaning state cards (one per pillar that needs
  * the user's attention). Bordered cards, dimension-coloured left edge,
