@@ -123,11 +123,13 @@ fn render_queue_row(v: &QueueRowView, is_selected: bool) -> Markup {
             data-detail-url=(detail_url)
             data-detail-target="#detail"
         {
-            (norm_glyph_with_tooltip(v.norm))
             span.date { (format_short_date(&v.row.date)) }
+            (norm_glyph_with_tooltip(v.norm))
             span.payee { (v.row.payee) }
-            (pair_glyph_optional(v.pair))
-            (cat_tag(v.cat, v.row.category_title.as_deref()))
+            span.post-payee {
+                (pair_glyph_optional(v.pair))
+                (cat_tag_optional(v.cat, v.row.category_title.as_deref()))
+            }
             span.(amount_class) { (signed_amount) }
         }
     }
@@ -143,42 +145,32 @@ fn norm_glyph_with_tooltip(s: NormState) -> Markup {
     html! { span.(cls) title=(title) {} }
 }
 
-/// Pair glyph that hides itself for `NotApplicable` and `Rejected`
-/// (those are the "nothing to act on" states; render a zero-width
-/// span so the grid column still aligns but no glyph is visible).
+/// Pair glyph that returns empty markup for `Rejected` and
+/// `NotApplicable`. With the post-payee grouping, an empty return
+/// means the cat-tag (if any) sits flush against the amount column,
+/// no wasted grid gap.
 fn pair_glyph_optional(s: PairState) -> Markup {
     let (cls, title) = match s {
         PairState::Confirmed => ("g-pair-confirmed", "transfer pair confirmed"),
         PairState::Pending => ("g-pair-pending", "transfer pair pending review"),
         PairState::Orphan => ("g-pair-orphan", "orphan transfer (looks like a transfer; no pair found)"),
-        // Render an empty placeholder span (no class, no glyph) so the
-        // grid column collapses to its minimum without leaving stale
-        // pair-rejected / pair-none classes in the DOM that the test
-        // suite actively checks against.
-        PairState::Rejected | PairState::NotApplicable => return html! { span.pair-empty {} },
+        PairState::Rejected | PairState::NotApplicable => return html! {},
     };
     html! { span.(cls) title=(title) {} }
 }
 
-/// Render the category tag. Pill-shaped span with a per-state class
-/// the CSS uses to colour. Content depends on state:
-/// - Confirmed: `<title>`
-/// - Pending:   `<title> ?`
-/// - Missing:   `?`
-/// - Rejected:  `×`  (multiplication sign, NOT an emoji — the user
-///                     specifically asked for this so it visually
-///                     reads as "struck out" rather than another
-///                     status emoji)
-fn cat_tag(s: CatState, title_opt: Option<&str>) -> Markup {
+/// Render the category tag, or nothing for `CatState::Missing`
+/// (round-4: uncategorised tag was too noisy and most rows are
+/// uncategorised). For non-Missing states the tag is a small
+/// squared box (`.cat-tag`) carrying the category title.
+fn cat_tag_optional(s: CatState, title_opt: Option<&str>) -> Markup {
     match s {
         CatState::Confirmed => {
-            let name = title_opt.unwrap_or("?");
+            let name = title_opt.unwrap_or("—");
             let tt = format!("category: {name}");
             html! { span.cat-tag.cat-tag-confirmed title=(tt) { (name) } }
         }
-        CatState::Missing => {
-            html! { span.cat-tag.cat-tag-missing title="uncategorised" { "?" } }
-        }
+        CatState::Missing => html! {},
     }
 }
 
@@ -231,11 +223,12 @@ mod tests {
 
     #[test]
     fn render_queue_row_layout_norm_left_pair_right_cat_tag() {
-        // New row layout:
-        //   [norm-glyph] [date] [payee] [pair-glyph?] [cat-tag] [amount]
-        // Norm glyph is always present (one of ✅/🔍/❓/🚫).
-        // Pair glyph only present when the row is paired/pending/orphan.
-        // Cat tag is a span.cat-tag with text content (name, name+?, ?, or x).
+        // Round-4 row layout:
+        //   [date] [norm-glyph] [payee] [post-payee: pair?+cat?] [amount]
+        // Date is leftmost (per round-4 feedback).
+        // Norm glyph is always present.
+        // post-payee groups pair-glyph + cat-tag in a single grid cell
+        // so we don't pay two grid gaps when both are absent.
         let views = vec![view(
             1,
             "Woolworths",
@@ -254,15 +247,8 @@ mod tests {
                 "unexpected pair glyph {cls} in non-transfer row: {html}"
             );
         }
-        // Category renders as a tag, not as a g-cat-* emoji.
-        assert!(
-            html.contains("class=\"cat-tag"),
-            "expected .cat-tag span in: {html}"
-        );
-        // The tag should contain the category title we passed (none in
-        // the helper here, so we get a sentinel instead). The default
-        // helper builds rows without category_title -- a separate test
-        // covers tag content with a real title.
+        // post-payee container exists.
+        assert!(html.contains("class=\"post-payee"), "post-payee span missing: {html}");
     }
 
     #[test]
@@ -301,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn render_queue_row_cat_tag_renders_title_or_question_or_cross() {
+    fn render_queue_row_cat_tag_renders_title_only_when_categorised() {
         // Categorised: tag shows the category title.
         let mut v = view(
             1, "X", -100, PairState::NotApplicable, NormState::Confirmed, CatState::Confirmed,
@@ -311,13 +297,15 @@ mod tests {
         assert!(html.contains("Eating Out"), "expected category title in tag: {html}");
         assert!(html.contains("cat-tag-confirmed"), "expected confirmed tag class: {html}");
 
-        // Uncategorised: tag shows just "?".
+        // Uncategorised: no cat-tag rendered at all (round-4: too noisy).
         let v = view(
             1, "Y", -100, PairState::NotApplicable, NormState::Confirmed, CatState::Missing,
         );
         let html = render_queue(&[v], None).into_string();
-        assert!(html.contains("cat-tag-missing"), "expected missing tag class: {html}");
-        assert!(html.contains(">?<"), "expected literal '?' as tag content: {html}");
+        assert!(
+            !html.contains("cat-tag"),
+            "missing-category row should not render any cat-tag, html:\n{html}"
+        );
     }
 
     #[test]
@@ -449,7 +437,7 @@ fn render_detail(row: &TxnQueueRow, pair: PairState, norm: NormState, cat: CatSt
                         (pair_glyph_optional(pair))
                     }
                     " "
-                    (cat_tag(cat, row.category_title.as_deref()))
+                    (cat_tag_optional(cat, row.category_title.as_deref()))
                 }
                 span.amount-big.(amount_class) { (signed) }
             }

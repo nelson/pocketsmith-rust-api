@@ -551,10 +551,10 @@ body {
  * vocabulary is readable regardless of colour vision.
  * Mnemonic shape families: Pair = links, Norm = labels, Cat = filing.
  * =========================================================== */
-.g-pair-confirmed::before { content: "\1F517"; }      /* chain link */
-.g-pair-pending::before   { content: "\1F501"; }      /* repeat / cycle */
-.g-pair-orphan::before    { content: "\26A0\FE0F"; }  /* warning triangle */
-.g-pair-rejected::before  { content: "\2702\FE0F"; }  /* scissors */
+.g-pair-confirmed::before { content: "\1F517"; }            /* chain link */
+.g-pair-pending::before   { content: "\1F4CE"; }            /* paperclip */
+.g-pair-orphan::before    { content: "\26D3 \FE0F \200D \1F4A5"; } /* broken chain (chains + ZWJ + collision) */
+.g-pair-rejected::before  { content: "\2702\FE0F"; }        /* scissors */
 .g-norm-confirmed::before { content: "\2705"; }       /* white heavy check mark */
 .g-norm-pending::before   { content: "\1F50D"; }      /* magnifying glass */
 .g-norm-missing::before   { content: "\2753"; }       /* red question mark */
@@ -585,10 +585,11 @@ body {
  * (set by render::render_page) so the override is scoped.
  * =========================================================== */
 .tab-transactions .queue-item {
-    /* Round-3 layout: norm-glyph | date | payee | pair-glyph? | cat-tag | amount
-       Pair glyph is optional content but the column is always present
-       (collapses to ~0 when empty). */
-    grid-template-columns: 24px 56px 1fr 24px auto 100px;
+    /* Round-4 layout: date | norm-glyph | payee | post-payee group | amount
+       Date is leftmost. The post-payee group bundles pair-glyph (when
+       present) and cat-tag (when categorised) into a single grid cell
+       so we don't pay two grid gaps when one or both are absent. */
+    grid-template-columns: 56px 24px minmax(0, 1fr) auto auto;
     align-items: center;
     padding: 6px 12px;
 }
@@ -609,25 +610,30 @@ body {
 }
 .tab-transactions .queue-item .amount-positive { color: var(--green); }
 .tab-transactions .queue-item .amount-negative { color: var(--fg); }
-.tab-transactions .queue-item .pair-empty { display: inline-block; min-width: 1px; }
+.tab-transactions .queue-item .post-payee {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
+}
 
-/* Category tag (pill) used in queue rows and detail header. */
+/* Category tag (small squared box) used in queue rows and detail header. */
 .tab-transactions .cat-tag {
     display: inline-block;
-    padding: 1px 8px;
-    border-radius: 999px;
-    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
     border: 1px solid var(--border);
     color: var(--fg-dim);
-    max-width: 160px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: help;
+    line-height: 1.4;
 }
-.tab-transactions .cat-tag-confirmed { color: var(--fg); border-color: var(--fg-dark); }
+.tab-transactions .cat-tag-confirmed { color: var(--fg-dim); border-color: var(--fg-dark); }
 .tab-transactions .cat-tag-pending   { color: var(--yellow); border-color: var(--yellow); }
-.tab-transactions .cat-tag-missing   { color: var(--red); border-color: var(--red); font-weight: 600; }
 .tab-transactions .cat-tag-rejected  { color: var(--fg-dim); border-color: var(--fg-dim); }
 
 /* Detail panel — cleaning state cards (one per pillar that needs
