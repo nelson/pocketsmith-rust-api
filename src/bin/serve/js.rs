@@ -34,23 +34,51 @@ function selectItem(item) {
 function scrollSelectedIntoView() {
     // Run on initial page load and after every HTMX body swap so the
     // user's place in the queue is preserved when an action causes a
-    // full re-render. Without this the queue panel scrolls back to
-    // its top after every Y/N/S because the panel element is replaced
-    // (innerHTML swap on body) and the browser does not restore the
-    // scroll position of internal scrollable containers.
+    // full re-render. block:'nearest' is a no-op when the active row
+    // is already in the visible area, so a 'scroll only if needed'
+    // policy falls out for free — *provided* the queue panel's
+    // scrollTop is the same as it was before the swap. The body swap
+    // resets it to 0, so we capture/restore in the htmx:beforeSwap /
+    // htmx:afterSwap listeners below.
     const sel = document.querySelector('.queue-item.selected');
     if (sel) sel.scrollIntoView({block: 'nearest'});
 }
+
+// Captured between beforeSwap and afterSwap so a body innerHTML swap
+// (the only kind that destroys #queue) doesn't drop the user's scroll
+// position. Null means 'no #queue existed at capture time' — e.g.
+// initial page load.
+let _savedQueueScrollTop = null;
 
 // Fire on initial render. The script tag is at the end of body so
 // document is fully parsed at this point.
 scrollSelectedIntoView();
 
-// Fire after every HTMX swap (action POSTs target body, fragment GETs
-// target #detail — in either case re-running this is cheap and
-// idempotent). Listening on document (not document.body) so the
-// listener survives a body innerHTML swap.
-document.addEventListener('htmx:afterSwap', scrollSelectedIntoView);
+document.addEventListener('htmx:beforeSwap', function() {
+    const q = document.querySelector('#queue');
+    _savedQueueScrollTop = q ? q.scrollTop : null;
+});
+
+// Fire after every HTMX swap. Listening on document (not document.body)
+// so the listener survives a body innerHTML swap.
+document.addEventListener('htmx:afterSwap', function() {
+    // Restore the queue's scroll position first. If the swap was
+    // body-targeted, #queue is a brand-new element with scrollTop=0;
+    // restoring puts the user back where they were. If the swap was
+    // detail-targeted, #queue wasn't replaced and this assignment is
+    // a harmless self-set.
+    if (_savedQueueScrollTop !== null) {
+        const q = document.querySelector('#queue');
+        if (q) q.scrollTop = _savedQueueScrollTop;
+    }
+    // Now scroll the active row into view *only if it isn't already*
+    // (block:'nearest' semantics). With the scroll position restored,
+    // an active row that was visible before the action will still be
+    // visible, and this call is a no-op. An active row that moved
+    // off-screen (e.g. user pressed J past the viewport) gets the
+    // minimal scroll to make it visible.
+    scrollSelectedIntoView();
+});
 
 function getSelectedIndex() {
     const items = document.querySelectorAll('.queue-item');
