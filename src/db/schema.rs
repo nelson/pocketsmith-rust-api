@@ -176,6 +176,25 @@ CREATE TABLE IF NOT EXISTS push_log (
 CREATE INDEX IF NOT EXISTS idx_push_log_attempted_at ON push_log(attempted_at);
 CREATE INDEX IF NOT EXISTS idx_push_log_txn_id ON push_log(txn_id);
 
+-- Queue ordering for the Transactions tab. The queue panel sorts
+-- date DESC, id DESC and limits to 1000; without this index SQLite
+-- has to scan + sort the full transactions table on every request,
+-- which dominates request latency on a 22k-row DB (~20ms each).
+-- Multi-column DESC index lets the planner walk the index and emit
+-- rows directly without a sort step.
+CREATE INDEX IF NOT EXISTS idx_transactions_date_id
+    ON transactions(date DESC, id DESC);
+
+-- Lookup by original_payee. Used by:
+--  * normalise::helpers::matching_transactions (sibling-txn list on
+--    the detail panel, ~22k rows scanned without this).
+--  * The pn LEFT JOIN in filtered_transactions when we fold the per-
+--    row state derivation into the main queue query.
+-- The trailing date,id columns let the same index satisfy the ORDER
+-- BY in matching_transactions without a sort step.
+CREATE INDEX IF NOT EXISTS idx_transactions_original_payee
+    ON transactions(original_payee, date DESC, id DESC);
+
 CREATE INDEX IF NOT EXISTS idx_transaction_changes_transaction_id
     ON _transaction_changes(transaction_id);
 

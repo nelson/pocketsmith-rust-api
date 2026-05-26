@@ -39,15 +39,28 @@ pub struct TxnQueueRow {
     /// `is_transfer` flag from the source row. Drives orphan detection
     /// (this is_transfer=1 + no `transfer_pairs` row ⇒ orphan).
     pub is_transfer: bool,
+    /// Status code from `transfer_pairs` (0=pending, 1=confirmed,
+    /// 2=rejected) if this txn is part of any pair, else `None`.
+    /// Pre-fetched here via a LEFT JOIN so the queue render does not
+    /// have to do per-row SQL lookups (eliminates the N+1 that
+    /// dominated render time on a 22k-row DB).
+    pub pair_status: Option<i32>,
+    /// Status code from `payee_normalisations` for this txn's
+    /// original_payee, or `None` if no row exists. Same N+1
+    /// motivation as `pair_status`.
+    pub norm_status: Option<i32>,
 }
 
 /// Fetch the most recent transactions (date DESC, id DESC as tiebreak)
 /// joined with their account name. `limit` caps the result; pass a
 /// large value to fetch everything.
 ///
-/// This is the queue panel's primary data source. Filters and search
-/// will narrow this set later — for now it returns "the last N rows"
-/// unconditionally so the very first version of the queue can render.
+/// Test-only now: production code paths use `filtered_transactions`
+/// (with a TxnFilter::All argument when no filter is needed) so the
+/// queue panel and detail-fragment paths share a single SQL query
+/// shape. Kept here so the per-row tests for join/order/limit/cents
+/// keep working without rewrites.
+#[cfg(test)]
 pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueueRow>> {
     let mut stmt = conn.prepare(
         "SELECT t.id,
@@ -90,10 +103,66 @@ pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueue
                 category_id: row.get(6)?,
                 category_title: row.get(7)?,
                 is_transfer: is_transfer_int != 0,
+                pair_status: None,
+                norm_status: None,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
+}
+
+/// Fetch one transaction by id, materialising the same row shape as
+/// `recent_transactions`. Returns `None` if no such row exists.
+///
+/// Splitting this out matters for performance: the previous detail-
+/// panel code path called `recent_transactions(100_000)` and then
+/// linear-scanned the result for a single id, which is ~50ms per
+/// detail GET on a 22k-row DB. A direct lookup by primary key is
+/// ~1ms.
+pub fn fetch_by_id(conn: &Connection, txn_id: i64) -> Result<Option<TxnQueueRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id,
+                t.date,
+                t.payee,
+                t.amount,
+                ta.name,
+                t.original_payee,
+                t.category_id,
+                c.title,
+                COALESCE(t.is_transfer, 0)
+         FROM transactions t
+         LEFT JOIN transaction_accounts ta
+           ON ta.id = t.transaction_account_id
+         LEFT JOIN categories c
+           ON c.id = t.category_id
+         WHERE t.id = ?1",
+    )?;
+    let row = stmt
+        .query_row(rusqlite::params![txn_id], |row| {
+            let amount: f64 = row.get(3)?;
+            let is_transfer_int: i64 = row.get(8)?;
+            let payee: Option<String> = row.get(2)?;
+            let original_payee: Option<String> = row.get(5)?;
+            let display = payee
+                .clone()
+                .or_else(|| original_payee.clone())
+                .unwrap_or_default();
+            Ok(TxnQueueRow {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                payee: display,
+                amount_cents: (amount * 100.0).round() as i64,
+                account_name: row.get(4)?,
+                original_payee,
+                category_id: row.get(6)?,
+                category_title: row.get(7)?,
+                is_transfer: is_transfer_int != 0,
+                pair_status: None,
+                norm_status: None,
+            })
+        })
+        .ok();
+    Ok(row)
 }
 
 /// One of the queue's filter chips. Drives the WHERE clause on top of
@@ -160,6 +229,16 @@ impl TxnFilter {
 /// Filtered version of [`recent_transactions`]. Same join + ordering;
 /// the `filter` adds a tab-specific WHERE clause that narrows the row
 /// set without touching the base query.
+///
+/// Performance note: this query also LEFT JOINs `transfer_pairs`
+/// (twice, once per side) and `payee_normalisations` to pre-fetch
+/// `pair_status` and `norm_status` for each row. Folding the per-
+/// pillar lookups into the main query eliminates the N+1 the per-row
+/// state-derivation loop in `render_page_shell` would otherwise pay
+/// (~2000 prepared queries on a 1000-row queue, 10-20ms total). The
+/// unique indexes on `transfer_pairs.txn_id_a` / `txn_id_b` and the
+/// PK index on `payee_normalisations.original_payee` make the joins
+/// constant-time per row.
 pub fn filtered_transactions(
     conn: &Connection,
     filter: TxnFilter,
@@ -167,26 +246,24 @@ pub fn filtered_transactions(
 ) -> Result<Vec<TxnQueueRow>> {
     // The where_clause is interpolated literally into the SQL: it does
     // not contain any user input, only the canonical clause for each
-    // filter variant.
+    // filter variant. Filters reuse the joined `pn`, `tpa`, `tpb`
+    // aliases instead of correlated subqueries -- one less query plan
+    // for the optimiser to think about.
     let where_clause: &str = match filter {
         TxnFilter::All => "1 = 1",
         TxnFilter::NeedsRule => {
             // No payee_normalisations row exists for this original_payee.
-            "t.original_payee IS NOT NULL
-             AND NOT EXISTS (SELECT 1 FROM payee_normalisations p
-                              WHERE p.original_payee = t.original_payee)"
+            "t.original_payee IS NOT NULL AND pn.original_payee IS NULL"
         }
         TxnFilter::RulePending => {
             // payee_normalisations row exists with status = 0 (pending).
-            "EXISTS (SELECT 1 FROM payee_normalisations p
-                      WHERE p.original_payee = t.original_payee
-                        AND p.status = 0)"
+            "pn.status = 0"
         }
         TxnFilter::OrphanTransfer => {
-            // is_transfer = 1 and no row in transfer_pairs for this id.
+            // is_transfer = 1 and no row in transfer_pairs (either side).
             "COALESCE(t.is_transfer, 0) = 1
-             AND NOT EXISTS (SELECT 1 FROM transfer_pairs tp
-                              WHERE tp.txn_id_a = t.id OR tp.txn_id_b = t.id)"
+             AND tpa.txn_id_a IS NULL
+             AND tpb.txn_id_b IS NULL"
         }
         TxnFilter::Uncategorised => "t.category_id IS NULL",
     };
@@ -199,12 +276,20 @@ pub fn filtered_transactions(
                 t.original_payee,
                 t.category_id,
                 c.title,
-                COALESCE(t.is_transfer, 0)
+                COALESCE(t.is_transfer, 0),
+                COALESCE(tpa.status, tpb.status) AS pair_status,
+                pn.status AS norm_status
          FROM transactions t
          LEFT JOIN transaction_accounts ta
            ON ta.id = t.transaction_account_id
          LEFT JOIN categories c
            ON c.id = t.category_id
+         LEFT JOIN transfer_pairs tpa
+           ON tpa.txn_id_a = t.id
+         LEFT JOIN transfer_pairs tpb
+           ON tpb.txn_id_b = t.id
+         LEFT JOIN payee_normalisations pn
+           ON pn.original_payee = t.original_payee
          WHERE {where_clause}
          ORDER BY t.date DESC, t.id DESC
          LIMIT ?1"
@@ -230,6 +315,8 @@ pub fn filtered_transactions(
                 category_id: row.get(6)?,
                 category_title: row.get(7)?,
                 is_transfer: is_transfer_int != 0,
+                pair_status: row.get(9)?,
+                norm_status: row.get(10)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;

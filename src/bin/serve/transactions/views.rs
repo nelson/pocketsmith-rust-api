@@ -40,13 +40,13 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let st = state.lock().unwrap();
     let filter = TxnFilter::parse(&st.txn_filter);
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
+    // No per-row SQL needed -- pair_status and norm_status arrive
+    // pre-fetched via LEFT JOIN in filtered_transactions.
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
-            let pair = super::state::derive_pair_state(&st.conn, r.id, r.is_transfer)
-                .unwrap_or(PairState::NotApplicable);
-            let norm = super::state::derive_norm_state(&st.conn, r.original_payee.as_deref())
-                .unwrap_or(NormState::Missing);
+            let pair = super::state::pair_state_from_status(r.pair_status, r.is_transfer);
+            let norm = super::state::norm_state_from_status(r.norm_status);
             let cat = super::state::derive_cat_state(r.category_id);
             QueueRowView { row: r, pair, norm, cat }
         })
@@ -87,10 +87,7 @@ fn render_active_detail(
     // stay anchored on it -- see handlers::pick_next_active). Fetch
     // the row by id directly so the detail panel still shows what
     // the user last acted on, with its updated state.
-    let Some(row) = super::helpers::recent_transactions(&state.conn, 100_000)
-        .ok()
-        .and_then(|rows| rows.into_iter().find(|r| r.id == id))
-    else {
+    let Some(row) = super::helpers::fetch_by_id(&state.conn, id).unwrap_or(None) else {
         return html! { div.empty-state { p { "Transaction not found." } } };
     };
     let pair = super::state::derive_pair_state(&state.conn, row.id, row.is_transfer)
@@ -166,10 +163,8 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, filter_str: &str) -> 
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
-            let pair = super::state::derive_pair_state(&st.conn, r.id, r.is_transfer)
-                .unwrap_or(PairState::NotApplicable);
-            let norm = super::state::derive_norm_state(&st.conn, r.original_payee.as_deref())
-                .unwrap_or(NormState::Missing);
+            let pair = super::state::pair_state_from_status(r.pair_status, r.is_transfer);
+            let norm = super::state::norm_state_from_status(r.norm_status);
             let cat = super::state::derive_cat_state(r.category_id);
             QueueRowView { row: r, pair, norm, cat }
         })
@@ -374,6 +369,8 @@ mod tests {
             category_id: None,
             category_title: None,
             is_transfer: false,
+            pair_status: None,
+            norm_status: None,
         }
     }
 
@@ -586,9 +583,7 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Mark
     // row's detail visible (see render_active_detail in render_page_shell).
     let mut st = state.lock().unwrap();
     st.txn_active = Some(txn_id);
-    let row_opt: Option<TxnQueueRow> = super::helpers::recent_transactions(&st.conn, 100_000)
-        .ok()
-        .and_then(|rows| rows.into_iter().find(|r| r.id == txn_id));
+    let row_opt: Option<TxnQueueRow> = super::helpers::fetch_by_id(&st.conn, txn_id).unwrap_or(None);
 
     let Some(row) = row_opt else {
         return html! {
@@ -920,6 +915,8 @@ mod detail_tests {
             category_id: None,
             category_title: None,
             is_transfer: false,
+            pair_status: None,
+            norm_status: None,
         }
     }
 

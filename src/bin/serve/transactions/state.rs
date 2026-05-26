@@ -66,6 +66,33 @@ pub enum CatState {
     Missing,
 }
 
+/// Pure variant of [`derive_pair_state`]: takes the pre-fetched
+/// status code (None when no pair row exists) and the row's
+/// `is_transfer` flag. Used by the queue render path which
+/// pre-fetches `pair_status` via a LEFT JOIN to avoid the per-row
+/// SQL queries the DB-querying variant would do.
+pub fn pair_state_from_status(status: Option<i32>, is_transfer: bool) -> PairState {
+    match status.and_then(Status::from_i32) {
+        Some(Status::Confirmed) => PairState::Confirmed,
+        Some(Status::Pending) => PairState::Pending,
+        Some(Status::Rejected) => PairState::Rejected,
+        None if is_transfer => PairState::Orphan,
+        None => PairState::NotApplicable,
+    }
+}
+
+/// Pure variant of [`derive_norm_state`]: takes the pre-fetched
+/// status code (None when no pn row exists). Same N+1-avoidance
+/// motivation as `pair_state_from_status`.
+pub fn norm_state_from_status(status: Option<i32>) -> NormState {
+    match status.and_then(Status::from_i32) {
+        Some(Status::Confirmed) => NormState::Confirmed,
+        Some(Status::Pending) => NormState::Pending,
+        Some(Status::Rejected) => NormState::Rejected,
+        None => NormState::Missing,
+    }
+}
+
 /// Derive the pair state for one transaction. The query checks both
 /// sides of `transfer_pairs` because either side carries the same
 /// status. `is_transfer` is supplied by the caller because it's
