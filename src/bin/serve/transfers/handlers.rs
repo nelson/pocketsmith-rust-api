@@ -78,6 +78,11 @@ pub fn undo(state: &Arc<Mutex<AppState>>, key: (i64, i64)) {
     }
     st.transfers.decisions.remove(&key);
     st.transfers.activity.retain(|e| e.pair_id != key);
+    // Restore the just-undone row as active so the user lands on it
+    // for review. Mirrors what `normalise::handlers::undo` does --
+    // contextually, undoing means 'I made a mistake, let me look at
+    // this again', so the detail panel must show the row in question.
+    st.transfers.active = Some(key);
 }
 
 /// Drop every active Skip decision in one shot.
