@@ -17,6 +17,34 @@ pub fn format_dollars(cents: i64) -> String {
     format!("${formatted}.{frac:02}")
 }
 
+/// Compact unsigned dollar amount for the queue panel where horizontal
+/// space is precious. Same return contract as `format_dollars` (no
+/// sign — caller adds `+`/`-`), but rounds large values into k/M/B
+/// units so a 7-figure transaction doesn't blow out the column.
+///
+/// Tiers:
+/// - `< $10,000` — full precision (e.g. `$1,234.56`)
+/// - `$10k`-`$1M` — thousands, 1dp (e.g. `$12.3k`, `$999.9k`)
+/// - `$1M`-`$1B` — millions, 2dp (e.g. `$1.23M`, `$123.45M`)
+/// - `>= $1B` — billions, 2dp (e.g. `$1.23B`)
+///
+/// Boundaries are biased to avoid the rounding artefact `$1000.0k`:
+/// values >= ~$999,500 jump to `$1.00M` instead.
+pub fn format_dollars_compact(cents: i64) -> String {
+    let abs_cents = cents.abs();
+    let abs_dollars = abs_cents as f64 / 100.0;
+    if abs_dollars < 10_000.0 {
+        return format_dollars(cents);
+    }
+    if abs_dollars < 999_500.0 {
+        return format!("${:.1}k", abs_dollars / 1_000.0);
+    }
+    if abs_dollars < 999_500_000.0 {
+        return format!("${:.2}M", abs_dollars / 1_000_000.0);
+    }
+    format!("${:.2}B", abs_dollars / 1_000_000_000.0)
+}
+
 pub fn format_short_date(date: &str) -> String {
     let parts: Vec<&str> = date.split('-').collect();
     if parts.len() != 3 { return date.to_string(); }
@@ -130,5 +158,63 @@ mod tests {
     #[test]
     fn extract_param_empty_value() {
         assert_eq!(extract_param("filter=", "filter"), Some("".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod compact_tests {
+    use super::*;
+
+    #[test]
+    fn compact_under_10k_uses_full_precision() {
+        assert_eq!(format_dollars_compact(0), "$0.00");
+        assert_eq!(format_dollars_compact(123), "$1.23");
+        assert_eq!(format_dollars_compact(123_456), "$1,234.56");
+        assert_eq!(format_dollars_compact(999_999), "$9,999.99");
+    }
+
+    #[test]
+    fn compact_10k_to_under_1m_uses_k_with_one_decimal() {
+        // $10,000.00 -> $10.0k
+        assert_eq!(format_dollars_compact(1_000_000), "$10.0k");
+        // $12,345.67 -> $12.3k
+        assert_eq!(format_dollars_compact(1_234_567), "$12.3k");
+        // $123,456.78 -> $123.5k
+        assert_eq!(format_dollars_compact(12_345_678), "$123.5k");
+        // $999,400.00 -> $999.4k (just under the M-bump boundary)
+        assert_eq!(format_dollars_compact(99_940_000), "$999.4k");
+    }
+
+    #[test]
+    fn compact_avoids_1000k_artefact_by_jumping_to_M() {
+        // $999,500.00 -> $1.00M (would otherwise round to "$1000.0k")
+        assert_eq!(format_dollars_compact(99_950_000), "$1.00M");
+        // $999,999.99 -> $1.00M
+        assert_eq!(format_dollars_compact(99_999_999), "$1.00M");
+    }
+
+    #[test]
+    fn compact_1m_plus_uses_M_with_two_decimals() {
+        // $1,000,000.00 -> $1.00M
+        assert_eq!(format_dollars_compact(100_000_000), "$1.00M");
+        // $1,234,567.89 -> $1.23M
+        assert_eq!(format_dollars_compact(123_456_789), "$1.23M");
+        // $12,345,678.90 -> $12.35M
+        assert_eq!(format_dollars_compact(1_234_567_890), "$12.35M");
+    }
+
+    #[test]
+    fn compact_1b_plus_uses_B() {
+        // $1,000,000,000.00 -> $1.00B
+        assert_eq!(format_dollars_compact(100_000_000_000), "$1.00B");
+    }
+
+    #[test]
+    fn compact_handles_negative_via_abs_sign_left_to_caller() {
+        // Same contract as format_dollars: returns positive string,
+        // sign added by the call site.
+        assert_eq!(format_dollars_compact(-1_234_567), "$12.3k");
+        assert_eq!(format_dollars_compact(-100_000_000), "$1.00M");
+        assert_eq!(format_dollars_compact(-500), "$5.00");
     }
 }
