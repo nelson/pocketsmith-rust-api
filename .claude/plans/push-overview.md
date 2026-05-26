@@ -14,12 +14,15 @@ Guiding rule: **never silently overwrite upstream**. Every stage refuses to writ
 
 ## Stage list
 
-| Stage | Name | Code? | Gate | Plan |
-|-------|------|-------|------|------|
-| 1 | `is_transfer` + `category_id` push for confirmed transfer pairs | yes | passes own tests + manual smoke | [push-stage-1-transfer-pair-mvp.md](./push-stage-1-transfer-pair-mvp.md) |
-| 2 | Observation | no — usage only | written debrief informs Stage 3 | [push-stage-2-observation.md](./push-stage-2-observation.md) ([debrief](./push-stage-2-debrief.md)) |
-| 3 | Expand to `payee` (normalise) and remaining tracked fields | yes | tests + manual | [push-stage-3-expand-fields.md](./push-stage-3-expand-fields.md) |
-| 4 | Replace timestamp guard with per-field conflict detection + conflicts table | yes | tests + manual | [push-stage-4-per-field-conflict-detection.md](./push-stage-4-per-field-conflict-detection.md) |
-| 5 | Conflict review/resolution UX | yes | only after seeing real conflicts in Stage 4 | [push-stage-5-conflict-resolution-ux.md](./push-stage-5-conflict-resolution-ux.md) |
+| Stage | Name | Status | Plan |
+|-------|------|--------|------|
+| 1 | `is_transfer` + `category_id` push for confirmed transfer pairs | **done** (commit `6481871`) | (plan archived in git history) |
+| 2 | Observation | **done** | [debrief](./push-stage-2-debrief.md) |
+| 3 | Expand to `payee` (normalise) and remaining tracked fields | **done** (commit `89aab72`) | (plan archived in git history) |
+| 4 | Replace timestamp guard with per-field conflict detection + conflicts table | future | [push-stage-4-per-field-conflict-detection.md](./push-stage-4-per-field-conflict-detection.md) |
+| 5 | Conflict review/resolution UX | future | [push-stage-5-conflict-resolution-ux.md](./push-stage-5-conflict-resolution-ux.md) |
 
-Only Stage 1 is fully specified. Stages 2–5 are real plans of *what we will do at that stage*, including the open questions we deliberately want to defer until we have data from the previous stage.
+Stages 1-3 are implemented and live on `master`. Stage 4 is the next
+actionable push work; the [Stage 2 debrief](./push-stage-2-debrief.md)
+informs its design. Stage 5 only begins after Stage 4 has produced
+real conflict rows.
