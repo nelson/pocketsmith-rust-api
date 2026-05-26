@@ -120,6 +120,11 @@ body {
     gap: 8px;
     align-items: center;
     padding: 6px 12px;
+    /* Reserve a 3px transparent left border on every row so toggling
+       .selected (which fills the same border) does not shift the row
+       content right. Without this, every selected row's columns slide
+       3px to the right relative to the unselected rows. */
+    border-left: 3px solid transparent;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
@@ -127,7 +132,7 @@ body {
     transition: background 0.1s;
 }
 .queue-item:hover { background: var(--bg-highlight); }
-.queue-item.selected { background: var(--bg-highlight); border-left: 3px solid var(--accent); padding-left: 9px; }
+.queue-item.selected { background: var(--bg-highlight); border-left-color: var(--accent); }
 
 .conf-badge {
     font-size: 10px;
