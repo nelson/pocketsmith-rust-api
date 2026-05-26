@@ -511,52 +511,81 @@ fn render_detail(row: &TxnQueueRow, pair: PairState, norm: NormState, cat: CatSt
             }
         }
 
-        (render_pair_card(pair))
-        (render_norm_card(norm, row.original_payee.as_deref()))
+        (render_pair_card(pair, row.id))
+        (render_norm_card(norm, row.id))
         (render_cat_card(cat))
 
         div.note {
-            "Action wiring (Y / N / S) lands in a follow-up commit. For now the cards are read-only."
+            "Y / N / S act on whichever pillar is currently up for review (norm-pending or pair-pending). Press the buttons or the corresponding key."
         }
     }
 }
 
-fn render_pair_card(s: PairState) -> Markup {
-    let (cls, title, sub) = match s {
+fn render_action_buttons(action_base: &str) -> Markup {
+    // Mirrors the existing render::render_actions but scoped here so
+    // we can render the action group inside whatever card needs it,
+    // not just at the bottom of the panel. The data-action-base on
+    // the .actions div is what js.rs reads for keyboard Y/N/S.
+    html! {
+        div.actions data-action-base=(action_base) {
+            button.btn.btn-confirm
+                hx-post=(format!("{action_base}/confirm"))
+                hx-target="body"
+            { "[Y] Confirm" }
+            button.btn.btn-reject
+                hx-post=(format!("{action_base}/reject"))
+                hx-target="body"
+            { "[N] Reject" }
+            button.btn.btn-skip
+                hx-post=(format!("{action_base}/skip"))
+                hx-target="body"
+            { "[S] Skip" }
+        }
+    }
+}
+
+fn render_pair_card(s: PairState, txn_id: i64) -> Markup {
+    let (cls, title, sub, show_actions) = match s {
         PairState::Confirmed => (
             "ok",
             "Pair confirmed",
             "This transaction is paired with its counterpart.",
+            false,
         ),
         PairState::Pending => (
             "warn",
             "Pair proposed",
             "The pairing pipeline proposed a counterpart \u{2014} your call to confirm.",
+            true,
         ),
         PairState::Orphan => (
             "bad",
             "Looks like a transfer, no pair found",
             "Either the counterpart hasn't synced yet, this isn't a real internal transfer, or the pairing pipeline missed it.",
+            false, // orphan-flow needs transfer_decisions (PLAN §8); follow-up commit
         ),
         PairState::Rejected => (
             "ok",
             "Pair rejected",
             "You've decided this is not a transfer.",
+            false,
         ),
         PairState::NotApplicable => return html! {},
     };
+    let action_base = format!("/transactions/txn/{txn_id}/pair");
     html! {
         div.cleaning-card.(cls) {
             span.glyph.(pair_glyph_class(s)) { }
             div {
                 div.title { (title) }
                 div.sub { (sub) }
+                @if show_actions { (render_action_buttons(&action_base)) }
             }
         }
     }
 }
 
-fn render_norm_card(s: NormState, original_payee: Option<&str>) -> Markup {
+fn render_norm_card(s: NormState, txn_id: i64) -> Markup {
     let (cls, title, sub) = match s {
         NormState::Confirmed => (
             "ok",
@@ -579,13 +608,15 @@ fn render_norm_card(s: NormState, original_payee: Option<&str>) -> Markup {
             "You've decided this payee should not be normalised.",
         ),
     };
-    let _ = original_payee; // for future commits when we link to /normalise/item/<slug>
+    let action_base = format!("/transactions/txn/{txn_id}/norm");
+    let show_actions = matches!(s, NormState::Pending);
     html! {
         div.cleaning-card.(cls) {
             span.glyph.(norm_glyph_class(s)) { }
             div {
                 div.title { (title) }
                 div.sub { (sub) }
+                @if show_actions { (render_action_buttons(&action_base)) }
             }
         }
     }

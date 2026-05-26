@@ -75,6 +75,32 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
                 Err(_) => html! { p { "Invalid transaction id" } },
             }
         }
+        // POST /transactions/txn/<id>/{norm,pair}/{confirm,reject,skip,undo}
+        (Method::Post, p) if p.starts_with("/transactions/txn/") => {
+            let rest = &p["/transactions/txn/".len()..];
+            // Path: <id>/<pillar>/<verb>
+            let mut parts = rest.split('/');
+            let id_str = parts.next().unwrap_or("");
+            let pillar = parts.next().unwrap_or("");
+            let verb = parts.next().unwrap_or("");
+            let id = match id_str.parse::<i64>() {
+                Ok(v) => v,
+                Err(_) => return invalid_action_response(request),
+            };
+            match (pillar, verb) {
+                ("norm", "confirm") => transactions::handlers::act_norm(&state, id, Decision::Confirm),
+                ("norm", "reject") => transactions::handlers::act_norm(&state, id, Decision::Reject),
+                ("norm", "skip") => transactions::handlers::act_norm(&state, id, Decision::Skip),
+                ("norm", "undo") | ("norm", "unskip") => transactions::handlers::undo_norm(&state, id),
+                ("pair", "confirm") => transactions::handlers::act_pair(&state, id, Decision::Confirm),
+                ("pair", "reject") => transactions::handlers::act_pair(&state, id, Decision::Reject),
+                ("pair", "skip") => transactions::handlers::act_pair(&state, id, Decision::Skip),
+                ("pair", "undo") | ("pair", "unskip") => transactions::handlers::undo_pair(&state, id),
+                _ => return invalid_action_response(request),
+            }
+            // Re-render the Transactions page so the user keeps their context.
+            transactions::views::render_page_shell(&state)
+        }
 
         // --- Normalise tab (matched first so /normalise/* POSTs don't
         // fall into the transfer arms below.)

@@ -9,6 +9,7 @@
 //! into existing `/normalise/*` and `/transfers/*` endpoints, plus the
 //! new `/transfer-decisions/*` endpoints for the orphan flow.
 
+pub mod handlers;
 pub mod helpers;
 pub mod state;
 pub mod views;

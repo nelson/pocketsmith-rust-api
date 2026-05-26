@@ -190,3 +190,44 @@ fn transactions_page_renders_filter_chips() {
         ],
     );
 }
+
+#[test]
+fn transactions_detail_panel_renders_action_buttons_on_norm_pending_card() {
+    // The fresh fixture seeds one pending payee_normalisation for
+    // original_payee="WOOLIES NORTH STRATHF" and a txn cloud with id 10
+    // (FROM CHEQUE) — let's add a non-transfer txn whose payee matches
+    // the seeded pn so the norm-pending card renders with Y/N/S.
+    let state = fresh_state();
+    {
+        let st = state.lock().unwrap();
+        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount,
+                    original_payee, payee, is_transfer)
+                 VALUES (50, 1, '2026-04-01', -10.0, 'WOOLIES NORTH STRATHF',
+                         'WOOLIES NORTH STRATHF', 0)",
+                [],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    let html = crate::transactions::views::render_detail_fragment(&state, 50).into_string();
+
+    contains_all(
+        &html,
+        &[
+            // The data-action-base hook the JS keyboard handler reads.
+            "data-action-base=\"/transactions/txn/50/norm\"",
+            "[Y] Confirm",
+            "[N] Reject",
+            "[S] Skip",
+            // Each button posts to the txn-scoped action URL so the
+            // re-render lands back on the Transactions page.
+            "hx-post=\"/transactions/txn/50/norm/confirm\"",
+            "hx-post=\"/transactions/txn/50/norm/reject\"",
+            "hx-post=\"/transactions/txn/50/norm/skip\"",
+        ],
+    );
+}
