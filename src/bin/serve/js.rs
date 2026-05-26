@@ -31,6 +31,27 @@ function selectItem(item) {
     item.scrollIntoView({block: 'nearest'});
 }
 
+function scrollSelectedIntoView() {
+    // Run on initial page load and after every HTMX body swap so the
+    // user's place in the queue is preserved when an action causes a
+    // full re-render. Without this the queue panel scrolls back to
+    // its top after every Y/N/S because the panel element is replaced
+    // (innerHTML swap on body) and the browser does not restore the
+    // scroll position of internal scrollable containers.
+    const sel = document.querySelector('.queue-item.selected');
+    if (sel) sel.scrollIntoView({block: 'nearest'});
+}
+
+// Fire on initial render. The script tag is at the end of body so
+// document is fully parsed at this point.
+scrollSelectedIntoView();
+
+// Fire after every HTMX swap (action POSTs target body, fragment GETs
+// target #detail — in either case re-running this is cheap and
+// idempotent). Listening on document (not document.body) so the
+// listener survives a body innerHTML swap.
+document.addEventListener('htmx:afterSwap', scrollSelectedIntoView);
+
 function getSelectedIndex() {
     const items = document.querySelectorAll('.queue-item');
     const selected = document.querySelector('.queue-item.selected');
