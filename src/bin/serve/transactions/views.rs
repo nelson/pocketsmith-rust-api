@@ -39,7 +39,7 @@ pub struct QueueRowView {
 pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let st = state.lock().unwrap();
     let filter = TxnFilter::parse(&st.txn_filter);
-    let rows = super::helpers::filtered_transactions(&st.conn, filter, 200).unwrap_or_default();
+    let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
@@ -71,23 +71,40 @@ fn render_active_detail(
     let Some(id) = active_id else {
         return html! { div.empty-state { p { "Select a transaction from the queue." } } };
     };
-    let Some(v) = views.iter().find(|x| x.row.id == id) else {
-        return html! { div.empty-state { p { "Active transaction is not in the current filter view." } } };
+    // Cheap path: the active row is in the rendered queue subset.
+    if let Some(v) = views.iter().find(|x| x.row.id == id) {
+        let pipeline = v.row.original_payee.as_deref().map(run_normalise);
+        let siblings = v
+            .row
+            .original_payee
+            .as_deref()
+            .map(|op| crate::normalise::helpers::matching_transactions(&state.conn, op))
+            .unwrap_or_default();
+        return render_detail(&v.row, v.pair, v.norm, v.cat, pipeline.as_ref(), &siblings);
+    }
+    // Fallback: the active row is no longer in the filtered view
+    // (e.g. an action just resolved it and the resolver decided to
+    // stay anchored on it -- see handlers::pick_next_active). Fetch
+    // the row by id directly so the detail panel still shows what
+    // the user last acted on, with its updated state.
+    let Some(row) = super::helpers::recent_transactions(&state.conn, 100_000)
+        .ok()
+        .and_then(|rows| rows.into_iter().find(|r| r.id == id))
+    else {
+        return html! { div.empty-state { p { "Transaction not found." } } };
     };
-    // Pipeline trace and siblings need DB access; fetch them here so
-    // render_detail stays pure / testable in isolation.
-    let pipeline = v
-        .row
-        .original_payee
-        .as_deref()
-        .map(run_normalise);
-    let siblings = v
-        .row
+    let pair = super::state::derive_pair_state(&state.conn, row.id, row.is_transfer)
+        .unwrap_or(PairState::NotApplicable);
+    let norm = super::state::derive_norm_state(&state.conn, row.original_payee.as_deref())
+        .unwrap_or(NormState::Missing);
+    let cat = super::state::derive_cat_state(row.category_id);
+    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let siblings = row
         .original_payee
         .as_deref()
         .map(|op| crate::normalise::helpers::matching_transactions(&state.conn, op))
         .unwrap_or_default();
-    render_detail(&v.row, v.pair, v.norm, v.cat, pipeline.as_ref(), &siblings)
+    render_detail(&row, pair, norm, cat, pipeline.as_ref(), &siblings)
 }
 
 /// Render the activity panel for the Transactions tab. Mirrors the
@@ -145,7 +162,7 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, filter_str: &str) -> 
     let mut st = state.lock().unwrap();
     st.txn_filter = filter_str.to_string();
     let filter = TxnFilter::parse(filter_str);
-    let rows = super::helpers::filtered_transactions(&st.conn, filter, 200).unwrap_or_default();
+    let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {

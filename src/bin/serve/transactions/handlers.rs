@@ -17,9 +17,8 @@ use rusqlite::Connection;
 use pocketsmith_sync::normalise::slug_for;
 
 use crate::state::{AppState, Decision, TxnActionPillar, TxnActivityEntry};
-use crate::tab::next_after;
 
-use super::helpers::{filtered_transactions, TxnFilter, TxnQueueRow};
+use super::helpers::{filtered_transactions, TxnFilter};
 
 /// Look up the `original_payee` for a transaction, then compute the
 /// pn slug. Returns `None` if the txn doesn't exist or its
@@ -67,31 +66,83 @@ fn txn_snapshot(conn: &Connection, txn_id: i64) -> Option<(String, i64, Option<S
     .ok()
 }
 
-/// Compute the next visible txn id after `current_id` against the
-/// active filter. Used to advance `txn_active` after a Y/N/S so the
-/// keyboard-driven flow keeps moving through the queue.
-fn next_txn_id(conn: &Connection, filter: TxnFilter, current_id: i64) -> Option<i64> {
-    let rows = filtered_transactions(conn, filter, 1000).unwrap_or_default();
-    next_after(&rows, |r: &TxnQueueRow| r.id == current_id).map(|r| r.id)
+/// Pick the txn id that should be active *after* the user acts on
+/// `current_id` under `filter`. Walks `pre_visible` (the queue right
+/// before the action) starting after `current_id` and returns the
+/// first id still present in `post_visible`. If no row after
+/// `current_id` survives, walks backwards through earlier rows. If
+/// neither direction finds a survivor, falls back to `current_id`
+/// itself — the user stays anchored on the row they just acted on,
+/// so the detail panel can show its updated state instead of going
+/// blank.
+///
+/// Why two-direction with backwards fallback: when several siblings
+/// share the same `original_payee`, confirming the rule resolves all
+/// of them at once. The pre-computed naive 'next' (one position ahead)
+/// may itself be one of those resolved siblings; the next surviving
+/// row could be several positions further along, or there may be no
+/// rows further along at all (acted on the tail row of a small group).
+fn pick_next_active(
+    pre_visible: &[i64],
+    post_visible: &[i64],
+    current_id: i64,
+) -> Option<i64> {
+    use std::collections::HashSet;
+    let post_set: HashSet<i64> = post_visible.iter().copied().collect();
+    let pos = pre_visible.iter().position(|id| *id == current_id);
+
+    // Forward: first surviving row after current_id.
+    let forward = pos.and_then(|p| {
+        pre_visible
+            .iter()
+            .skip(p + 1)
+            .find(|id| post_set.contains(id))
+            .copied()
+    });
+    if forward.is_some() {
+        return forward;
+    }
+    // Backward: most-recent surviving row before current_id (closest
+    // first, hence .rev()). Useful when the user acted on the tail of
+    // a small filtered queue and the only remaining work is above.
+    let backward = pos.and_then(|p| {
+        pre_visible
+            .iter()
+            .take(p)
+            .rev()
+            .find(|id| post_set.contains(id))
+            .copied()
+    });
+    if backward.is_some() {
+        return backward;
+    }
+    // No surviving row in either direction (queue exhausted).
+    // Stay on the acted-on row so the detail panel reflects the
+    // updated state rather than going blank.
+    Some(current_id)
 }
 
 /// Confirm/reject/skip the normalisation proposal that owns this txn.
 /// Delegates straight into `normalise::handlers::act`. No-op if the
 /// txn has no `original_payee` (and hence no slug to act on).
 pub fn act_norm(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
-    let (slug, snapshot, next, filter) = {
+    let (slug, snapshot, pre_visible, filter) = {
         let st = state.lock().unwrap();
         let filter = TxnFilter::parse(&st.txn_filter);
         let slug = slug_for_txn(&st.conn, txn_id);
         let snapshot = txn_snapshot(&st.conn, txn_id);
-        // Compute next BEFORE the action while the row is still visible.
-        let next = next_txn_id(&st.conn, filter, txn_id);
-        (slug, snapshot, next, filter)
+        // Capture pre-action queue so we can pick the next active id
+        // post-action even when several rows resolve together.
+        let pre_visible: Vec<i64> = filtered_transactions(&st.conn, filter, 1000)
+            .unwrap_or_default()
+            .iter()
+            .map(|r| r.id)
+            .collect();
+        (slug, snapshot, pre_visible, filter)
     };
     let Some(slug) = slug else { return };
     crate::normalise::handlers::act(state, &slug, decision);
 
-    // After the action, push to the activity log and advance txn_active.
     let mut st = state.lock().unwrap();
     if let Some((payee, amount_cents, _orig)) = snapshot {
         st.push_txn_activity(TxnActivityEntry {
@@ -102,14 +153,12 @@ pub fn act_norm(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
             pillar: TxnActionPillar::Norm,
         });
     }
-    // Re-resolve next against the post-action filter result. The
-    // pre-computed `next` is the preferred candidate; fall back to
-    // tail of the visible queue if it's no longer present (e.g. the
-    // filter was 'rule-pending' and `next` was just confirmed too).
-    let visible = filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
-    st.txn_active = next
-        .filter(|n| visible.iter().any(|r| r.id == *n))
-        .or_else(|| visible.last().map(|r| r.id));
+    let post_visible: Vec<i64> = filtered_transactions(&st.conn, filter, 1000)
+        .unwrap_or_default()
+        .iter()
+        .map(|r| r.id)
+        .collect();
+    st.txn_active = pick_next_active(&pre_visible, &post_visible, txn_id);
 }
 
 /// Undo the previous normalisation decision for the txn's slug.
@@ -132,13 +181,17 @@ pub fn undo_norm(state: &Arc<Mutex<AppState>>, txn_id: i64) {
 /// Delegates into `transfers::handlers::act`. No-op if the txn has no
 /// pair row.
 pub fn act_pair(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
-    let (key, snapshot, next, filter) = {
+    let (key, snapshot, pre_visible, filter) = {
         let st = state.lock().unwrap();
         let filter = TxnFilter::parse(&st.txn_filter);
         let key = pair_key_for_txn(&st.conn, txn_id);
         let snapshot = txn_snapshot(&st.conn, txn_id);
-        let next = next_txn_id(&st.conn, filter, txn_id);
-        (key, snapshot, next, filter)
+        let pre_visible: Vec<i64> = filtered_transactions(&st.conn, filter, 1000)
+            .unwrap_or_default()
+            .iter()
+            .map(|r| r.id)
+            .collect();
+        (key, snapshot, pre_visible, filter)
     };
     let Some(k) = key else { return };
     crate::transfers::handlers::act(state, k, decision);
@@ -153,10 +206,12 @@ pub fn act_pair(state: &Arc<Mutex<AppState>>, txn_id: i64, decision: Decision) {
             pillar: TxnActionPillar::Pair,
         });
     }
-    let visible = filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
-    st.txn_active = next
-        .filter(|n| visible.iter().any(|r| r.id == *n))
-        .or_else(|| visible.last().map(|r| r.id));
+    let post_visible: Vec<i64> = filtered_transactions(&st.conn, filter, 1000)
+        .unwrap_or_default()
+        .iter()
+        .map(|r| r.id)
+        .collect();
+    st.txn_active = pick_next_active(&pre_visible, &post_visible, txn_id);
 }
 
 /// Undo the previous pair decision for the txn's pair.
@@ -294,6 +349,70 @@ mod tests {
 
         let active = state.lock().unwrap().txn_active;
         assert_eq!(active, Some(21), "txn_active should advance to id=21");
+    }
+
+    #[test]
+    fn act_norm_skips_resolved_siblings_when_advancing() {
+        // Two consecutive txns share original_payee 'AMAZON'. Acting on
+        // the first under the rule-pending filter confirms the rule for
+        // both, so the precomputed 'next' (id=50) drops out of the
+        // filter alongside the acted-on row. The resolver must skip
+        // the resolved sibling and pick the next still-pending row.
+        let state = fresh();
+        state.lock().unwrap().txn_filter = "rule-pending".to_string();
+        {
+            let st = state.lock().unwrap();
+            // Two txns sharing 'AMAZON' (same pn row, pending).
+            seed_txn(&st.conn, 50, 1, "AMAZON", "AMAZON").unwrap();
+            seed_txn(&st.conn, 51, 1, "AMAZON", "AMAZON").unwrap();
+            seed_pn(&st.conn, "AMAZON", "Amazon", Status::Pending, 2).unwrap();
+        }
+        // rule-pending pre_visible by id DESC: 51, 50, 10
+        // (txn 10's WOOLIES NORTH STRATHF pn is also pending from fresh()).
+        state.lock().unwrap().txn_active = Some(51);
+
+        act_norm(&state, 51, Decision::Confirm);
+
+        // Acting on 51 confirms AMAZON's pn -> both 51 and 50 drop
+        // out. Pre-computed 'next' (50) is now resolved. The resolver
+        // must walk forward in pre_visible past the resolved sibling
+        // and land on 10 (still pending).
+        let active = state.lock().unwrap().txn_active;
+        assert_eq!(
+            active,
+            Some(10),
+            "resolver should skip resolved sibling 50 and land on 10"
+        );
+    }
+
+    #[test]
+    fn act_norm_stays_on_acted_row_when_no_other_rows_remain() {
+        // Last user-visible row scenario: AMAZON is the only pending
+        // payee, two txns share it. After acting on 51, the rule-
+        // pending queue is empty. The resolver should fall back to
+        // the acted-on row id so the detail panel renders its updated
+        // state (Confirmed) instead of jumping to an empty placeholder.
+        let state = fresh();
+        state.lock().unwrap().txn_filter = "rule-pending".to_string();
+        {
+            let st = state.lock().unwrap();
+            st.conn
+                .execute("DELETE FROM payee_normalisations", [])
+                .unwrap();
+            seed_txn(&st.conn, 50, 1, "AMAZON", "AMAZON").unwrap();
+            seed_txn(&st.conn, 51, 1, "AMAZON", "AMAZON").unwrap();
+            seed_pn(&st.conn, "AMAZON", "Amazon", Status::Pending, 2).unwrap();
+        }
+        state.lock().unwrap().txn_active = Some(50);
+
+        act_norm(&state, 50, Decision::Confirm);
+
+        let active = state.lock().unwrap().txn_active;
+        assert_eq!(
+            active,
+            Some(50),
+            "resolver should fall back to the acted-on row when no other rows remain"
+        );
     }
 
     #[test]
