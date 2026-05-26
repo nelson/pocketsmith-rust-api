@@ -91,6 +91,14 @@ pub struct AppState {
     pub normalise: TabState<String, NormActivityEntry>,
     pub norm_status_filter: String,
     pub norm_class_filter: String,
+
+    // --- Transactions tab ---
+    /// Active filter chip slug ("all", "needs-rule", "rule-pending",
+    /// "orphan-transfer", "uncategorised"). Persisted across page
+    /// re-renders so the user's chosen filter survives a refresh.
+    pub txn_filter: String,
+    /// id of the currently-selected transaction row, if any.
+    pub txn_active: Option<i64>,
 }
 
 impl AppState {
@@ -103,6 +111,8 @@ impl AppState {
             normalise: TabState::default(),
             norm_status_filter: "all".to_string(),
             norm_class_filter: "all".to_string(),
+            txn_filter: "all".to_string(),
+            txn_active: None,
         }
     }
 }

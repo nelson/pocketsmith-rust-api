@@ -15,7 +15,7 @@ use maud::{html, Markup};
 use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::state::AppState;
 
-use super::helpers::TxnQueueRow;
+use super::helpers::{TxnFilter, TxnQueueRow};
 use super::state::{CatState, NormState, PairState};
 
 /// One row of the queue panel, decorated with its three-pillar
@@ -29,14 +29,15 @@ pub struct QueueRowView {
     pub cat: CatState,
 }
 
-/// Render the full `/transactions/` page. Fetches the most recent
-/// transactions, decorates each with its three-pillar cleaning state,
-/// and renders the queue panel.
+/// Render the full `/transactions/` page. Fetches transactions
+/// matching the active filter, decorates each with its three-pillar
+/// cleaning state, and renders the queue panel.
 pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let st = state.lock().unwrap();
+    let filter = TxnFilter::parse(&st.txn_filter);
     // 200 rows is enough to fill the panel on first paint without
     // hammering SQLite. Pagination / load-older is a later commit.
-    let rows = super::helpers::recent_transactions(&st.conn, 200).unwrap_or_default();
+    let rows = super::helpers::filtered_transactions(&st.conn, filter, 200).unwrap_or_default();
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
@@ -50,7 +51,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
         .collect();
 
     let n_views = views.len();
-    let queue = render_queue(&views, None);
+    let queue = render_queue_with_header(&views, st.txn_active, filter);
     let detail = html! {
         div.empty-state { p { "Select a transaction from the queue." } }
     };
@@ -60,6 +61,56 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
         }
     };
     crate::render::render_page("transactions", "Transactions", queue, detail, activity)
+}
+
+/// Render the queue panel for an HTMX swap. The route handler updates
+/// `state.txn_filter` to the requested slug and then asks for this
+/// fragment, scoped to `#queue`.
+pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, filter_str: &str) -> Markup {
+    let mut st = state.lock().unwrap();
+    st.txn_filter = filter_str.to_string();
+    let filter = TxnFilter::parse(filter_str);
+    let rows = super::helpers::filtered_transactions(&st.conn, filter, 200).unwrap_or_default();
+    let views: Vec<QueueRowView> = rows
+        .into_iter()
+        .map(|r| {
+            let pair = super::state::derive_pair_state(&st.conn, r.id, r.is_transfer)
+                .unwrap_or(PairState::NotApplicable);
+            let norm = super::state::derive_norm_state(&st.conn, r.original_payee.as_deref())
+                .unwrap_or(NormState::Missing);
+            let cat = super::state::derive_cat_state(r.category_id);
+            QueueRowView { row: r, pair, norm, cat }
+        })
+        .collect();
+    render_queue_with_header(&views, st.txn_active, filter)
+}
+
+/// Inner queue render with header (count + filter chips). Pure.
+fn render_queue_with_header(
+    views: &[QueueRowView],
+    active_id: Option<i64>,
+    filter: TxnFilter,
+) -> Markup {
+    html! {
+        div.queue-header {
+            h2 { (views.len()) " transactions" }
+            div.filter-row {
+                @for f in TxnFilter::ALL {
+                    button.filter-btn
+                        .(if f == filter { "active" } else { "" })
+                        hx-get=(format!("/transactions/queue?filter={}", f.as_str()))
+                        hx-target="#queue"
+                        hx-swap="innerHTML"
+                    { (f.label()) }
+                }
+            }
+        }
+        div.queue-list {
+            @for v in views {
+                (render_queue_row(v, active_id == Some(v.row.id)))
+            }
+        }
+    }
 }
 
 /// Render the queue panel from a slice of pre-decorated rows. Pure

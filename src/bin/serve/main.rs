@@ -62,6 +62,12 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let response = match (method, path.as_str()) {
         // --- Transactions tab (read-only shell for now)
         (Method::Get, "/transactions" | "/transactions/") => transactions::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/transactions/queue?") => {
+            let params = p.strip_prefix("/transactions/queue?").unwrap_or("");
+            let filter = extract_param(params, "filter").unwrap_or("all".to_string());
+            transactions::views::render_queue_fragment(&state, &filter)
+        }
+        (Method::Get, "/transactions/queue") => transactions::views::render_queue_fragment(&state, "all"),
         (Method::Get, p) if p.starts_with("/transactions/txn/") => {
             let id_str = p.trim_start_matches("/transactions/txn/").split('/').next().unwrap_or("");
             match id_str.parse::<i64>() {

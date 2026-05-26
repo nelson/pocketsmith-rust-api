@@ -163,3 +163,30 @@ fn transactions_page_lists_transactions_tab_as_active_only_once() {
         "exactly one active tab expected, got {active_count}"
     );
 }
+
+#[test]
+fn transactions_page_renders_filter_chips() {
+    // The five filter chips drive the queue narrowing. Each chip must
+    // hx-get the queue fragment endpoint with its slug; the active
+    // chip carries .filter-btn.active.
+    let state = fresh_state();
+    let html = crate::transactions::views::render_page_shell(&state).into_string();
+
+    contains_all(
+        &html,
+        &[
+            // Chip labels.
+            ">All<",
+            ">Needs rule<",
+            ">Rule pending<",
+            ">Orphan transfer<",
+            ">Uncategorised<",
+            // Each chip swaps the queue panel.
+            "hx-target=\"#queue\"",
+            // Default filter is 'all'.
+            "filter=all",
+            // Active chip class on the default (All).
+            "filter-btn active",
+        ],
+    );
+}

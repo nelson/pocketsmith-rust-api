@@ -96,6 +96,146 @@ pub fn recent_transactions(conn: &Connection, limit: i64) -> Result<Vec<TxnQueue
     Ok(rows)
 }
 
+/// One of the queue's filter chips. Drives the WHERE clause on top of
+/// the base query in `recent_transactions`. The string forms travel in
+/// the URL (`?filter=needs-rule`) and on the wire to HTMX swaps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TxnFilter {
+    All,
+    /// Rows whose `original_payee` has no row in `payee_normalisations`
+    /// at all. The pipeline has nothing to say about this payee — you
+    /// either teach it a rule, or accept the noise.
+    NeedsRule,
+    /// Rows whose `original_payee` has a `payee_normalisations` row
+    /// with status = pending. The pipeline produced a proposal that
+    /// hasn't been reviewed yet.
+    RulePending,
+    /// Rows with `is_transfer = 1` and no row in `transfer_pairs`
+    /// (either side). "Looks like a transfer; no counterpart found."
+    OrphanTransfer,
+    /// Rows with `category_id IS NULL`.
+    Uncategorised,
+}
+
+impl TxnFilter {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "needs-rule" => Self::NeedsRule,
+            "rule-pending" => Self::RulePending,
+            "orphan-transfer" => Self::OrphanTransfer,
+            "uncategorised" => Self::Uncategorised,
+            _ => Self::All,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::NeedsRule => "needs-rule",
+            Self::RulePending => "rule-pending",
+            Self::OrphanTransfer => "orphan-transfer",
+            Self::Uncategorised => "uncategorised",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::NeedsRule => "Needs rule",
+            Self::RulePending => "Rule pending",
+            Self::OrphanTransfer => "Orphan transfer",
+            Self::Uncategorised => "Uncategorised",
+        }
+    }
+
+    pub const ALL: [TxnFilter; 5] = [
+        Self::All,
+        Self::NeedsRule,
+        Self::RulePending,
+        Self::OrphanTransfer,
+        Self::Uncategorised,
+    ];
+}
+
+/// Filtered version of [`recent_transactions`]. Same join + ordering;
+/// the `filter` adds a tab-specific WHERE clause that narrows the row
+/// set without touching the base query.
+pub fn filtered_transactions(
+    conn: &Connection,
+    filter: TxnFilter,
+    limit: i64,
+) -> Result<Vec<TxnQueueRow>> {
+    // The where_clause is interpolated literally into the SQL: it does
+    // not contain any user input, only the canonical clause for each
+    // filter variant.
+    let where_clause: &str = match filter {
+        TxnFilter::All => "1 = 1",
+        TxnFilter::NeedsRule => {
+            // No payee_normalisations row exists for this original_payee.
+            "t.original_payee IS NOT NULL
+             AND NOT EXISTS (SELECT 1 FROM payee_normalisations p
+                              WHERE p.original_payee = t.original_payee)"
+        }
+        TxnFilter::RulePending => {
+            // payee_normalisations row exists with status = 0 (pending).
+            "EXISTS (SELECT 1 FROM payee_normalisations p
+                      WHERE p.original_payee = t.original_payee
+                        AND p.status = 0)"
+        }
+        TxnFilter::OrphanTransfer => {
+            // is_transfer = 1 and no row in transfer_pairs for this id.
+            "COALESCE(t.is_transfer, 0) = 1
+             AND NOT EXISTS (SELECT 1 FROM transfer_pairs tp
+                              WHERE tp.txn_id_a = t.id OR tp.txn_id_b = t.id)"
+        }
+        TxnFilter::Uncategorised => "t.category_id IS NULL",
+    };
+    let sql = format!(
+        "SELECT t.id,
+                t.date,
+                t.payee,
+                t.amount,
+                ta.name,
+                t.original_payee,
+                t.category_id,
+                c.title,
+                COALESCE(t.is_transfer, 0)
+         FROM transactions t
+         LEFT JOIN transaction_accounts ta
+           ON ta.id = t.transaction_account_id
+         LEFT JOIN categories c
+           ON c.id = t.category_id
+         WHERE {where_clause}
+         ORDER BY t.date DESC, t.id DESC
+         LIMIT ?1"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(rusqlite::params![limit], |row| {
+            let amount: f64 = row.get(3)?;
+            let is_transfer_int: i64 = row.get(8)?;
+            let payee: Option<String> = row.get(2)?;
+            let original_payee: Option<String> = row.get(5)?;
+            let display = payee
+                .clone()
+                .or_else(|| original_payee.clone())
+                .unwrap_or_default();
+            Ok(TxnQueueRow {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                payee: display,
+                amount_cents: (amount * 100.0).round() as i64,
+                account_name: row.get(4)?,
+                original_payee,
+                category_id: row.get(6)?,
+                category_title: row.get(7)?,
+                is_transfer: is_transfer_int != 0,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +410,156 @@ mod tests {
         assert_eq!(rows[1].category_id, Some(42));
         assert_eq!(rows[1].category_title.as_deref(), Some("_Bills"));
         assert!(rows[1].is_transfer);
+    }
+}
+
+#[cfg(test)]
+mod filter_tests {
+    use super::*;
+    use pocketsmith_sync::db::{initialize_in_memory, transfer_pairs, with_operation};
+    use pocketsmith_sync::review::Status;
+    use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
+    use pocketsmith_sync::transfers::{Confidence, TransferPair};
+
+    fn insert_txn(
+        conn: &Connection,
+        id: i64,
+        account_id: i64,
+        date: &str,
+        original_payee: &str,
+        payee: Option<&str>,
+        category_id: Option<i64>,
+        is_transfer: bool,
+    ) {
+        with_operation(conn, "test-seed", |c| {
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount,
+                    original_payee, payee, category_id, is_transfer)
+                 VALUES (?1, ?2, ?3, -1.0, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    id,
+                    account_id,
+                    date,
+                    original_payee,
+                    payee,
+                    category_id,
+                    if is_transfer { 1 } else { 0 },
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    fn seed_category(conn: &Connection, id: i64, title: &str) {
+        conn.execute(
+            "INSERT INTO categories (id, title) VALUES (?1, ?2)",
+            rusqlite::params![id, title],
+        )
+        .unwrap();
+    }
+
+    fn fixture() -> Connection {
+        let conn = initialize_in_memory().unwrap();
+        seed_account(&conn, 1, "Cheque").unwrap();
+        seed_account(&conn, 2, "Savings").unwrap();
+        seed_category(&conn, 100, "_Bills");
+
+        // 1: needs rule (no pn row, no category, not a transfer)
+        insert_txn(&conn, 1, 1, "2026-01-01", "WILD UNKNOWN", None, None, false);
+
+        // 2: rule pending (pn row pending, has category)
+        insert_txn(&conn, 2, 1, "2026-01-02", "AMAZON", Some("Amazon"), Some(100), false);
+        seed_pn(&conn, "AMAZON", "Amazon", Status::Pending, 1).unwrap();
+
+        // 3: rule confirmed, categorised, not orphan
+        insert_txn(&conn, 3, 1, "2026-01-03", "WOOLIES", Some("Woolworths"), Some(100), false);
+        seed_pn(&conn, "WOOLIES", "Woolworths", Status::Confirmed, 1).unwrap();
+
+        // 4: orphan transfer (is_transfer=1, no pair, no rule, uncategorised)
+        insert_txn(&conn, 4, 1, "2026-01-04", "TRF TO X", None, None, true);
+
+        // 5: paired transfer (is_transfer=1, pair confirmed, has category)
+        insert_txn(&conn, 5, 1, "2026-01-05", "TRF FROM Y", Some("From Savings"), Some(100), true);
+        insert_txn(&conn, 6, 2, "2026-01-05", "TRF TO Y", Some("To Cheque"), Some(100), true);
+        with_operation(&conn, "test-seed", |c| {
+            transfer_pairs::insert_pair(
+                c,
+                &TransferPair {
+                    txn_id_a: 5,
+                    txn_id_b: 6,
+                    amount_cents: 100,
+                    confidence: Confidence::High,
+                    status: Status::Confirmed,
+                },
+            )
+        })
+        .unwrap();
+
+        // 7: uncategorised but has rule and not a transfer
+        insert_txn(&conn, 7, 1, "2026-01-07", "STARBUCKS", Some("Starbucks"), None, false);
+        seed_pn(&conn, "STARBUCKS", "Starbucks", Status::Confirmed, 1).unwrap();
+
+        conn
+    }
+
+    fn ids(conn: &Connection, filter: TxnFilter) -> Vec<i64> {
+        let mut ids: Vec<i64> = filtered_transactions(conn, filter, 1000)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn filter_all_returns_every_row() {
+        let conn = fixture();
+        // 7 inserted (ids 1..=7).
+        assert_eq!(ids(&conn, TxnFilter::All), vec![1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn filter_needs_rule_excludes_rows_with_any_pn_row() {
+        let conn = fixture();
+        // Rows lacking pn rows: id 1 (WILD UNKNOWN), id 4 (TRF TO X),
+        // id 5 (TRF FROM Y), id 6 (TRF TO Y). Note that 5 and 6 are
+        // paired but pairing and normalisation are independent --
+        // having a confirmed pair does not exempt a row from needing
+        // a normalisation rule.
+        assert_eq!(ids(&conn, TxnFilter::NeedsRule), vec![1, 4, 5, 6]);
+    }
+
+    #[test]
+    fn filter_rule_pending_picks_only_pending_pn_rows() {
+        let conn = fixture();
+        // id 2 (AMAZON) is the only pn=pending row.
+        assert_eq!(ids(&conn, TxnFilter::RulePending), vec![2]);
+    }
+
+    #[test]
+    fn filter_orphan_transfer_excludes_paired_transfers() {
+        let conn = fixture();
+        // id 4 is is_transfer=1 with no pair row.
+        // ids 5, 6 are is_transfer=1 but paired.
+        assert_eq!(ids(&conn, TxnFilter::OrphanTransfer), vec![4]);
+    }
+
+    #[test]
+    fn filter_uncategorised_picks_only_null_category_id() {
+        let conn = fixture();
+        // ids 1, 4, 7 have category_id IS NULL.
+        assert_eq!(ids(&conn, TxnFilter::Uncategorised), vec![1, 4, 7]);
+    }
+
+    #[test]
+    fn filter_parse_round_trips_through_as_str() {
+        for f in TxnFilter::ALL {
+            assert_eq!(TxnFilter::parse(f.as_str()), f);
+        }
+        // Unknown strings fall back to All (URL-tampering robustness).
+        assert_eq!(TxnFilter::parse("not-a-filter"), TxnFilter::All);
     }
 }
