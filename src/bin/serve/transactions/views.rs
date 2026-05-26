@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use crate::helpers::{format_dollars, format_short_date};
+use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::state::AppState;
 
 use super::helpers::TxnQueueRow;
@@ -111,9 +111,9 @@ fn render_queue_row(v: &QueueRowView, is_selected: bool) -> Markup {
         "amount amount-negative"
     };
     let signed_amount = if v.row.amount_cents >= 0 {
-        format!("+{}", format_dollars(v.row.amount_cents))
+        format!("+{}", format_dollars_compact(v.row.amount_cents))
     } else {
-        format!("-{}", format_dollars(v.row.amount_cents))
+        format!("-{}", format_dollars_compact(v.row.amount_cents))
     };
     html! {
         div.queue-item.(if is_selected { "selected" } else { "" })
