@@ -46,8 +46,12 @@ function scrollSelectedIntoView() {
 
 // Captured between beforeSwap and afterSwap so a body innerHTML swap
 // (the only kind that destroys #queue) doesn't drop the user's scroll
-// position. Null means 'no #queue existed at capture time' — e.g.
+// position. Null means 'no .queue-list existed at capture time' — e.g.
 // initial page load.
+//
+// Note: the scrollable element is .queue-list (overflow-y: auto), NOT
+// #queue (overflow: hidden). #queue is the queue-panel container; its
+// scrollTop is always 0 because nothing scrolls there.
 let _savedQueueScrollTop = null;
 
 // Fire on initial render. The script tag is at the end of body so
@@ -55,21 +59,21 @@ let _savedQueueScrollTop = null;
 scrollSelectedIntoView();
 
 document.addEventListener('htmx:beforeSwap', function() {
-    const q = document.querySelector('#queue');
-    _savedQueueScrollTop = q ? q.scrollTop : null;
+    const list = document.querySelector('.queue-list');
+    _savedQueueScrollTop = list ? list.scrollTop : null;
 });
 
 // Fire after every HTMX swap. Listening on document (not document.body)
 // so the listener survives a body innerHTML swap.
 document.addEventListener('htmx:afterSwap', function() {
     // Restore the queue's scroll position first. If the swap was
-    // body-targeted, #queue is a brand-new element with scrollTop=0;
-    // restoring puts the user back where they were. If the swap was
-    // detail-targeted, #queue wasn't replaced and this assignment is
-    // a harmless self-set.
+    // body-targeted, .queue-list is a brand-new element with
+    // scrollTop=0; restoring puts the user back where they were. If
+    // the swap was detail-targeted, .queue-list wasn't replaced and
+    // this assignment is a harmless self-set.
     if (_savedQueueScrollTop !== null) {
-        const q = document.querySelector('#queue');
-        if (q) q.scrollTop = _savedQueueScrollTop;
+        const list = document.querySelector('.queue-list');
+        if (list) list.scrollTop = _savedQueueScrollTop;
     }
     // Now scroll the active row into view *only if it isn't already*
     // (block:'nearest' semantics). With the scroll position restored,
