@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
+use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, TraceEntry};
+
 use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::state::{AppState, Decision};
 
@@ -70,12 +72,22 @@ fn render_active_detail(
         return html! { div.empty-state { p { "Select a transaction from the queue." } } };
     };
     let Some(v) = views.iter().find(|x| x.row.id == id) else {
-        // Active id no longer in the visible queue (e.g. filter changed).
-        // Fall back to an empty state rather than a stale render.
         return html! { div.empty-state { p { "Active transaction is not in the current filter view." } } };
     };
-    let _ = state; // future commits use it for sibling-txn lookup
-    render_detail(&v.row, v.pair, v.norm, v.cat)
+    // Pipeline trace and siblings need DB access; fetch them here so
+    // render_detail stays pure / testable in isolation.
+    let pipeline = v
+        .row
+        .original_payee
+        .as_deref()
+        .map(run_normalise);
+    let siblings = v
+        .row
+        .original_payee
+        .as_deref()
+        .map(|op| crate::normalise::helpers::matching_transactions(&state.conn, op))
+        .unwrap_or_default();
+    render_detail(&v.row, v.pair, v.norm, v.cat, pipeline.as_ref(), &siblings)
 }
 
 /// Render the activity panel for the Transactions tab. Mirrors the
@@ -572,12 +584,25 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Mark
     let norm = super::state::derive_norm_state(&st.conn, row.original_payee.as_deref())
         .unwrap_or(NormState::Missing);
     let cat = super::state::derive_cat_state(row.category_id);
-    render_detail(&row, pair, norm, cat)
+    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let siblings = row
+        .original_payee
+        .as_deref()
+        .map(|op| crate::normalise::helpers::matching_transactions(&st.conn, op))
+        .unwrap_or_default();
+    render_detail(&row, pair, norm, cat, pipeline.as_ref(), &siblings)
 }
 
 /// Pure rendering of the detail panel content. Split out so tests can
 /// drive it without database setup.
-fn render_detail(row: &TxnQueueRow, pair: PairState, norm: NormState, cat: CatState) -> Markup {
+fn render_detail(
+    row: &TxnQueueRow,
+    pair: PairState,
+    norm: NormState,
+    cat: CatState,
+    pipeline: Option<&NormalisationResult>,
+    siblings: &[crate::normalise::helpers::MatchingTxn],
+) -> Markup {
     let amount_class = if row.amount_cents >= 0 { "amount-positive" } else { "amount-negative" };
     let signed = if row.amount_cents >= 0 {
         format!("+{}", format_dollars(row.amount_cents))
@@ -616,8 +641,97 @@ fn render_detail(row: &TxnQueueRow, pair: PairState, norm: NormState, cat: CatSt
         (render_norm_card(norm, row.id))
         (render_cat_card(cat))
 
+        @if let Some(p) = pipeline { (render_pipeline_trace(p)) }
+
+        @if !siblings.is_empty() { (render_siblings(row.original_payee.as_deref(), siblings)) }
+
         div.note {
             "Y / N / S act on whichever pillar is currently up for review (norm-pending or pair-pending). Press the buttons or the corresponding key."
+        }
+    }
+}
+
+/// Render the per-stage transformation trace for the active row.
+/// Mirrors the Normalise tab's pipeline-trace section but reuses the
+/// same data (NormalisationResult). One row per pipeline stage that
+/// mutated the normalised string or attached a feature.
+fn render_pipeline_trace(p: &NormalisationResult) -> Markup {
+    if p.trace.is_empty() {
+        return html! {
+            div.norm-trace {
+                h3 { "Pipeline trace" }
+                div.norm-trace-empty { "(no rules matched \u{2014} normalised string equals the original)" }
+            }
+        };
+    }
+    html! {
+        div.norm-trace {
+            h3 { "Pipeline trace" }
+            div.norm-trace-list {
+                @for entry in &p.trace {
+                    (render_trace_entry(entry))
+                }
+            }
+        }
+    }
+}
+
+fn render_trace_entry(entry: &TraceEntry) -> Markup {
+    let changed_string = entry.before != entry.after;
+    html! {
+        div.norm-trace-row {
+            span.norm-trace-stage { (entry.stage) }
+            div.norm-trace-body {
+                @if changed_string {
+                    div.norm-trace-diff {
+                        span.norm-trace-before { (entry.before) }
+                        span.norm-trace-arrow { " \u{2192} " }
+                        span.norm-trace-after { (entry.after) }
+                    }
+                }
+                @if !entry.features_added.is_empty() || entry.class_set.is_some() {
+                    div.norm-trace-extracted {
+                        @if let Some(c) = &entry.class_set {
+                            span.norm-trace-class { "class = " (format!("{:?}", c).to_lowercase()) }
+                        }
+                        @for feat in &entry.features_added {
+                            span.norm-trace-feat { "+" (feat) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Sibling transactions sharing the same original_payee. Useful for
+/// 'I'm about to confirm this rule \u{2014} how many other txns will it
+/// affect, and what do they look like?'
+fn render_siblings(
+    original_payee: Option<&str>,
+    siblings: &[crate::normalise::helpers::MatchingTxn],
+) -> Markup {
+    let label = original_payee
+        .map(|op| format!("sharing original_payee = {op:?}"))
+        .unwrap_or_else(|| "siblings".to_string());
+    html! {
+        div.prior-section {
+            h3 { (siblings.len()) " sibling transactions " (label) }
+            div.prior-list.norm-txn-list {
+                @for t in siblings.iter().take(20) {
+                    div.prior-row {
+                        span { (format_short_date(&t.date)) }
+                        span { (t.payee.as_deref().unwrap_or("\u{2014}")) }
+                        span.((if t.amount_cents >= 0 { "amount-positive" } else { "amount-negative" })) {
+                            (format_dollars(t.amount_cents))
+                        }
+                        span.norm-txn-acct { (t.account_name.as_deref().unwrap_or("?")) }
+                    }
+                }
+                @if siblings.len() > 20 {
+                    div.prior-row.empty-state-row { "\u{2026} " (siblings.len() - 20) " more not shown" }
+                }
+            }
         }
     }
 }
@@ -798,8 +912,7 @@ mod detail_tests {
             &row(-1699),
             PairState::Orphan,
             NormState::Missing,
-            CatState::Missing,
-        )
+            CatState::Missing, None, &[])
         .into_string();
         // Three distinct cards, one per pillar.
         assert_eq!(
@@ -825,8 +938,7 @@ mod detail_tests {
             &row(-1234),
             PairState::NotApplicable,
             NormState::Confirmed,
-            CatState::Confirmed,
-        )
+            CatState::Confirmed, None, &[])
         .into_string();
         assert_eq!(
             html.matches("class=\"cleaning-card").count(),
@@ -845,8 +957,7 @@ mod detail_tests {
             &row(-1699),
             PairState::NotApplicable,
             NormState::Missing,
-            CatState::Missing,
-        )
+            CatState::Missing, None, &[])
         .into_string();
         assert!(html.contains("amount-negative"), "html:\n{html}");
         assert!(html.contains("$16.99"), "html:\n{html}");
@@ -855,8 +966,7 @@ mod detail_tests {
             &row(2500),
             PairState::NotApplicable,
             NormState::Missing,
-            CatState::Missing,
-        )
+            CatState::Missing, None, &[])
         .into_string();
         assert!(html.contains("amount-positive"), "html:\n{html}");
         assert!(html.contains("$25.00"), "html:\n{html}");
@@ -870,8 +980,7 @@ mod detail_tests {
             &row(-1699),
             PairState::NotApplicable,
             NormState::Confirmed,
-            CatState::Confirmed,
-        )
+            CatState::Confirmed, None, &[])
         .into_string();
         assert!(
             html.contains("AMAZON MARKETPLACE"),

@@ -305,3 +305,40 @@ fn transactions_queue_emoji_is_clickable_to_undo_when_decided() {
         ],
     );
 }
+
+#[test]
+fn transactions_detail_renders_pipeline_trace_and_siblings() {
+    let state = fresh_state();
+    {
+        // Insert two txns sharing original_payee = "WOOLIES NORTH STRATHF"
+        // (which the fresh_state fixture already pn-stages as 'Woolworths').
+        // The first becomes the active row; the second is the sibling.
+        let st = state.lock().unwrap();
+        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount, original_payee, payee, is_transfer)
+                 VALUES (70, 1, '2026-04-01', -10.0, 'WOOLIES NORTH STRATHF', 'WOOLIES', 0)",
+                [],
+            )?;
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount, original_payee, payee, is_transfer)
+                 VALUES (71, 1, '2026-04-02', -5.0, 'WOOLIES NORTH STRATHF', 'WOOLIES', 0)",
+                [],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    let html = crate::transactions::views::render_detail_fragment(&state, 70).into_string();
+    contains_all(
+        &html,
+        &[
+            // The pipeline-trace section header.
+            "Pipeline trace",
+            // Sibling transactions section, plural in the heading.
+            "sibling transactions",
+        ],
+    );
+}
