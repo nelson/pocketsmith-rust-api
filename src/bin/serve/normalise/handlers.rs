@@ -87,6 +87,10 @@ pub fn undo(state: &Arc<Mutex<AppState>>, slug: &str) {
     st.normalise.undone += 1;
     st.normalise.decisions.remove(&row.original_payee);
     st.normalise.activity.retain(|e| e.slug != row.slug);
+    // Restore the just-undone row as active. Contextually undo means
+    // 'I made a mistake, let me look at this again' -- the detail
+    // panel must show the row in question.
+    st.normalise.active = Some(row.slug.clone());
 }
 
 /// Drop every active Skip decision in one shot. Mirrors
@@ -194,6 +198,9 @@ mod tests {
         assert!(st.normalise.decisions.is_empty());
         assert!(st.normalise.activity.is_empty());
         assert_eq!(st.normalise.undone, 1);
+        // Round-5: undo restores the just-undone row as active so the
+        // user lands on it for review.
+        assert_eq!(st.normalise.active.as_deref(), Some(slug.as_str()));
     }
 
     #[test]

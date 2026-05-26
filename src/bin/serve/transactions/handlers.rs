@@ -170,11 +170,11 @@ pub fn undo_norm(state: &Arc<Mutex<AppState>>, txn_id: i64) {
     if let Some(slug) = slug {
         crate::normalise::handlers::undo(state, &slug);
     }
-    // Drop the activity entry for this txn (whichever pillar) so the
-    // user doesn't see a stale row in the activity panel.
     let mut st = state.lock().unwrap();
     st.txn_activity.retain(|e| e.txn_id != txn_id);
     st.txn_undone += 1;
+    // Anchor the user on the just-undone row so they can review it.
+    st.txn_active = Some(txn_id);
 }
 
 /// Confirm/reject/skip the transfer pair this txn participates in.
@@ -226,6 +226,7 @@ pub fn undo_pair(state: &Arc<Mutex<AppState>>, txn_id: i64) {
     let mut st = state.lock().unwrap();
     st.txn_activity.retain(|e| e.txn_id != txn_id);
     st.txn_undone += 1;
+    st.txn_active = Some(txn_id);
 }
 
 #[cfg(test)]
@@ -438,6 +439,10 @@ mod tests {
         let st = state.lock().unwrap();
         assert_eq!(st.txn_activity.len(), 0, "activity entry removed");
         assert_eq!(st.txn_undone, 1, "undone counter incremented");
+        // Round-5: undo restores the just-undone row as active so the
+        // user can review it (contextually, undo means 'I made a
+        // mistake, let me look at this again').
+        assert_eq!(st.txn_active, Some(10));
     }
 
     #[test]
