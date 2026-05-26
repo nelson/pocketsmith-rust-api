@@ -162,6 +162,7 @@ mod tests {
             account_name: Some("Cheque".to_string()),
             original_payee: original.map(str::to_string),
             category_id: None,
+            category_title: None,
             is_transfer: false,
         }
     }
@@ -502,6 +503,7 @@ mod detail_tests {
             account_name: Some("Amex Platinum".to_string()),
             original_payee: Some("AMAZON MARKETPLACE".to_string()),
             category_id: None,
+            category_title: None,
             is_transfer: false,
         }
     }
