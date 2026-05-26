@@ -121,6 +121,12 @@ fn render_queue_with_header(
 /// `active_id` is the currently-selected transaction id, used to add
 /// the `.selected` CSS class. `None` means no selection (initial
 /// render before the user has navigated).
+/// Test-only thin wrapper around the row-rendering loop. Production
+/// code goes through `render_queue_with_header`, which adds the count
+/// header and the filter chips. The tests focus on per-row markup
+/// (emoji classes, data attributes, amount formatting) so they call
+/// this header-less variant for cleaner assertions.
+#[cfg(test)]
 pub fn render_queue(views: &[QueueRowView], active_id: Option<i64>) -> Markup {
     html! {
         div.queue-header {
