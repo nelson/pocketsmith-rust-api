@@ -79,6 +79,33 @@ pub struct NormActivityEntry {
     pub decision: Decision,
 }
 
+/// Activity-log entry for the transactions tab. Records a decision
+/// the user made from the Transactions detail panel so the activity
+/// panel can show recent actions and offer one-click undo.
+pub struct TxnActivityEntry {
+    pub txn_id: i64,
+    pub payee: String,
+    pub amount_cents: i64,
+    pub decision: Decision,
+    /// Which pillar's endpoint to call on undo: "norm" or "pair".
+    pub pillar: TxnActionPillar,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TxnActionPillar {
+    Norm,
+    Pair,
+}
+
+impl TxnActionPillar {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Norm => "norm",
+            Self::Pair => "pair",
+        }
+    }
+}
+
 pub struct AppState {
     pub conn: rusqlite::Connection,
 
@@ -99,6 +126,10 @@ pub struct AppState {
     pub txn_filter: String,
     /// id of the currently-selected transaction row, if any.
     pub txn_active: Option<i64>,
+    /// Activity log; newest at the tail. Capped at 100 entries.
+    pub txn_activity: Vec<TxnActivityEntry>,
+    /// Cumulative undo count for the activity panel header.
+    pub txn_undone: usize,
 }
 
 impl AppState {
@@ -113,6 +144,17 @@ impl AppState {
             norm_class_filter: "all".to_string(),
             txn_filter: "all".to_string(),
             txn_active: None,
+            txn_activity: Vec::new(),
+            txn_undone: 0,
+        }
+    }
+
+    /// Append `entry` to the transactions activity log, trimming the
+    /// oldest if it would exceed 100 items. Mirrors `TabState::push_activity`.
+    pub fn push_txn_activity(&mut self, entry: TxnActivityEntry) {
+        self.txn_activity.push(entry);
+        if self.txn_activity.len() > 100 {
+            self.txn_activity.remove(0);
         }
     }
 }

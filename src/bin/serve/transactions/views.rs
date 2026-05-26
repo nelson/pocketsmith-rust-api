@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup};
 
 use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
-use crate::state::AppState;
+use crate::state::{AppState, Decision};
 
 use super::helpers::{TxnFilter, TxnQueueRow};
 use super::state::{CatState, NormState, PairState};
@@ -31,12 +31,12 @@ pub struct QueueRowView {
 
 /// Render the full `/transactions/` page. Fetches transactions
 /// matching the active filter, decorates each with its three-pillar
-/// cleaning state, and renders the queue panel.
+/// cleaning state, and renders the queue panel. The detail panel
+/// renders the currently-active row (if any); the activity panel
+/// shows the session's recent decisions with undo buttons.
 pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let st = state.lock().unwrap();
     let filter = TxnFilter::parse(&st.txn_filter);
-    // 200 rows is enough to fill the panel on first paint without
-    // hammering SQLite. Pagination / load-older is a later commit.
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 200).unwrap_or_default();
     let views: Vec<QueueRowView> = rows
         .into_iter()
@@ -50,17 +50,80 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
         })
         .collect();
 
-    let n_views = views.len();
-    let queue = render_queue_with_header(&views, st.txn_active, filter);
-    let detail = html! {
-        div.empty-state { p { "Select a transaction from the queue." } }
-    };
-    let activity = html! {
-        div.activity-header {
-            span.stat { (n_views) " transactions visible. Detail and actions land in subsequent commits." }
-        }
-    };
+    let active_id = st.txn_active;
+    let queue = render_queue_with_header(&views, active_id, filter);
+    let detail = render_active_detail(&st, &views, active_id);
+    let activity = render_activity(&st);
     crate::render::render_page("transactions", "Transactions", queue, detail, activity)
+}
+
+/// Render the detail panel for the active row, or an empty-state
+/// placeholder if no row is selected. We re-use the QueueRowView
+/// already computed for the queue (avoids a second round-trip per
+/// page render).
+fn render_active_detail(
+    state: &AppState,
+    views: &[QueueRowView],
+    active_id: Option<i64>,
+) -> Markup {
+    let Some(id) = active_id else {
+        return html! { div.empty-state { p { "Select a transaction from the queue." } } };
+    };
+    let Some(v) = views.iter().find(|x| x.row.id == id) else {
+        // Active id no longer in the visible queue (e.g. filter changed).
+        // Fall back to an empty state rather than a stale render.
+        return html! { div.empty-state { p { "Active transaction is not in the current filter view." } } };
+    };
+    let _ = state; // future commits use it for sibling-txn lookup
+    render_detail(&v.row, v.pair, v.norm, v.cat)
+}
+
+/// Render the activity panel for the Transactions tab. Mirrors the
+/// layout used by the Normalise tab: top row of session counters,
+/// list of recent activity entries each with an undo-btn (the JS
+/// keyboard handler binds `U` to the first .undo-btn it finds).
+fn render_activity(state: &AppState) -> Markup {
+    let n_confirm = count_decisions(&state.txn_activity, Decision::Confirm);
+    let n_reject = count_decisions(&state.txn_activity, Decision::Reject);
+    let n_skip = count_decisions(&state.txn_activity, Decision::Skip);
+    html! {
+        div.activity-header {
+            span.stat { "Confirmed " span.count-confirmed { (n_confirm) } }
+            span.stat { "Rejected " span.count-rejected { (n_reject) } }
+            span.stat { "Skipped " span.count-skipped { (n_skip) } }
+            span.stat { "Undone " span.count-undone { (state.txn_undone) } }
+        }
+        div.activity-list {
+            @for entry in state.txn_activity.iter().rev().take(20) {
+                div.activity-row {
+                    span.((match entry.decision {
+                        Decision::Confirm => "status-confirmed",
+                        Decision::Reject => "status-rejected",
+                        Decision::Skip => "status-skipped",
+                    })) {
+                        @match entry.decision {
+                            Decision::Confirm => { "\u{2713} confirmed" },
+                            Decision::Reject => { "\u{2717} rejected" },
+                            Decision::Skip => { "\u{2298} skipped" },
+                        }
+                    }
+                    span { (entry.payee) }
+                    span {
+                        @if entry.amount_cents >= 0 { "+" } @else { "-" }
+                        (format_dollars_compact(entry.amount_cents))
+                    }
+                    button.undo-btn
+                        hx-post=(format!("/transactions/txn/{}/{}/undo", entry.txn_id, entry.pillar.as_str()))
+                        hx-target="body"
+                    { "undo" }
+                }
+            }
+        }
+    }
+}
+
+fn count_decisions(activity: &[crate::state::TxnActivityEntry], d: Decision) -> usize {
+    activity.iter().filter(|e| e.decision == d).count()
 }
 
 /// Render the queue panel for an HTMX swap. The route handler updates
@@ -181,10 +244,10 @@ fn render_queue_row(v: &QueueRowView, is_selected: bool) -> Markup {
             data-detail-target="#detail"
         {
             span.date { (format_short_date(&v.row.date)) }
-            (norm_glyph_with_tooltip(v.norm))
+            (norm_glyph_with_tooltip_clickable(v.norm, v.row.id))
             span.payee { (v.row.payee) }
             span.post-payee {
-                (pair_glyph_optional(v.pair))
+                (pair_glyph_optional_clickable(v.pair, v.row.id))
                 (cat_tag_optional(v.cat, v.row.category_title.as_deref()))
             }
             span.(amount_class) { (signed_amount) }
@@ -193,27 +256,62 @@ fn render_queue_row(v: &QueueRowView, is_selected: bool) -> Markup {
 }
 
 fn norm_glyph_with_tooltip(s: NormState) -> Markup {
+    norm_glyph_with_tooltip_clickable(s, 0)
+}
+
+/// Norm glyph with hover tooltip, optionally clickable when the state
+/// represents a decision the user can undo (Confirmed or Rejected).
+/// Pass `txn_id = 0` for non-clickable contexts (e.g. detail header).
+fn norm_glyph_with_tooltip_clickable(s: NormState, txn_id: i64) -> Markup {
     let (cls, title) = match s {
         NormState::Confirmed => ("g-norm-confirmed", "normalisation rule confirmed"),
         NormState::Pending => ("g-norm-pending", "normalisation pending review"),
         NormState::Missing => ("g-norm-missing", "no normalisation rule"),
         NormState::Rejected => ("g-norm-rejected", "normalisation rejected"),
     };
-    html! { span.(cls) title=(title) {} }
+    let undoable = matches!(s, NormState::Confirmed | NormState::Rejected) && txn_id != 0;
+    if undoable {
+        let undo_url = format!("/transactions/txn/{txn_id}/norm/undo");
+        let title2 = format!("{title} \u{2014} click to undo");
+        html! {
+            span.(cls).clickable
+                title=(title2)
+                hx-post=(undo_url)
+                hx-target="body"
+                onclick="event.stopPropagation()"
+            {}
+        }
+    } else {
+        html! { span.(cls) title=(title) {} }
+    }
 }
 
-/// Pair glyph that returns empty markup for `Rejected` and
-/// `NotApplicable`. With the post-payee grouping, an empty return
-/// means the cat-tag (if any) sits flush against the amount column,
-/// no wasted grid gap.
 fn pair_glyph_optional(s: PairState) -> Markup {
+    pair_glyph_optional_clickable(s, 0)
+}
+
+fn pair_glyph_optional_clickable(s: PairState, txn_id: i64) -> Markup {
     let (cls, title) = match s {
         PairState::Confirmed => ("g-pair-confirmed", "transfer pair confirmed"),
         PairState::Pending => ("g-pair-pending", "transfer pair pending review"),
         PairState::Orphan => ("g-pair-orphan", "orphan transfer (looks like a transfer; no pair found)"),
         PairState::Rejected | PairState::NotApplicable => return html! {},
     };
-    html! { span.(cls) title=(title) {} }
+    let undoable = matches!(s, PairState::Confirmed) && txn_id != 0;
+    if undoable {
+        let undo_url = format!("/transactions/txn/{txn_id}/pair/undo");
+        let title2 = format!("{title} \u{2014} click to undo");
+        html! {
+            span.(cls).clickable
+                title=(title2)
+                hx-post=(undo_url)
+                hx-target="body"
+                onclick="event.stopPropagation()"
+            {}
+        }
+    } else {
+        html! { span.(cls) title=(title) {} }
+    }
 }
 
 /// Render the category tag, or nothing for `CatState::Missing`
@@ -455,7 +553,10 @@ mod tests {
 /// rendered but not wired up; the action plumbing lands in a later
 /// commit.
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Markup {
-    let st = state.lock().unwrap();
+    // Set txn_active so a subsequent body-target re-render keeps this
+    // row's detail visible (see render_active_detail in render_page_shell).
+    let mut st = state.lock().unwrap();
+    st.txn_active = Some(txn_id);
     let row_opt: Option<TxnQueueRow> = super::helpers::recent_transactions(&st.conn, 100_000)
         .ok()
         .and_then(|rows| rows.into_iter().find(|r| r.id == txn_id));

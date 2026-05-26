@@ -231,3 +231,77 @@ fn transactions_detail_panel_renders_action_buttons_on_norm_pending_card() {
         ],
     );
 }
+
+#[test]
+fn transactions_activity_panel_shows_recent_decisions_with_undo_btn() {
+    let state = fresh_state();
+    {
+        // Seed a non-transfer txn whose original_payee matches the
+        // pre-seeded pn. Then confirm to push an activity entry.
+        let st = state.lock().unwrap();
+        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount,
+                    original_payee, payee, is_transfer)
+                 VALUES (60, 1, '2026-04-01', -10.0, 'WOOLIES NORTH STRATHF',
+                         'WOOLIES NORTH STRATHF', 0)",
+                [],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    crate::transactions::handlers::act_norm(&state, 60, crate::state::Decision::Confirm);
+
+    let html = crate::transactions::views::render_page_shell(&state).into_string();
+    contains_all(
+        &html,
+        &[
+            // Counter says one confirm.
+            "Confirmed <span class=\"count-confirmed\">1",
+            // Activity row carries an undo-btn pointing at the txn-scoped endpoint.
+            "class=\"undo-btn\"",
+            "hx-post=\"/transactions/txn/60/norm/undo\"",
+            // The payee text appears in the activity row.
+            "WOOLIES NORTH STRATHF",
+        ],
+    );
+}
+
+#[test]
+fn transactions_queue_emoji_is_clickable_to_undo_when_decided() {
+    let state = fresh_state();
+    {
+        let st = state.lock().unwrap();
+        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+            c.execute(
+                "INSERT INTO transactions
+                   (id, transaction_account_id, date, amount,
+                    original_payee, payee, is_transfer)
+                 VALUES (61, 1, '2026-04-01', -10.0, 'WOOLIES NORTH STRATHF',
+                         'WOOLIES NORTH STRATHF', 0)",
+                [],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    // Confirm the rule (DB status flips to Confirmed for the shared
+    // pn row; both txn rows displaying that payee should now show a
+    // clickable g-norm-confirmed indicator).
+    crate::transactions::handlers::act_norm(&state, 61, crate::state::Decision::Confirm);
+
+    let html = crate::transactions::views::render_page_shell(&state).into_string();
+    contains_all(
+        &html,
+        &[
+            // The confirmed row's norm emoji is clickable.
+            "class=\"g-norm-confirmed clickable\"",
+            // Click triggers a POST to the undo endpoint.
+            "hx-post=\"/transactions/txn/61/norm/undo\"",
+            // ...with a tooltip that says "click to undo".
+            "click to undo",
+        ],
+    );
+}
