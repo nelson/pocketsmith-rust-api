@@ -58,7 +58,13 @@ cargo run --bin serve --features web
 
 Then open <http://127.0.0.1:3141>. Override the port with `SERVE_PORT=4000 cargo run --bin serve --features web`.
 
-The page is a single HTMX-driven view:
+The server hosts five tabs in the canonical left-to-right order **Dashboard · Transactions · Review · Transfers · Normalise**. Two tabs are implemented today (Transfers, Normalise, plus the new Transactions); Dashboard and Review have plans in `.claude/plans/dashboard-tab-mvp.md` and `.claude/plans/review-tab-mvp.md` and are not yet built.
+
+Every tab uses the same three-pane shell: a filterable queue on the left, a detail panel for the selected row, and an activity log + counters at the bottom. `Tab` / `Shift+Tab` cycles tabs; `↑` / `↓` walks the queue; `Y` / `N` / `S` confirm / reject / skip; `U` undoes the most recent decision. Search is `/`. Clicking the status emoji on a confirmed or rejected row also undoes.
+
+#### Transfers tab
+
+The original surface, for reviewing pending transfer pairs:
 
 - **Queue (left)** — filterable list of pairs (status: all / pending / confirmed / rejected / skipped, plus confidence: all / high / medium / low). Click a pair to load it.
 - **Detail (right)** — side-by-side transaction cards for the selected pair, prior transfer history for the two accounts, and **Y confirm / N reject / S skip** action buttons (also bound to keyboard shortcuts).
@@ -67,6 +73,29 @@ The page is a single HTMX-driven view:
 Confirm and Reject write straight to the `transfer_pairs.status` column in `pocketsmith.db`. Skip is in-memory only (not persisted) and is forgotten when the server restarts. The web UI does **not** apply confirmed pairs to the `transactions` table — run `cargo run --bin transfers -- --apply` for that step.
 
 This is a graphical alternative to the now-removed `--review` CLI flag.
+
+#### Transactions tab
+
+A reverse-chronological river of every transaction with three-pillar cleaning state (Pair / Norm / Cat) visible on each row. Built so progress on data cleaning is at-a-glance:
+
+- **Queue (left)** — transactions ordered by date DESC. Each row shows: date, normalisation glyph (✅ / 🔍 / ❓ / 🚫), display payee, optional pair glyph (🔗 / 📎 / broken-chain) when the row is paired or pending or orphan, optional category tag, and the signed amount in compact form (e.g. `$12.3k`, `$1.23M`). Filter chips: All / Needs rule / Rule pending / Orphan transfer / Uncategorised.
+- **Detail (right)** — cleaning-state cards (one per pillar that needs attention), the normalisation pipeline trace for the active row's `original_payee`, and a list of sibling transactions sharing that `original_payee`. Y/N/S act on whichever pillar is currently up for review; the action delegates to the existing `/normalise/*` and `/transfers/*` endpoints but re-renders the Transactions page so the user keeps their context.
+- **Activity (bottom)** — the same session-counter / activity-log / undo pattern as the Transfers tab.
+
+Most rows aren't transfers, so the pair glyph slot is hidden when not relevant. Clicking the norm or pair glyph on a confirmed row triggers a one-click undo (same as the activity-log undo button).
+
+Follow-up work (free-text search, account multi-select filter, orphan-transfer flow, `/` redirect to `/dashboard/`) is captured in `.claude/plans/transactions-tab-mvp-followups.md`.
+
+#### Performance
+
+The queue render uses a single composite SQL query with LEFT JOINs to pre-fetch the per-row pair-status and norm-status fields (the alternative — a per-row state-derivation loop — was an N+1 that dominated render time). Two indexes are required:
+
+```sql
+CREATE INDEX idx_transactions_date_id          ON transactions(date DESC, id DESC);
+CREATE INDEX idx_transactions_original_payee   ON transactions(original_payee, date DESC, id DESC);
+```
+
+Both are created idempotently by `db::initialize` (see `src/db/schema.rs`). On a 22k-row DB, action POSTs land in ~15-25ms end-to-end.
 
 ### Apply
 
