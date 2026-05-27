@@ -74,6 +74,10 @@ pub fn render_actions(action_base: &str, is_skipped: bool) -> Markup {
 /// All tabs use the same HTML element ids (`#queue`, `#detail`,
 /// `#activity`) so the JS keyboard handler and the HTMX swap targets
 /// in views.rs can be tab-agnostic.
+/// Convenience wrapper: same as [`render_page_with_sync`] but with no
+/// sync timestamp. Retained because the page-shell tests render the
+/// skeleton without setting up a DB row.
+#[allow(dead_code)]
 pub fn render_page(
     tab_slug: &str,
     title: &str,

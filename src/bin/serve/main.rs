@@ -1,4 +1,5 @@
 mod css;
+mod dashboard;
 mod helpers;
 mod js;
 mod normalise;
@@ -50,16 +51,29 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
     let path = request.url().to_string();
     let method = request.method().clone();
 
-    // `/` redirects to the transfers tab. Each tab is its own page tree.
+    // `/` redirects to the dashboard tab. Each tab is its own page tree.
     if method == Method::Get && (path == "/" || path.is_empty()) {
         let resp = Response::from_data(Vec::new())
             .with_status_code(302)
-            .with_header(Header::from_bytes("Location", "/transfers/").unwrap());
+            .with_header(Header::from_bytes("Location", "/dashboard/").unwrap());
         let _ = request.respond(resp);
         return;
     }
 
     let response = match (method, path.as_str()) {
+        // --- Dashboard tab
+        (Method::Get, "/dashboard" | "/dashboard/") => dashboard::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/dashboard/month/") => {
+            let ym = p.trim_start_matches("/dashboard/month/");
+            // Reject anything that doesn't look like YYYY-MM so we
+            // don't run an unbounded query on a malformed URL.
+            if ym.len() == 7 && ym.chars().nth(4) == Some('-') {
+                dashboard::views::render_month_detail_fragment(&state, ym)
+            } else {
+                html! { p { "Invalid month" } }
+            }
+        }
+
         // --- Transactions tab (read-only shell for now)
         (Method::Get, "/transactions" | "/transactions/") => transactions::views::render_page_shell(&state),
         (Method::Get, p) if p.starts_with("/transactions/queue?") => {

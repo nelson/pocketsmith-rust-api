@@ -775,6 +775,116 @@ body {
 .tab-transactions .clickable { cursor: pointer; }
 .tab-transactions .clickable:hover { transform: scale(1.15); transition: transform 0.1s; }
 
+/* ===========================================================
+ * Dashboard tab.
+ * =========================================================== */
+.dash-queue-help { font-size: 11px; color: var(--fg-dim); margin-top: 4px; line-height: 1.3; }
+
+.tab-dashboard .queue-item.month-row {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 8px 12px;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    font-size: 12px;
+}
+.tab-dashboard .month-label { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tab-dashboard .month-figs { color: var(--fg-dim); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-dashboard .month-figs .amount-positive,
+.tab-dashboard .month-figs .amount-negative { font-weight: 500; }
+.tab-dashboard .net-pos { color: var(--green); font-weight: 600; }
+.tab-dashboard .net-neg { color: var(--red);   font-weight: 600; }
+
+.tab-dashboard .hyg-dots { display: inline-flex; gap: 3px; align-items: center; }
+.tab-dashboard .hyg-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--fg-dark);
+}
+.tab-dashboard .hyg-on   { background: var(--green); }
+.tab-dashboard .hyg-warn { background: var(--yellow); }
+.tab-dashboard .hyg-bad  { background: var(--red); }
+
+.tab-dashboard .detail-header { padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tab-dashboard .detail-header .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.tab-dashboard .detail-header h2 { font-size: 18px; font-weight: 500; }
+.tab-dashboard .detail-header .amount-big { font-size: 18px; font-variant-numeric: tabular-nums; }
+.tab-dashboard .detail-header .meta { color: var(--fg-dim); font-size: 12px; margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+.tab-dashboard .chip { display: inline-block; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 11px; color: var(--fg-dim); }
+
+.tab-dashboard .dash-month-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 1100px) {
+    .tab-dashboard .dash-month-grid { grid-template-columns: 1fr; }
+}
+.tab-dashboard .dash-sankey-wrap,
+.tab-dashboard .dash-breakdown-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+}
+.tab-dashboard .dash-sankey-wrap h3,
+.tab-dashboard .dash-breakdown-wrap h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+.tab-dashboard .dash-sankey-wrap .sub,
+.tab-dashboard .dash-breakdown-wrap .sub { color: var(--fg-dim); font-size: 11px; margin-bottom: 8px; }
+.tab-dashboard .dash-sankey { width: 100%; height: auto; display: block; }
+
+.tab-dashboard .dash-breakdown {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    font-size: 12px;
+}
+.tab-dashboard .dash-breakdown th,
+.tab-dashboard .dash-breakdown td {
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+.tab-dashboard .dash-breakdown th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-dim);
+    font-weight: 500;
+}
+.tab-dashboard .dash-breakdown .align-right { text-align: right; }
+.tab-dashboard .dash-breakdown .align-left { text-align: left; }
+.tab-dashboard .dash-section-row td {
+    background: var(--bg-highlight);
+    color: var(--fg-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 6px;
+}
+.tab-dashboard .empty-state-row { color: var(--fg-dim); font-style: italic; padding: 12px; }
+
+.tab-dashboard .kbd-inline {
+    display: inline-block;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 0 5px;
+    margin: 0 2px;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    color: var(--fg);
+    font-size: 11px;
+}
+
 /* Detail panel — cleaning state cards (one per pillar that needs
  * the user's attention). Bordered cards, dimension-coloured left edge,
  * inline glyph + title + sub. */
