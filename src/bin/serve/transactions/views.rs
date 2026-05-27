@@ -657,9 +657,7 @@ fn render_detail(
             }
         }
 
-        (render_pair_card(pair, row.id))
-        (render_norm_card(norm, row.id))
-        (render_cat_card(cat))
+        (render_cards_row(pair, norm, cat, row.id))
 
         @if let Some(p) = pipeline { (render_pipeline_trace(p)) }
 
@@ -779,106 +777,168 @@ fn render_action_buttons(action_base: &str) -> Markup {
     }
 }
 
+/// Render the three cleaning-state cards side-by-side in a horizontal
+/// row. Each card uses the same dark-box visual language as the
+/// transfers tab's `.txn-card` (no coloured left border), with a
+/// status chip in the header and the Y/N/S action buttons rendered
+/// inside the card when there's a decision pending. Cards that don't
+/// apply (e.g. pair on a non-transfer row) render as a dimmed
+/// placeholder so the three-column grid stays balanced.
+fn render_cards_row(pair: PairState, norm: NormState, cat: CatState, txn_id: i64) -> Markup {
+    html! {
+        div.cleaning-cards {
+            (render_pair_card(pair, txn_id))
+            (render_norm_card(norm, txn_id))
+            (render_cat_card(cat))
+        }
+    }
+}
+
+/// Shared status-chip vocabulary used by all three cards in their
+/// header strip. Same colour palette as the existing `.btn-*` classes
+/// so the user reads green/yellow/red consistently across the page.
+#[derive(Copy, Clone)]
+enum CardStatus { Ok, Warn, Bad }
+
+impl CardStatus {
+    fn class(self) -> &'static str {
+        match self {
+            CardStatus::Ok => "card-status-ok",
+            CardStatus::Warn => "card-status-warn",
+            CardStatus::Bad => "card-status-bad",
+        }
+    }
+    fn label(self) -> &'static str {
+        match self {
+            CardStatus::Ok => "ok",
+            CardStatus::Warn => "pending",
+            CardStatus::Bad => "needs you",
+        }
+    }
+}
+
+/// Render one cleaning-state card. Layout mirrors the transfers tab's
+/// `.txn-card`: header strip with pillar name + status chip, body with
+/// glyph + title + sub, optional action buttons at the bottom when the
+/// pillar has a decision pending.
+fn render_card(
+    pillar: &str,
+    status: CardStatus,
+    glyph_cls: &str,
+    title: &str,
+    sub: &str,
+    action_base: Option<&str>,
+) -> Markup {
+    html! {
+        div.cleaning-card {
+            div.cleaning-card-header {
+                span.cleaning-card-pillar { (pillar) }
+                span.cleaning-card-status.(status.class()) { (status.label()) }
+            }
+            div.cleaning-card-body {
+                span.glyph.(glyph_cls) {}
+                div.cleaning-card-text {
+                    div.title { (title) }
+                    div.sub { (sub) }
+                }
+            }
+            @if let Some(base) = action_base { (render_action_buttons(base)) }
+        }
+    }
+}
+
+/// A dimmed placeholder card used when a pillar doesn't apply to the
+/// active row (e.g. Pair on a non-transfer). Keeps the three-column
+/// grid balanced so the eye doesn't have to retarget on every row.
+fn render_card_placeholder(pillar: &str, reason: &str) -> Markup {
+    html! {
+        div.cleaning-card.cleaning-card-na {
+            div.cleaning-card-header {
+                span.cleaning-card-pillar { (pillar) }
+                span.cleaning-card-status { "n/a" }
+            }
+            div.cleaning-card-body { div.cleaning-card-text { div.sub { (reason) } } }
+        }
+    }
+}
+
 fn render_pair_card(s: PairState, txn_id: i64) -> Markup {
-    let (cls, title, sub, show_actions) = match s {
+    let (status, title, sub, show_actions) = match s {
         PairState::Confirmed => (
-            "ok",
+            CardStatus::Ok,
             "Pair confirmed",
             "This transaction is paired with its counterpart.",
             false,
         ),
         PairState::Pending => (
-            "warn",
+            CardStatus::Warn,
             "Pair proposed",
             "The pairing pipeline proposed a counterpart \u{2014} your call to confirm.",
             true,
         ),
         PairState::Orphan => (
-            "bad",
+            CardStatus::Bad,
             "Looks like a transfer, no pair found",
             "Either the counterpart hasn't synced yet, this isn't a real internal transfer, or the pairing pipeline missed it.",
             false, // orphan-flow needs transfer_decisions (PLAN §8); follow-up commit
         ),
         PairState::Rejected => (
-            "ok",
+            CardStatus::Ok,
             "Pair rejected",
             "You've decided this is not a transfer.",
             false,
         ),
-        PairState::NotApplicable => return html! {},
+        PairState::NotApplicable => return render_card_placeholder("Pair", "not a transfer"),
     };
     let action_base = format!("/transactions/txn/{txn_id}/pair");
-    html! {
-        div.cleaning-card.(cls) {
-            span.glyph.(pair_glyph_class(s)) { }
-            div {
-                div.title { (title) }
-                div.sub { (sub) }
-                @if show_actions { (render_action_buttons(&action_base)) }
-            }
-        }
-    }
+    render_card("Pair", status, pair_glyph_class(s), title, sub, show_actions.then_some(action_base.as_str()))
 }
 
 fn render_norm_card(s: NormState, txn_id: i64) -> Markup {
-    let (cls, title, sub) = match s {
+    let (status, title, sub) = match s {
         NormState::Confirmed => (
-            "ok",
+            CardStatus::Ok,
             "Normalisation rule confirmed",
             "Payee has a confirmed normalisation rule.",
         ),
         NormState::Pending => (
-            "warn",
+            CardStatus::Warn,
             "Normalisation rule pending review",
             "The pipeline produced a proposal \u{2014} your call to confirm.",
         ),
         NormState::Missing => (
-            "bad",
+            CardStatus::Bad,
             "No normalisation rule",
             "The pipeline has nothing to say about this payee. Either teach it a rule, or ignore.",
         ),
         NormState::Rejected => (
-            "ok",
+            CardStatus::Ok,
             "Normalisation rule rejected",
             "You've decided this payee should not be normalised.",
         ),
     };
     let action_base = format!("/transactions/txn/{txn_id}/norm");
     let show_actions = matches!(s, NormState::Pending);
-    html! {
-        div.cleaning-card.(cls) {
-            span.glyph.(norm_glyph_class(s)) { }
-            div {
-                div.title { (title) }
-                div.sub { (sub) }
-                @if show_actions { (render_action_buttons(&action_base)) }
-            }
-        }
-    }
+    render_card(
+        "Normalise", status, norm_glyph_class(s), title, sub,
+        show_actions.then_some(action_base.as_str()),
+    )
 }
 
 fn render_cat_card(s: CatState) -> Markup {
-    let (cls, title, sub) = match s {
+    let (status, title, sub) = match s {
         CatState::Confirmed => (
-            "ok",
+            CardStatus::Ok,
             "Categorised",
             "This transaction has a category.",
         ),
         CatState::Missing => (
-            "bad",
+            CardStatus::Bad,
             "Uncategorised",
             "This transaction has no category. Mutation is out of scope for v1 \u{2014} fix it in PocketSmith and re-sync.",
         ),
     };
-    html! {
-        div.cleaning-card.(cls) {
-            span.glyph.(cat_glyph_class(s)) { }
-            div {
-                div.title { (title) }
-                div.sub { (sub) }
-            }
-        }
-    }
+    render_card("Categorise", status, cat_glyph_class(s), title, sub, None)
 }
 
 // Class-only variants of the glyph fns so the detail panel can use
@@ -938,7 +998,8 @@ mod detail_tests {
         .into_string();
         // Three distinct cards, one per pillar.
         assert_eq!(
-            html.matches("class=\"cleaning-card").count(),
+            html.matches("<div class=\"cleaning-card\">").count()
+                + html.matches("<div class=\"cleaning-card cleaning-card-na\">").count(),
             3,
             "expected 3 cleaning cards, html:\n{html}"
         );
@@ -952,10 +1013,12 @@ mod detail_tests {
     }
 
     #[test]
-    fn render_detail_omits_pair_card_when_not_applicable() {
-        // A non-transfer row with confirmed norm + cat: only the
-        // norm+cat cards should render, both with .ok class. No pair
-        // card at all (PairState::NotApplicable returns empty markup).
+    fn render_detail_renders_three_cards_horizontally_even_when_pair_na() {
+        // New layout (round-5): three cards always rendered in a
+        // horizontal row. A non-applicable pair becomes a dimmed
+        // placeholder card instead of being omitted, so the grid
+        // stays balanced. The pair-glyph classes are still absent
+        // because the placeholder has no glyph.
         let html = render_detail(
             &row(-1234),
             PairState::NotApplicable,
@@ -963,13 +1026,18 @@ mod detail_tests {
             CatState::Confirmed, None, &[])
         .into_string();
         assert_eq!(
-            html.matches("class=\"cleaning-card").count(),
-            2,
-            "expected 2 cleaning cards (no pair card), html:\n{html}"
+            html.matches("<div class=\"cleaning-card\">").count()
+                + html.matches("<div class=\"cleaning-card cleaning-card-na\">").count(),
+            3,
+            "expected 3 cleaning cards (one is the n/a placeholder), html:\n{html}"
+        );
+        assert!(
+            html.contains("cleaning-card-na"),
+            "expected the not-applicable placeholder card, html:\n{html}"
         );
         assert!(
             !html.contains("g-pair-"),
-            "no pair-* class expected for not-applicable row, html:\n{html}"
+            "no pair-* glyph expected for not-applicable row, html:\n{html}"
         );
     }
 
