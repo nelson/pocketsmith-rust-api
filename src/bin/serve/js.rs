@@ -156,6 +156,17 @@ document.addEventListener('keydown', function(e) {
             const undoBtn = document.querySelector('.undo-btn');
             if (undoBtn) undoBtn.click();
             break;
+        case '?':
+            e.preventDefault();
+            document.getElementById('hints-overlay').classList.toggle('open');
+            break;
+    }
+    if (e.key === 'Escape') {
+        const overlay = document.getElementById('hints-overlay');
+        if (overlay && overlay.classList.contains('open')) {
+            e.preventDefault();
+            overlay.classList.remove('open');
+        }
     }
 });
 

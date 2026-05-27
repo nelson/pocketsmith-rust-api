@@ -90,7 +90,15 @@ fn render_full_page(
     };
     let activity = render_activity(state);
 
-    crate::render::render_page("normalise", "Payee Normalisations", queue, detail, activity)
+    let sync = crate::render::last_sync_info(&state.conn);
+    crate::render::render_page_with_sync(
+        "normalise",
+        "Payee Normalisations",
+        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        queue,
+        detail,
+        activity,
+    )
 }
 
 fn render_queue(

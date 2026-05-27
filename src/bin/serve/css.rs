@@ -17,6 +17,119 @@ pub const CSS: &str = r#"
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Header row: tab bar on the left, right-aligned sync chip + hints
+ * trigger on the right. */
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 0.75rem 0;
+}
+.header .tab-bar { margin: 0; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.sync-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--fg-dim);
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    cursor: help;
+}
+.sync-chip-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+}
+.sync-chip-fresh .sync-chip-dot { background: var(--green); }
+.sync-chip-stale .sync-chip-dot { background: var(--yellow); }
+.sync-chip-old   .sync-chip-dot { background: var(--red); }
+.sync-chip-never .sync-chip-dot { background: var(--red); }
+
+.hints-trigger {
+    background: var(--bg-surface);
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.hints-trigger:hover { color: var(--fg); border-color: var(--accent); }
+
+/* Keyboard-hints modal overlay (toggled by `?` or the header trigger). */
+.hints-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+.hints-overlay.open { display: flex; }
+.hints-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    min-width: 420px;
+    max-width: 560px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+.hints-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.hints-card h2 { font-size: 14px; font-weight: 600; }
+.hints-close {
+    background: none;
+    border: none;
+    color: var(--fg-dim);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+}
+.hints-close:hover { color: var(--fg); }
+.hints-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 8px 16px;
+    font-size: 12px;
+}
+.hints-grid .kbd {
+    display: inline-block;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    color: var(--fg);
+    text-align: center;
+    min-width: 24px;
+}
+.hints-foot {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--fg-dim);
+}
+
 .tab-bar {
     display: flex;
     gap: 0.25rem;
