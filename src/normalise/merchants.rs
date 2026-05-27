@@ -12,6 +12,7 @@ struct Merchant {
 struct CompiledMerchant {
     regex: Regex,
     canonical: &'static str,
+    pattern: &'static str,
 }
 
 pub fn apply(result: &mut NormalisationResult) {
@@ -22,6 +23,7 @@ pub fn apply(result: &mut NormalisationResult) {
         if cm.regex.is_match(&result.normalised) {
             result.features.entity_name = Some(cm.canonical.to_string());
             result.set_class(PayeeClass::Merchant);
+            result.last_matched_pattern = Some(cm.pattern);
             return;
         }
     }
@@ -211,6 +213,7 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
             .map(|m| CompiledMerchant {
                 regex: Regex::new(m.pattern).expect("invalid merchant pattern"),
                 canonical: m.canonical,
+                pattern: m.pattern,
             })
             .collect()
     })

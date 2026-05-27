@@ -302,6 +302,11 @@ fn render_pipeline_trace(p: &NormalisationResult) -> Markup {
 
 fn render_trace_entry(entry: &TraceEntry) -> Markup {
     let changed_string = entry.before != entry.after;
+    let values: std::collections::HashMap<&str, &str> = entry
+        .feature_values
+        .iter()
+        .map(|(k, v)| (*k, v.as_str()))
+        .collect();
     html! {
         div.norm-trace-row {
             span.norm-trace-stage { (entry.stage) }
@@ -319,8 +324,22 @@ fn render_trace_entry(entry: &TraceEntry) -> Markup {
                             span.norm-trace-class { "class = " (format!("{:?}", c).to_lowercase()) }
                         }
                         @for feat in &entry.features_added {
-                            span.norm-trace-feat { "+" (feat) }
+                            @if let Some(v) = values.get(feat) {
+                                span.norm-trace-feat {
+                                    "+" (feat) " "
+                                    span.norm-trace-feat-val { "(" (v) ")" }
+                                }
+                            } @else {
+                                span.norm-trace-feat { "+" (feat) }
+                            }
                         }
+                    }
+                }
+                @if let Some(pat) = entry.matched_pattern {
+                    div.norm-trace-pattern {
+                        span.norm-trace-pattern-label { "matched" }
+                        " "
+                        code.norm-trace-pattern-src { (pat) }
                     }
                 }
             }
