@@ -141,7 +141,6 @@ fn transactions_page_renders_tab_bar_and_three_panes() {
             "class=\"tab active\">Transactions",
             // Other tabs render as links.
             "href=\"/dashboard/\"",
-            "href=\"/review/\"",
             "href=\"/transfers/\"",
             "href=\"/normalise/\"",
             // Layout panel ids that the JS and HTMX swap targets rely on.

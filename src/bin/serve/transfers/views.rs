@@ -75,7 +75,15 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
     };
     let activity = render_activity(state);
 
-    crate::render::render_page("transfers", "Transfer Pairs", queue, detail, activity)
+    let sync = crate::render::last_sync_info(&state.conn);
+    crate::render::render_page_with_sync(
+        "transfers",
+        "Transfer Pairs",
+        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        queue,
+        detail,
+        activity,
+    )
 }
 
 // Bulk-action buttons that sit under the filter rows. When idle, two buttons:

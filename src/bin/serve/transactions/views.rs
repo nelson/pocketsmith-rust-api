@@ -56,7 +56,15 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let queue = render_queue_with_header(&views, active_id, filter);
     let detail = render_active_detail(&st, &views, active_id);
     let activity = render_activity(&st);
-    crate::render::render_page("transactions", "Transactions", queue, detail, activity)
+    let sync = crate::render::last_sync_info(&st.conn);
+    crate::render::render_page_with_sync(
+        "transactions",
+        "Transactions",
+        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        queue,
+        detail,
+        activity,
+    )
 }
 
 /// Render the detail panel for the active row, or an empty-state

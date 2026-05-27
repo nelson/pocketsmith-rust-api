@@ -1,0 +1,193 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Mockup · Dashboard · Yearly</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+.detail-panel { padding: 1rem 1.25rem; overflow-y: auto; }
+.year-header { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 0.7rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.year-header h2 { font-size: 1.4rem; font-weight: 300; }
+
+/* 12 months across, single row */
+.months-strip {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 0.4rem;
+    margin: 0.6rem 0 1.2rem 0;
+}
+.mo-cell {
+    padding: 0.5rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    font-size: 0.72rem;
+    cursor: pointer;
+    text-align: center;
+}
+.mo-cell:hover { background: var(--bg-highlight); }
+.mo-cell.selected { background: var(--bg-highlight); border-color: var(--accent); }
+.mo-cell .mname { color: var(--fg-dim); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.mo-cell .net { font-variant-numeric: tabular-nums; font-weight: 500; margin-top: 0.2rem; }
+.mo-cell .pos { color: var(--green); }
+.mo-cell .neg { color: var(--red); }
+.mo-cell svg { display: block; margin: 0.3rem auto; width: 100%; height: 28px; }
+.mo-cell .hyg-dots { justify-content: center; margin-top: 0.2rem; }
+
+.year-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.summary-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 1rem; }
+.summary-card .label { font-size: 0.7rem; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.summary-card .val { font-size: 1.4rem; font-weight: 300; font-variant-numeric: tabular-nums; margin-top: 0.2rem; }
+.summary-card .delta { font-size: 0.78rem; color: var(--fg-dim); margin-top: 0.2rem; }
+</style></head><body>
+<div class="mock-banner">
+  <span><strong>Mockup F — Dashboard yearly view</strong> · 12 months side-by-side · <span class="kbd-chip">[</span>/<span class="kbd-chip">]</span> step years</span>
+  <a href="index.html">← back to index</a>
+</div>
+
+<nav class="tab-bar">
+  <a class="tab" href="dash-A-headline.html">Dashboard</a>
+  <a class="tab" href="txn-1-default.html">Transactions</a>
+  <a class="tab" href="review.html">Review</a>
+  <a class="tab" href="#">Transfers</a>
+  <a class="tab" href="#">Normalise</a>
+</nav>
+
+<div class="layout">
+  <div class="queue-panel">
+    <div class="queue-header">
+      <h2>Year</h2>
+      <div class="filter-row">
+        <button class="filter-btn">Month</button>
+        <button class="filter-btn active">Year</button>
+      </div>
+    </div>
+    <div class="queue-list">
+      <div class="month-row selected"><span class="ml">2026</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,11 8,11 16,12 24,13 32,14 40,15 48,15 56,16 64,17 72,17 80,17 88,18 100,18"/></svg><span class="figs"><span class="net-neg">−$33.3M</span></span><span class="hyg-dots"><span class="hyg-dot warn"></span><span class="hyg-dot warn"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2025</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,12 8,11 16,11 24,10 32,9 40,8 48,7 56,7 64,8 72,8 80,7 88,6 100,5"/></svg><span class="figs"><span class="net-pos">+$95k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2024</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,11 8,10 16,10 24,9 32,8 40,8 48,7 56,7 64,8 72,7 80,6 88,5 100,5"/></svg><span class="figs"><span class="net-pos">+$72k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2023</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,11 8,10 16,11 24,10 32,9 40,8 48,9 56,8 64,7 72,8 80,7 88,8 100,7"/></svg><span class="figs"><span class="net-pos">+$54k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2022</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,12 8,11 16,12 24,11 32,11 40,10 48,11 56,10 64,11 72,10 80,11 88,10 100,11"/></svg><span class="figs"><span class="net-pos">+$28k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2021</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,11 8,11 16,10 24,11 32,11 40,10 48,11 56,11 64,10 72,11 80,11 88,10 100,11"/></svg><span class="figs"><span class="net-pos">+$31k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+      <div class="month-row"><span class="ml">2020</span><svg class="spark" width="100" height="22"><polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="0,11 8,11 16,11 24,10 32,11 40,11 48,11 56,11 64,11 72,10 80,11 88,11 100,11"/></svg><span class="figs"><span class="net-pos">+$8k</span></span><span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span></div>
+    </div>
+  </div>
+
+  <div class="detail-panel">
+    <div class="year-header">
+      <h2>2026 · year-to-date</h2>
+      <span style="color:var(--fg-dim);font-size:0.85rem">Jan–May (5 of 12 months)</span>
+    </div>
+
+    <!-- Top-of-year summary -->
+    <div class="year-summary">
+      <div class="summary-card">
+        <div class="label">in</div>
+        <div class="val" style="color:var(--green)">$382k</div>
+        <div class="delta">+8% vs same months 2025</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">out</div>
+        <div class="val" style="color:var(--red)">−$33.71M</div>
+        <div class="delta" style="color:var(--yellow)">⚠ skewed by 2 large uncategorised txns</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">net</div>
+        <div class="val" style="color:var(--red)">−$33.33M</div>
+        <div class="delta">vs +$28k in same period 2025</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">cleanliness</div>
+        <div class="val" style="color:var(--yellow)">62%</div>
+        <div class="delta">$-weighted · 72% by count</div>
+      </div>
+    </div>
+
+    <!-- 12 months strip -->
+    <h3 style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--fg-dim);margin-bottom:0.3rem">Months at a glance</h3>
+    <div class="months-strip">
+      <div class="mo-cell"><div class="mname">Jan</div>
+        <div class="net neg">−$33M</div>
+        <svg viewBox="0 0 60 28" preserveAspectRatio="none"><line x1="0" y1="14" x2="60" y2="14" stroke="var(--fg-dark)" stroke-width="0.5"/><g><rect x="2" y="14" width="3" height="12" fill="var(--red)"/><rect x="7" y="6" width="3" height="8" fill="var(--green)"/><rect x="12" y="14" width="3" height="14" fill="var(--red)"/><rect x="17" y="14" width="3" height="6" fill="var(--red)"/><rect x="22" y="14" width="3" height="14" fill="var(--red)"/><rect x="27" y="6" width="3" height="8" fill="var(--green)"/><rect x="32" y="14" width="3" height="14" fill="var(--red)"/><rect x="37" y="14" width="3" height="6" fill="var(--red)"/><rect x="42" y="14" width="3" height="14" fill="var(--red)"/><rect x="47" y="6" width="3" height="8" fill="var(--green)"/><rect x="52" y="14" width="3" height="6" fill="var(--red)"/></g></svg>
+        <div class="hyg-dots"><span class="hyg-dot bad"></span><span class="hyg-dot warn"></span><span class="hyg-dot warn"></span></div>
+      </div>
+      <div class="mo-cell"><div class="mname">Feb</div>
+        <div class="net neg">−$12k</div>
+        <svg viewBox="0 0 60 28" preserveAspectRatio="none"><line x1="0" y1="14" x2="60" y2="14" stroke="var(--fg-dark)" stroke-width="0.5"/><g><rect x="2" y="14" width="3" height="6" fill="var(--red)"/><rect x="7" y="6" width="3" height="8" fill="var(--green)"/><rect x="12" y="14" width="3" height="10" fill="var(--red)"/><rect x="17" y="14" width="3" height="14" fill="var(--red)"/><rect x="22" y="14" width="3" height="6" fill="var(--red)"/><rect x="27" y="6" width="3" height="8" fill="var(--green)"/><rect x="32" y="14" width="3" height="14" fill="var(--red)"/><rect x="37" y="14" width="3" height="10" fill="var(--red)"/><rect x="42" y="14" width="3" height="6" fill="var(--red)"/><rect x="47" y="6" width="3" height="8" fill="var(--green)"/><rect x="52" y="14" width="3" height="10" fill="var(--red)"/></g></svg>
+        <div class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></div>
+      </div>
+      <div class="mo-cell"><div class="mname">Mar</div>
+        <div class="net neg">−$16k</div>
+        <svg viewBox="0 0 60 28" preserveAspectRatio="none"><line x1="0" y1="14" x2="60" y2="14" stroke="var(--fg-dark)" stroke-width="0.5"/><g><rect x="2" y="14" width="3" height="10" fill="var(--red)"/><rect x="7" y="6" width="3" height="8" fill="var(--green)"/><rect x="12" y="14" width="3" height="14" fill="var(--red)"/><rect x="17" y="14" width="3" height="6" fill="var(--red)"/><rect x="22" y="14" width="3" height="14" fill="var(--red)"/><rect x="27" y="6" width="3" height="8" fill="var(--green)"/><rect x="32" y="14" width="3" height="6" fill="var(--red)"/><rect x="37" y="14" width="3" height="14" fill="var(--red)"/><rect x="42" y="14" width="3" height="10" fill="var(--red)"/><rect x="47" y="6" width="3" height="8" fill="var(--green)"/><rect x="52" y="14" width="3" height="6" fill="var(--red)"/></g></svg>
+        <div class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></div>
+      </div>
+      <div class="mo-cell selected"><div class="mname">Apr</div>
+        <div class="net neg">−$149k</div>
+        <svg viewBox="0 0 60 28" preserveAspectRatio="none"><line x1="0" y1="14" x2="60" y2="14" stroke="var(--fg-dark)" stroke-width="0.5"/><g><rect x="2" y="14" width="3" height="10" fill="var(--red)"/><rect x="7" y="6" width="3" height="8" fill="var(--green)"/><rect x="12" y="14" width="3" height="14" fill="var(--red)"/><rect x="17" y="14" width="3" height="6" fill="var(--red)"/><rect x="22" y="14" width="3" height="14" fill="var(--red)"/><rect x="27" y="6" width="3" height="8" fill="var(--green)"/><rect x="32" y="14" width="3" height="6" fill="var(--red)"/><rect x="37" y="2" width="3" height="12" fill="var(--red)"/><rect x="42" y="14" width="3" height="14" fill="var(--red)"/><rect x="47" y="6" width="3" height="8" fill="var(--green)"/><rect x="52" y="14" width="3" height="10" fill="var(--red)"/></g></svg>
+        <div class="hyg-dots"><span class="hyg-dot warn"></span><span class="hyg-dot warn"></span><span class="hyg-dot on"></span></div>
+      </div>
+      <div class="mo-cell"><div class="mname">May</div>
+        <div class="net neg">−$25k</div>
+        <svg viewBox="0 0 60 28" preserveAspectRatio="none"><line x1="0" y1="14" x2="60" y2="14" stroke="var(--fg-dark)" stroke-width="0.5"/><g><rect x="2" y="14" width="3" height="6" fill="var(--red)"/><rect x="7" y="6" width="3" height="8" fill="var(--green)"/><rect x="12" y="14" width="3" height="10" fill="var(--red)"/><rect x="17" y="14" width="3" height="14" fill="var(--red)"/><rect x="22" y="14" width="3" height="6" fill="var(--red)"/><rect x="27" y="6" width="3" height="8" fill="var(--green)"/><rect x="32" y="14" width="3" height="14" fill="var(--red)"/><rect x="37" y="14" width="3" height="10" fill="var(--red)"/><rect x="42" y="14" width="3" height="6" fill="var(--red)"/><rect x="47" y="6" width="3" height="8" fill="var(--green)"/><rect x="52" y="14" width="3" height="10" fill="var(--red)"/></g></svg>
+        <div class="hyg-dots"><span class="hyg-dot bad"></span><span class="hyg-dot warn"></span><span class="hyg-dot bad"></span></div>
+      </div>
+      <!-- Future months: ghosted -->
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Jun</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Jul</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Aug</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Sep</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Oct</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Nov</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+      <div class="mo-cell" style="opacity:0.35"><div class="mname">Dec</div><div class="net" style="color:var(--fg-dim)">—</div><svg viewBox="0 0 60 28"></svg><div class="hyg-dots"><span class="hyg-dot"></span><span class="hyg-dot"></span><span class="hyg-dot"></span></div></div>
+    </div>
+
+    <!-- Cumulative net for the year -->
+    <h3 style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--fg-dim);margin: 1rem 0 0.3rem 0">Cumulative net · 2026 vs 2025 vs 2024</h3>
+    <svg viewBox="0 0 720 200" preserveAspectRatio="none" style="width:100%;height:auto">
+      <line x1="20" y1="100" x2="700" y2="100" stroke="var(--fg-dark)" stroke-width="0.5"/>
+      <text x="20" y="112" fill="var(--fg-dim)" font-size="9">$0</text>
+      <!-- 2024 ghost -->
+      <polyline fill="none" stroke="var(--fg-dim)" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"
+        points="20,100 76,98 132,94 188,90 244,84 300,76 356,70 412,64 468,56 524,50 580,42 636,38 700,30"/>
+      <text x="690" y="32" fill="var(--fg-dim)" font-size="9" text-anchor="end">2024</text>
+      <!-- 2025 -->
+      <polyline fill="none" stroke="var(--cyan)" stroke-width="1.4"
+        points="20,100 76,96 132,90 188,86 244,80 300,74 356,68 412,60 468,52 524,44 580,36 636,28 700,20"/>
+      <text x="690" y="22" fill="var(--cyan)" font-size="9" text-anchor="end">2025</text>
+      <!-- 2026 (currently negative) -->
+      <polyline fill="var(--red)" fill-opacity="0.10" stroke="none"
+        points="20,100 76,108 132,114 188,180 244,180 244,180 244,100"/>
+      <polyline fill="none" stroke="var(--accent)" stroke-width="1.6"
+        points="20,100 76,108 132,114 188,180 244,180"/>
+      <text x="244" y="194" fill="var(--accent)" font-size="9">2026 (May)</text>
+      <line x1="244" y1="0" x2="244" y2="200" stroke="var(--accent)" stroke-width="0.4" stroke-dasharray="2,3"/>
+    </svg>
+
+    <!-- Yearly category bars -->
+    <h3 style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--fg-dim);margin: 1rem 0 0.3rem 0">2026 YTD by category (vs 2025 same months)</h3>
+    <table class="tight">
+      <thead><tr><th>Category</th><th class="num">2026 YTD</th><th class="num">2025 same</th><th class="num">Δ</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Mortgage</td><td class="num">−$200,000</td><td class="num">−$200,000</td><td class="num">+0%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="200" height="6" fill="var(--red)"/><rect x="0" y="2" width="200" height="6" fill="var(--cyan)" opacity="0.3"/></svg></td></tr>
+        <tr><td>Eating Out</td><td class="num">−$66,200</td><td class="num">−$56,000</td><td class="num" style="color:var(--red)">+18%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="66" height="6" fill="var(--red)"/><rect x="0" y="2" width="56" height="6" fill="var(--cyan)" opacity="0.5"/></svg></td></tr>
+        <tr><td>Groceries</td><td class="num">−$24,820</td><td class="num">−$24,300</td><td class="num">+2%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="25" height="6" fill="var(--red)"/><rect x="0" y="2" width="24" height="6" fill="var(--cyan)" opacity="0.5"/></svg></td></tr>
+        <tr><td>Bills</td><td class="num">−$15,490</td><td class="num">−$15,200</td><td class="num">+2%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="16" height="6" fill="var(--red)"/><rect x="0" y="2" width="15" height="6" fill="var(--cyan)" opacity="0.5"/></svg></td></tr>
+        <tr><td>Shopping</td><td class="num">−$11,560</td><td class="num">−$13,500</td><td class="num" style="color:var(--green)">−14%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="12" height="6" fill="var(--red)"/><rect x="0" y="2" width="14" height="6" fill="var(--cyan)" opacity="0.5"/></svg></td></tr>
+        <tr><td>Income</td><td class="num" style="color:var(--green)">+$382k</td><td class="num" style="color:var(--green)">+$354k</td><td class="num" style="color:var(--green)">+8%</td><td><svg width="200" height="10" viewBox="0 0 200 10"><rect x="0" y="2" width="76" height="6" fill="var(--green)"/><rect x="0" y="2" width="71" height="6" fill="var(--cyan)" opacity="0.5"/></svg></td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <strong>What's missing:</strong> 2026 is dominated by 4,313 uncategorised transactions
+      ($33M of outflow showing as uncategorised, mostly January, likely a sync data-quality issue).
+      Open <a href="review.html">Review</a> to investigate — this is exactly the kind of skew
+      that the hygiene-first view exists to surface.
+    </div>
+  </div>
+</div>
+
+<div class="activity-panel">
+  <div class="activity-header">
+    <span class="stat">2026 YTD: <strong>62%</strong> $-clean (72% by count)</span>
+    <span class="stat">Best year on record: <strong>2024</strong> (96% clean)</span>
+    <span class="stat">Press <span class="kbd-chip">[</span> / <span class="kbd-chip">]</span> to step years</span>
+  </div>
+</div>
+</body></html>

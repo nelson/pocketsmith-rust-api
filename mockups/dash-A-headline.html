@@ -1,0 +1,362 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Mockup · Dashboard · Headline</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+.detail-panel { padding: 1rem 1.25rem; overflow-y: auto; }
+.chart-card { margin: 0 0 1.4rem 0; }
+.chart-card h3 {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--fg-dim); font-weight: 500; margin-bottom: 0.3rem;
+}
+.chart-card .sub { color: var(--fg-dim); font-size: 0.78rem; margin-bottom: 0.4rem; }
+.chart-svg { width: 100%; height: auto; display: block; background: transparent; }
+.legend-inline { font-size: 0.75rem; color: var(--fg-dim); display: flex; gap: 1rem; flex-wrap: wrap; }
+</style>
+</head><body>
+<div class="mock-banner">
+  <span><strong>Mockup A — Dashboard headline</strong> · sankey · daily cashflow strip · horizontal bar (no pie) · month summary in activity panel</span>
+  <a href="index.html">← back to index</a>
+</div>
+
+<nav class="tab-bar">
+  <span class="tab active">Dashboard</span>
+  <a class="tab" href="txn-1-default.html">Transactions</a>
+  <a class="tab" href="review.html">Review</a>
+  <a class="tab" href="#">Transfers</a>
+  <a class="tab" href="#">Normalise</a>
+</nav>
+
+<div class="layout">
+  <!-- ============== Months strip ============== -->
+  <div class="queue-panel">
+    <div class="queue-header">
+      <h2>Months</h2>
+      <div class="filter-row">
+        <button class="filter-btn active">Month</button>
+        <button class="filter-btn">Year</button>
+      </div>
+      <div style="font-size:0.7rem;color:var(--fg-dim);margin-top:0.4rem;line-height:1.3">
+        Each row: month · 30-day cashflow spark · in / out / net · three hygiene dots
+        (<span class="hyg-dot on" style="display:inline-block;vertical-align:middle"></span> categorised ·
+        <span class="hyg-dot warn" style="display:inline-block;vertical-align:middle"></span> norm-rules ·
+        <span class="hyg-dot bad" style="display:inline-block;vertical-align:middle"></span> pairs).
+      </div>
+    </div>
+    <div class="queue-list">
+      <!-- One row per month. Spark + figs + hygiene dots. -->
+      <div class="month-row">
+        <span class="ml">2026-05</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,9 8,7 16,10 24,12 32,14 40,11 48,13 56,15 64,16 72,14 80,17 88,16 100,18"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$90k</span> · out&nbsp;<span style="color:var(--red)">−$115k</span> · <span class="net-neg">−$25k</span></span>
+        <span class="hyg-dots" title="categorised · norm-rules · pairs">
+          <span class="hyg-dot bad"></span>
+          <span class="hyg-dot warn"></span>
+          <span class="hyg-dot bad"></span>
+        </span>
+      </div>
+      <div class="month-row selected">
+        <span class="ml">2026-04</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,8 8,9 16,11 24,13 32,12 40,15 48,17 56,15 64,18 72,16 80,17 88,18 100,19"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$71k</span> · out&nbsp;<span style="color:var(--red)">−$220k</span> · <span class="net-neg">−$149k</span></span>
+        <span class="hyg-dots">
+          <span class="hyg-dot warn"></span>
+          <span class="hyg-dot warn"></span>
+          <span class="hyg-dot on"></span>
+        </span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2026-03</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,10 8,9 16,11 24,12 32,11 40,12 48,13 56,12 64,13 72,12 80,13 88,12 100,11"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$71k</span> · out&nbsp;<span style="color:var(--red)">−$87k</span> · <span class="net-neg">−$16k</span></span>
+        <span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2026-02</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,10 8,11 16,9 24,10 32,11 40,12 48,11 56,12 64,11 72,12 80,11 88,12 100,11"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$59k</span> · out&nbsp;<span style="color:var(--red)">−$71k</span> · <span class="net-neg">−$12k</span></span>
+        <span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2026-01</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,9 8,8 16,9 24,10 32,9 40,10 48,9 56,10 64,9 72,10 80,9 88,10 100,9"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$92k</span> · out&nbsp;<span style="color:var(--red)">−$33M</span> · <span class="net-neg">−$33M</span></span>
+        <span class="hyg-dots"><span class="hyg-dot bad"></span><span class="hyg-dot warn"></span><span class="hyg-dot warn"></span></span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2025-12</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,11 8,10 16,11 24,12 32,11 40,12 48,11 56,10 64,9 72,8 80,9 88,8 100,7"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$77k</span> · out&nbsp;<span style="color:var(--red)">−$6.2M</span> · <span class="net-neg">−$6.2M</span></span>
+        <span class="hyg-dots"><span class="hyg-dot warn"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2025-11</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,12 8,10 16,8 24,7 32,5 40,7 48,6 56,4 64,3 72,5 80,4 88,3 100,2"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$357k</span> · out&nbsp;<span style="color:var(--red)">−$278k</span> · <span class="net-pos">+$79k</span></span>
+        <span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span>
+      </div>
+      <div class="month-row">
+        <span class="ml">2025-10</span>
+        <svg class="spark" width="100" height="22" viewBox="0 0 100 22">
+          <line x1="0" y1="11" x2="100" y2="11" stroke="var(--fg-dark)" stroke-width="0.4"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="1.2"
+            points="0,9 8,10 16,11 24,12 32,11 40,13 48,12 56,13 64,12 72,13 80,12 88,13 100,12"/>
+        </svg>
+        <span class="figs">in&nbsp;<span style="color:var(--green)">$183k</span> · out&nbsp;<span style="color:var(--red)">−$142k</span> · <span class="net-pos">+$41k</span></span>
+        <span class="hyg-dots"><span class="hyg-dot on"></span><span class="hyg-dot on"></span><span class="hyg-dot on"></span></span>
+      </div>
+      <div style="text-align:center;padding:0.7rem;color:var(--fg-dim);font-size:0.8rem">… 56 more months · <span class="kbd-chip">[</span>/<span class="kbd-chip">]</span> to step</div>
+    </div>
+  </div>
+
+  <!-- ============== Detail charts ============== -->
+  <div class="detail-panel">
+    <div class="detail-header">
+      <div class="row">
+        <h2>April 2026</h2>
+        <span class="amount-big" style="color:var(--red)">net −$149,689</span>
+      </div>
+      <div class="meta">
+        <span>337 transactions · 22 accounts</span>
+        <span class="chip warn">68% reviewed</span>
+        <span class="chip">YTD net −$202k</span>
+      </div>
+    </div>
+
+    <!-- 1. Sankey -->
+    <div class="chart-card">
+      <h3>Where the money went · sankey</h3>
+      <div class="sub">Width is dollars. Sources at left, categories at right. Hover slices for details (in real impl).</div>
+      <svg class="chart-svg" viewBox="0 0 720 320" preserveAspectRatio="xMidYMid meet">
+        <!-- Source nodes (left) -->
+        <g>
+          <rect x="20"  y="20"  width="14" height="120" fill="var(--green)"/>
+          <rect x="20"  y="150" width="14" height="40"  fill="var(--green)" opacity="0.7"/>
+          <rect x="20"  y="200" width="14" height="20"  fill="var(--green)" opacity="0.5"/>
+          <text x="40"  y="35"  fill="var(--fg)" font-size="11">Salary $58,000</text>
+          <text x="40"  y="165" fill="var(--fg)" font-size="11">Refunds $9,840</text>
+          <text x="40"  y="213" fill="var(--fg)" font-size="11">Interest $3,190</text>
+        </g>
+        <!-- Middle (this month total in) -->
+        <rect x="320" y="20" width="14" height="200" fill="var(--accent)"/>
+        <text x="338" y="35" fill="var(--fg)" font-size="11">Inflow $71,030</text>
+        <!-- Right category nodes -->
+        <g>
+          <rect x="660" y="10"  width="14" height="80" fill="var(--red)"/>
+          <rect x="660" y="100" width="14" height="50" fill="var(--red)" opacity="0.85"/>
+          <rect x="660" y="160" width="14" height="38" fill="var(--red)" opacity="0.75"/>
+          <rect x="660" y="208" width="14" height="28" fill="var(--red)" opacity="0.65"/>
+          <rect x="660" y="246" width="14" height="22" fill="var(--red)" opacity="0.55"/>
+          <rect x="660" y="278" width="14" height="14" fill="var(--red)" opacity="0.45"/>
+          <text x="582" y="50"  fill="var(--fg)" font-size="11" text-anchor="end">Mortgage $40,000</text>
+          <text x="582" y="125" fill="var(--fg)" font-size="11" text-anchor="end">Eating Out $13,200</text>
+          <text x="582" y="179" fill="var(--fg)" font-size="11" text-anchor="end">Groceries $4,820</text>
+          <text x="582" y="222" fill="var(--fg)" font-size="11" text-anchor="end">Bills $3,100</text>
+          <text x="582" y="257" fill="var(--fg)" font-size="11" text-anchor="end">Shopping $2,310</text>
+          <text x="582" y="285" fill="var(--fg)" font-size="11" text-anchor="end">Other $1,820</text>
+          <!-- deficit node -->
+          <rect x="660" y="298" width="14" height="14" fill="var(--yellow)"/>
+          <text x="582" y="307" fill="var(--yellow)" font-size="11" text-anchor="end">Deficit $149,689 ⚠</text>
+        </g>
+        <!-- Flows source → middle (cubic Bezier ribbons) -->
+        <g fill="var(--green)" opacity="0.25">
+          <path d="M34,20 C180,20 180,20 320,20 L320,140 C180,140 180,140 34,140 Z"/>
+          <path d="M34,150 C180,150 180,150 320,140 L320,180 C180,180 180,180 34,190 Z"/>
+          <path d="M34,200 C180,200 180,200 320,180 L320,200 C180,200 180,200 34,220 Z"/>
+        </g>
+        <!-- Flows middle → categories -->
+        <g fill="var(--red)" opacity="0.25">
+          <path d="M334,20  C480,20  480,20  660,10  L660,90  C480,90  480,90  334,80  Z"/>
+          <path d="M334,80  C480,80  480,80  660,100 L660,150 C480,150 480,150 334,120 Z"/>
+          <path d="M334,120 C480,120 480,120 660,160 L660,198 C480,198 480,198 334,150 Z"/>
+          <path d="M334,150 C480,150 480,150 660,208 L660,236 C480,236 480,236 334,170 Z"/>
+          <path d="M334,170 C480,170 480,170 660,246 L660,268 C480,268 480,268 334,184 Z"/>
+          <path d="M334,184 C480,184 480,184 660,278 L660,292 C480,292 480,292 334,194 Z"/>
+        </g>
+        <!-- deficit flow -->
+        <g fill="var(--yellow)" opacity="0.3">
+          <path d="M334,194 C480,194 480,194 660,298 L660,312 C480,312 480,312 334,220 Z"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 2. Daily cashflow strip + 3 ghost months -->
+    <div class="chart-card">
+      <h3>Daily cashflow · April 2026 (with three previous months as ghosts)</h3>
+      <div class="sub">One bar per day. Above-axis green = inflow, below-axis red = outflow. Faded = previous months on the same axis.</div>
+      <svg class="chart-svg" viewBox="0 0 720 220" preserveAspectRatio="none">
+        <!-- zero axis -->
+        <line x1="20" y1="110" x2="700" y2="110" stroke="var(--fg-dark)" stroke-width="0.5"/>
+        <!-- Ghost months (Jan/Feb/Mar) -->
+        <g opacity="0.18">
+          <!-- pseudo-random ghost bars -->
+          <g fill="var(--green)">
+            <rect x="22"  y="86"  width="20" height="24"/>
+            <rect x="44"  y="98"  width="20" height="12"/>
+            <rect x="88"  y="78"  width="20" height="32"/>
+            <rect x="176" y="70"  width="20" height="40"/>
+            <rect x="264" y="92"  width="20" height="18"/>
+            <rect x="396" y="60"  width="20" height="50"/>
+            <rect x="528" y="82"  width="20" height="28"/>
+          </g>
+          <g fill="var(--red)">
+            <rect x="22"  y="110" width="20" height="20"/>
+            <rect x="66"  y="110" width="20" height="55"/>
+            <rect x="132" y="110" width="20" height="30"/>
+            <rect x="220" y="110" width="20" height="65"/>
+            <rect x="308" y="110" width="20" height="40"/>
+            <rect x="440" y="110" width="20" height="80"/>
+            <rect x="572" y="110" width="20" height="35"/>
+          </g>
+        </g>
+        <!-- April (foreground) - 30 daily bars -->
+        <g>
+          <!-- Inflow days -->
+          <g fill="var(--green)">
+            <rect x="22"  y="80"  width="14" height="30"/>
+            <rect x="180" y="60"  width="14" height="50"/>
+            <rect x="358" y="20"  width="14" height="90"/>  <!-- payday -->
+            <rect x="538" y="92"  width="14" height="18"/>
+            <rect x="650" y="86"  width="14" height="24"/>
+          </g>
+          <!-- Outflow days -->
+          <g fill="var(--red)">
+            <rect x="42"  y="110" width="14" height="22"/>
+            <rect x="64"  y="110" width="14" height="55"/>
+            <rect x="86"  y="110" width="14" height="14"/>
+            <rect x="108" y="110" width="14" height="38"/>
+            <rect x="130" y="110" width="14" height="30"/>
+            <rect x="152" y="110" width="14" height="50"/>
+            <rect x="196" y="110" width="14" height="40"/>
+            <rect x="218" y="110" width="14" height="180"/> <!-- mortgage -->
+            <rect x="240" y="110" width="14" height="35"/>
+            <rect x="262" y="110" width="14" height="22"/>
+            <rect x="284" y="110" width="14" height="60"/>
+            <rect x="306" y="110" width="14" height="44"/>
+            <rect x="328" y="110" width="14" height="28"/>
+            <rect x="372" y="110" width="14" height="38"/>
+            <rect x="394" y="110" width="14" height="65"/>
+            <rect x="416" y="110" width="14" height="42"/>
+            <rect x="438" y="110" width="14" height="29"/>
+            <rect x="460" y="110" width="14" height="55"/>
+            <rect x="482" y="110" width="14" height="33"/>
+            <rect x="504" y="110" width="14" height="48"/>
+            <rect x="552" y="110" width="14" height="28"/>
+            <rect x="574" y="110" width="14" height="60"/>
+            <rect x="596" y="110" width="14" height="35"/>
+            <rect x="618" y="110" width="14" height="42"/>
+            <rect x="666" y="110" width="14" height="22"/>
+          </g>
+        </g>
+        <!-- cumulative net line (overlaid) -->
+        <polyline fill="none" stroke="var(--accent)" stroke-width="1.5"
+          points="22,108 64,128 130,150 218,202 264,208 358,170 416,180 504,196 552,202 666,210"/>
+        <!-- axis labels -->
+        <g fill="var(--fg-dim)" font-size="9" font-family="ui-monospace,monospace">
+          <text x="22"  y="216">Apr 1</text>
+          <text x="358" y="216" text-anchor="middle">Apr 15</text>
+          <text x="680" y="216" text-anchor="end">Apr 30</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 3. Horizontal bar (pie dropped) -->
+    <div class="chart-card">
+      <h3>Outflow by category</h3>
+      <div class="sub">Sorted descending. Top 6 named, the rest folded into "Other" with a sub-list.
+        <span style="color:var(--fg-dark)">(pie removed per Tufte / round-1 review)</span></div>
+      <svg class="chart-svg" viewBox="0 0 720 200" preserveAspectRatio="xMidYMid meet">
+        <g transform="translate(20,12)">
+          <g font-size="11" fill="var(--fg)">
+            <text x="0" y="12">Mortgage</text>
+            <text x="0" y="40">Eating Out</text>
+            <text x="0" y="68">Groceries</text>
+            <text x="0" y="96">Bills</text>
+            <text x="0" y="124">Shopping</text>
+            <text x="0" y="152">Other (12 cats)</text>
+          </g>
+          <g transform="translate(110,0)">
+            <rect x="0" y="3"   height="14" width="500" fill="var(--red)"/>
+            <rect x="0" y="31"  height="14" width="165" fill="var(--red)" opacity="0.85"/>
+            <rect x="0" y="59"  height="14" width="60"  fill="var(--red)" opacity="0.75"/>
+            <rect x="0" y="87"  height="14" width="39"  fill="var(--red)" opacity="0.65"/>
+            <rect x="0" y="115" height="14" width="29"  fill="var(--red)" opacity="0.55"/>
+            <rect x="0" y="143" height="14" width="23"  fill="var(--fg-dim)" opacity="0.6"/>
+          </g>
+          <g transform="translate(620,0)" font-size="11" fill="var(--fg-dim)" font-family="ui-monospace,monospace">
+            <text x="0" y="14">$40,000  56%</text>
+            <text x="0" y="42">$13,200  19%</text>
+            <text x="0" y="70">$4,820   7%</text>
+            <text x="0" y="98">$3,100   4%</text>
+            <text x="0" y="126">$2,310   3%</text>
+            <text x="0" y="154">$1,820   3%</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 4. Cumulative net line -->
+    <div class="chart-card">
+      <h3>Cumulative net · YTD vs prior year</h3>
+      <div class="sub">Solid = this year's running net. Ghost = same period last year. Zero rule emphasised.</div>
+      <svg class="chart-svg" viewBox="0 0 720 160" preserveAspectRatio="none">
+        <line x1="20" y1="80" x2="700" y2="80" stroke="var(--fg-dark)" stroke-width="0.5"/>
+        <text x="20" y="92" fill="var(--fg-dim)" font-size="9">$0</text>
+        <!-- ghost prior year -->
+        <polyline fill="none" stroke="var(--fg-dim)" stroke-width="1" stroke-dasharray="3,3"
+          points="20,75 80,68 140,72 200,60 260,55 320,40 380,30 440,42 500,28 560,18 620,22 700,12"/>
+        <!-- this year (currently negative) -->
+        <polyline fill="var(--red)" fill-opacity="0.10" stroke="none"
+          points="20,80 80,90 140,95 200,110 260,115 320,150 380,150 440,150 500,150 560,150 620,150 700,150 700,80"/>
+        <polyline fill="none" stroke="var(--accent)" stroke-width="1.6"
+          points="20,80 80,90 140,95 200,110 260,115 320,150 380,148 440,144 500,140 560,138 620,134 700,130"/>
+        <!-- April marker -->
+        <line x1="320" y1="10" x2="320" y2="155" stroke="var(--accent)" stroke-width="0.6" stroke-dasharray="2,3"/>
+        <text x="324" y="18" fill="var(--accent)" font-size="10">Apr (selected)</text>
+        <g fill="var(--fg-dim)" font-size="9" font-family="ui-monospace,monospace">
+          <text x="20" y="155">Jan</text><text x="200" y="155">Mar</text>
+          <text x="380" y="155">May</text><text x="560" y="155">Jul</text><text x="700" y="155" text-anchor="end">Dec</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ============== Activity panel: condensed month summary only ============== -->
+<div class="activity-panel">
+  <div class="activity-header">
+    <span class="stat">April 2026: <span class="count-rejected">42% clean by $-weight</span> (337 txns) ·
+      <a href="review.html">open in Review →</a></span>
+    <span class="stat">Press <span class="kbd-chip">[</span> / <span class="kbd-chip">]</span> to step months</span>
+    <span class="stat">Toggle to <strong>Year</strong> view to see 12 months side-by-side.</span>
+  </div>
+</div>
+</body></html>
