@@ -14,6 +14,7 @@ struct CompiledBankingOp {
     regex: Regex,
     operation: BankingOperation,
     has_account: bool,
+    pattern: &'static str,
 }
 
 pub fn apply(result: &mut NormalisationResult) {
@@ -26,6 +27,7 @@ pub fn apply(result: &mut NormalisationResult) {
                         result.features.account = Some(account.as_str().to_string());
                     }
                 }
+                result.last_matched_pattern = Some(cop.pattern);
                 break;
             }
         }
@@ -128,6 +130,7 @@ fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
                     regex: Regex::new(pat).expect("invalid banking op pattern"),
                     operation: op.operation,
                     has_account: op.has_account,
+                    pattern: pat,
                 })
             })
             .collect()

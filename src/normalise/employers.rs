@@ -12,6 +12,7 @@ struct Employer {
 struct CompiledEmployer {
     regex: Regex,
     canonical: &'static str,
+    pattern: &'static str,
 }
 
 pub fn apply(result: &mut NormalisationResult) {
@@ -22,6 +23,7 @@ pub fn apply(result: &mut NormalisationResult) {
         if ce.regex.is_match(&result.normalised) {
             result.features.entity_name = Some(ce.canonical.to_string());
             result.set_class(PayeeClass::Employer);
+            result.last_matched_pattern = Some(ce.pattern);
             return;
         }
     }
@@ -64,6 +66,7 @@ fn compiled_employers() -> &'static [CompiledEmployer] {
                 e.patterns.iter().map(move |&pat| CompiledEmployer {
                     regex: Regex::new(pat).expect("invalid employer pattern"),
                     canonical: e.canonical,
+                    pattern: pat,
                 })
             })
             .collect()

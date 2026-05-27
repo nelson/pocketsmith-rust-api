@@ -12,6 +12,7 @@ struct Person {
 struct CompiledPerson {
     regex: Regex,
     canonical: &'static str,
+    pattern: &'static str,
 }
 
 fn compiled_persons() -> &'static [CompiledPerson] {
@@ -27,6 +28,7 @@ fn compiled_persons() -> &'static [CompiledPerson] {
                     ))
                     .expect("invalid person pattern"),
                     canonical: p.canonical,
+                    pattern: pat,
                 })
             })
             .collect()
@@ -38,6 +40,7 @@ pub fn apply(result: &mut NormalisationResult) {
         if cp.regex.is_match(&result.normalised) {
             result.features.entity_name = Some(cp.canonical.to_string());
             result.set_class(PayeeClass::Person);
+            result.last_matched_pattern = Some(cp.pattern);
             return;
         }
     }

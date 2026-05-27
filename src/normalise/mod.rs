@@ -84,6 +84,12 @@ pub struct NormalisationResult {
     /// changed `normalised` or attached a feature. Populated only by
     /// [`normalise`] (raw stages don't write this).
     pub trace: Vec<TraceEntry>,
+    /// Scratch slot for the current stage to record the pattern it
+    /// matched. `run_traced` reads it after the stage runs, copies it
+    /// into the appended [`TraceEntry`], and clears it. Stages that
+    /// don't set it leave it `None`.
+    #[doc(hidden)]
+    pub last_matched_pattern: Option<&'static str>,
 }
 
 /// One entry in [`NormalisationResult::trace`]. Records what a single
@@ -97,8 +103,19 @@ pub struct TraceEntry {
     /// New feature keys this stage populated (entity_name, location,
     /// operation, etc.). Empty if the stage only mutated the string.
     pub features_added: Vec<&'static str>,
+    /// Snapshot of the values populated for each `features_added` key,
+    /// captured right after the stage ran. Empty when `features_added`
+    /// is empty. Held as `String` for uniform rendering even though
+    /// the underlying field types vary (e.g. operation is an enum).
+    pub feature_values: Vec<(&'static str, String)>,
     /// Class set by this stage, if any.
     pub class_set: Option<PayeeClass>,
+    /// The pattern (regex source string) that the stage matched, if
+    /// it's meaningful. Populated by table-driven stages (merchants,
+    /// banking_ops, persons, employers) that try one of many patterns
+    /// until one wins. `None` for stages that don't have a single
+    /// matched-pattern concept (prefix/suffix/expand apply many rules).
+    pub matched_pattern: Option<&'static str>,
 }
 
 impl NormalisationResult {
@@ -109,6 +126,7 @@ impl NormalisationResult {
             class: None,
             features: Features::default(),
             trace: Vec::new(),
+            last_matched_pattern: None,
         }
     }
 
@@ -194,7 +212,9 @@ pub fn normalise(original: &str) -> NormalisationResult {
             before,
             after: result.normalised.clone(),
             features_added: Vec::new(),
+            feature_values: Vec::new(),
             class_set: None,
+            matched_pattern: None,
         });
     }
     result
@@ -210,25 +230,53 @@ fn run_traced(
     let before_str = result.normalised.clone();
     let before_keys = populated_feature_keys(&result.features);
     let before_class = result.class.clone();
+    result.last_matched_pattern = None;
     apply(result);
     let after_keys = populated_feature_keys(&result.features);
     let features_added: Vec<&'static str> = after_keys
         .into_iter()
         .filter(|k| !before_keys.contains(k))
         .collect();
+    let feature_values: Vec<(&'static str, String)> = features_added
+        .iter()
+        .filter_map(|k| feature_value(&result.features, k).map(|v| (*k, v)))
+        .collect();
     let class_set = if before_class.is_none() && result.class.is_some() {
         result.class.clone()
     } else {
         None
     };
+    let matched_pattern = result.last_matched_pattern.take();
     if before_str != result.normalised || !features_added.is_empty() || class_set.is_some() {
         result.trace.push(TraceEntry {
             stage,
             before: before_str,
             after: result.normalised.clone(),
             features_added,
+            feature_values,
             class_set,
+            matched_pattern,
         });
+    }
+}
+
+/// String form of a single populated feature value, suitable for the
+/// pipeline-trace render. Returns `None` for keys whose value is
+/// unset — keeps `feature_values` aligned with what the stage actually
+/// populated.
+fn feature_value(f: &Features, key: &str) -> Option<String> {
+    match key {
+        "entity_name" => f.entity_name.clone(),
+        "location" => f.location.clone(),
+        "operation" => f.operation.as_ref().map(|o| o.display_name().to_string()),
+        "reason" => f.reason.clone(),
+        "institution" => f.institution.clone(),
+        "gateway" => f.gateway.clone(),
+        "account" => f.account.clone(),
+        "date" => f.date.clone(),
+        "currency_code" => f.currency_code.clone(),
+        "amount_in_cents" => f.amount_in_cents.map(|c| format!("{c}c")),
+        _ => None,
     }
 }
 
