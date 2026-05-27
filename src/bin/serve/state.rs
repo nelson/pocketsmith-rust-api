@@ -130,6 +130,12 @@ pub struct AppState {
     pub txn_activity: Vec<TxnActivityEntry>,
     /// Cumulative undo count for the activity panel header.
     pub txn_undone: usize,
+
+    // --- Dashboard tab ---
+    /// Currently-selected month on the Dashboard tab, formatted as
+    /// `YYYY-MM`. `None` means "use the most recent month with data",
+    /// which is what the shell falls back to on first render.
+    pub dash_active_month: Option<String>,
 }
 
 impl AppState {
@@ -146,6 +152,7 @@ impl AppState {
             txn_active: None,
             txn_activity: Vec::new(),
             txn_undone: 0,
+            dash_active_month: None,
         }
     }
 

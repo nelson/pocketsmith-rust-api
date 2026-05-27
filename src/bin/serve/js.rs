@@ -95,6 +95,19 @@ document.addEventListener('click', function(e) {
     if (item) selectItem(item);
 });
 
+function navigateQueue(delta) {
+    const items = document.querySelectorAll('.queue-item');
+    if (items.length === 0) return;
+    let idx = getSelectedIndex();
+    if (idx === -1) idx = 0;
+    idx = Math.max(0, Math.min(items.length - 1, idx + delta));
+    const item = items[idx];
+    selectItem(item);
+    const url = item.dataset.detailUrl;
+    const target = item.dataset.detailTarget || '#detail';
+    if (url) htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
+}
+
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -115,20 +128,16 @@ document.addEventListener('keydown', function(e) {
 
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const items = document.querySelectorAll('.queue-item');
-        if (items.length === 0) return;
-        let idx = getSelectedIndex();
-        if (idx === -1) idx = 0;
-        if (e.key === 'ArrowDown') {
-            idx = Math.min(idx + 1, items.length - 1);
-        } else {
-            idx = Math.max(idx - 1, 0);
-        }
-        const item = items[idx];
-        selectItem(item);
-        const url = item.dataset.detailUrl;
-        const target = item.dataset.detailTarget || '#detail';
-        if (url) htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
+        navigateQueue(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+    }
+
+    // [ and ] step months on the dashboard. Bound globally for the
+    // dashboard tab only (other tabs ignore them, which keeps these
+    // characters typeable in any future text input we add).
+    if ((e.key === '[' || e.key === ']') && document.body.classList.contains('tab-dashboard')) {
+        e.preventDefault();
+        navigateQueue(e.key === ']' ? -1 : 1); // ] = newer (up), [ = older (down)
         return;
     }
 
