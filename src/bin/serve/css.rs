@@ -766,18 +766,74 @@ body {
     border: 1px solid var(--border); border-radius: 999px;
     font-size: 11px; color: var(--fg-dim);
 }
-.tab-transactions .cleaning-card {
-    border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px 12px; margin: 6px 0;
-    background: var(--bg-highlight);
-    display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center;
+/* Cleaning-state cards (Pair / Normalise / Categorise). Three cards
+ * laid out horizontally so the entire pillar state is visible at a
+ * glance. Visual language matches the transfers tab's .txn-card:
+ * dark-box background, no coloured left border. The pillar status is
+ * communicated by a chip in the card header (ok / pending / needs you).
+ * Action buttons render inside the card when there's a decision
+ * pending, so the user's eye doesn't have to leave the card. */
+.tab-transactions .cleaning-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
 }
-.tab-transactions .cleaning-card.bad  { border-left: 3px solid var(--red);    }
-.tab-transactions .cleaning-card.warn { border-left: 3px solid var(--yellow); }
-.tab-transactions .cleaning-card.ok   { border-left: 3px solid var(--green);  }
+@media (max-width: 768px) {
+    .tab-transactions .cleaning-cards { grid-template-columns: 1fr; }
+}
+.tab-transactions .cleaning-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+.tab-transactions .cleaning-card-na { opacity: 0.45; }
+.tab-transactions .cleaning-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+.tab-transactions .cleaning-card-pillar {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+}
+.tab-transactions .cleaning-card-status {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+}
+.tab-transactions .card-status-ok   { color: var(--green);  border-color: rgba(158, 206, 106, 0.4); background: rgba(158, 206, 106, 0.08); }
+.tab-transactions .card-status-warn { color: var(--yellow); border-color: rgba(224, 175, 104, 0.4); background: rgba(224, 175, 104, 0.08); }
+.tab-transactions .card-status-bad  { color: var(--red);    border-color: rgba(247, 118, 142, 0.4); background: rgba(247, 118, 142, 0.08); }
+.tab-transactions .cleaning-card-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    flex: 1;
+}
 .tab-transactions .cleaning-card .glyph { font-size: 20px; line-height: 1; }
-.tab-transactions .cleaning-card .title { font-size: 13px; }
-.tab-transactions .cleaning-card .sub { font-size: 11px; color: var(--fg-dim); }
+.tab-transactions .cleaning-card-text { min-width: 0; }
+.tab-transactions .cleaning-card .title { font-size: 12px; color: var(--fg); margin-bottom: 2px; line-height: 1.3; }
+.tab-transactions .cleaning-card .sub   { font-size: 11px; color: var(--fg-dim); line-height: 1.35; }
+.tab-transactions .cleaning-card .actions { margin: 0; padding-top: 6px; border-top: 1px solid var(--border); }
+.tab-transactions .cleaning-card .actions .btn { padding: 4px 10px; font-size: 11px; }
 .tab-transactions .note {
     background: var(--bg-highlight); border-left: 3px solid var(--accent);
     padding: 8px 12px; font-size: 11px; color: var(--fg-dim);
