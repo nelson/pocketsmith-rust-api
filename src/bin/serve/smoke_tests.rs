@@ -141,6 +141,7 @@ fn transactions_page_renders_tab_bar_and_three_panes() {
             "class=\"tab active\">Transactions",
             // Other tabs render as links.
             "href=\"/dashboard/\"",
+            "href=\"/pipeline/\"",
             "href=\"/transfers/\"",
             "href=\"/normalise/\"",
             // Layout panel ids that the JS and HTMX swap targets rely on.
@@ -339,5 +340,57 @@ fn transactions_detail_renders_pipeline_trace_and_siblings() {
             // Sibling transactions section, plural in the heading.
             "sibling transactions",
         ],
+    );
+}
+
+#[test]
+fn pipeline_page_renders_eight_stages_with_counts_and_nav() {
+    let state = fresh_state();
+    // Seed the rule tables so the queue shows non-zero counts.
+    {
+        let st = state.lock().unwrap();
+        pocketsmith_sync::rules::load_into_db(&st.conn).unwrap();
+    }
+    let html = crate::pipeline::views::render_page_shell(&state).into_string();
+    contains_all(
+        &html,
+        &[
+            // Active tab is Pipeline; siblings render as links.
+            "class=\"tab active\">Pipeline",
+            "href=\"/transactions/\"",
+            "href=\"/transfers/\"",
+            // Three panes.
+            "id=\"queue\"",
+            "id=\"detail\"",
+            "id=\"activity\"",
+            // All eight stages present.
+            "Prefix", "Suffix", "Expand", "Persons",
+            "Employers", "Merchants", "Banking ops", "Locations",
+            // Two-line layout markers + attribute tags.
+            "pipeline-stage-tags",
+            "first match",
+            // Arrow-key / click nav attributes on a queue row.
+            "data-detail-url=\"/pipeline/stage/merchants\"",
+            "data-detail-target=\"#detail\"",
+        ],
+    );
+    // The merchants stage seeded 146 rules.
+    assert!(html.contains("146 rules"), "expected merchant count in: {html}");
+}
+
+#[test]
+fn pipeline_detail_fragment_selects_stage() {
+    let state = fresh_state();
+    {
+        let st = state.lock().unwrap();
+        pocketsmith_sync::rules::load_into_db(&st.conn).unwrap();
+    }
+    let html = crate::pipeline::views::render_detail_fragment(&state, "persons").into_string();
+    assert!(html.contains("Persons"), "{html}");
+    assert!(html.contains("118 rules"), "{html}");
+    // Active stage recorded for full-page re-render.
+    assert_eq!(
+        state.lock().unwrap().pipeline_active.as_deref(),
+        Some("persons")
     );
 }

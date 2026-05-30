@@ -253,6 +253,35 @@ body {
 .queue-item:hover { background: var(--bg-highlight); }
 .queue-item.selected { background: var(--bg-highlight); border-left-color: var(--accent); }
 
+/* Pipeline tab queue rows: two-line layout (name + count, then tags),
+   not the four-column grid the other tabs use (editable-rules-v3 §4.3). */
+.pipeline-stage-item {
+    display: block;
+}
+.pipeline-stage-line1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+.pipeline-stage-name { color: var(--fg); font-weight: 600; }
+.pipeline-stage-count { color: var(--fg-dim); font-size: 11px; }
+.pipeline-stage-tags {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.pipeline-tag {
+    font-size: 10px;
+    color: var(--fg-dark);
+    background: var(--bg-highlight);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 5px;
+    line-height: 1.5;
+}
+
 .conf-badge {
     font-size: 10px;
     font-weight: 700;
