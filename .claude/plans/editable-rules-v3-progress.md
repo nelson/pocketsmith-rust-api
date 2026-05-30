@@ -10,12 +10,34 @@ PR 0 and PR 1 are **merged to `master`**. Remaining PRs continue as
 their own branches, each stacked on the previous (rebase as you go).
 
 ```
-master  (← PR 0 + PR 1 merged)
-     └─ feat/editable-rules-pr2   (PipelineCtx + RuleCache)
-          └─ … PRs 3–10
+master  (← PR 0–PR 8 all merged: trace-empty state, schema+rules module,
+         PipelineCtx/RuleCache, Pipeline tab shell, and every stage
+         converted to DB-backed rules incl. banking_ops + locations)
+     └─ feat/editable-rules-pr-rulelist   read-only rule list in Pipeline detail  (HEAD)
 ```
 
-All tests green at each commit (`cargo test --features web`).
+All tests green at each commit: `cargo test --features web` (0 failures),
+plus `cargo test --features fidelity` for the real-DB stage-fidelity gate.
+
+## Where to resume
+
+The whole pipeline is now DB-backed and proven faithful, and the Pipeline
+tab is a working **read-only** rule browser. What's left is the
+review-sensitive editor surface (intentionally not built autonomously):
+
+1. **Editor UI** (the bulk of plan PRs 4b/5b/6b/8b): the editor card with
+   Edit/Evaluate modes, categorical-impact buckets (§4.6), the
+   create/edit/delete/reorder mutations (each wrapped in
+   `with_operation("rule-edit", …)` + `cache.invalidate(stage)` +
+   `rules::schedule_dump(stage, db_path)` — all that plumbing already
+   exists), and the dirty-rules banner + re-scan (§4.5).
+2. **PR 7 `locations`** — only if you decide it should feed `suffix`
+   (Decision #6); otherwise drop the module.
+3. **PR 10** — "+ Add rule for this payee" affordance + `guess_stage`
+   heuristic (§4.7).
+4. **Header chips** — wire `freshness::freshness_chip` into the dashboard
+   header once that branch merges (Decision #1).
+
 
 ## Status by PR
 
