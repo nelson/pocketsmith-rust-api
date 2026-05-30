@@ -265,9 +265,9 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
     run_traced(&mut result, "prefix", |r| prefix::apply_with_db(r, ctx));
     run_traced(&mut result, "suffix", |r| suffix::apply_with_db(r, ctx));
     run_traced(&mut result, "expand", |r| expand::apply_with_db(r, ctx));
-    run_traced(&mut result, "persons", persons::apply);
-    run_traced(&mut result, "employers", employers::apply);
-    run_traced(&mut result, "merchants", merchants::apply);
+    run_traced(&mut result, "persons", |r| persons::apply_with_db(r, ctx));
+    run_traced(&mut result, "employers", |r| employers::apply_with_db(r, ctx));
+    run_traced(&mut result, "merchants", |r| merchants::apply_with_db(r, ctx));
     run_traced(&mut result, "banking_ops", banking_ops::apply);
     // If normalised string is empty after stripping, use banking op name or "Cash"
     if result.normalised.trim().is_empty() {
@@ -374,7 +374,7 @@ mod tests {
         let ctx = p.ctx();
         let mut checked = 0usize;
         for payee in &payees {
-            for stage in ["prefix", "suffix", "expand"] {
+            for stage in ["prefix", "suffix", "expand", "persons", "employers", "merchants"] {
                 let mut a = NormalisationResult::new(payee);
                 let mut b = NormalisationResult::new(payee);
                 match stage {
@@ -386,9 +386,21 @@ mod tests {
                         suffix::apply(&mut a);
                         suffix::apply_with_db(&mut b, &ctx);
                     }
-                    _ => {
+                    "expand" => {
                         expand::apply(&mut a);
                         expand::apply_with_db(&mut b, &ctx);
+                    }
+                    "persons" => {
+                        persons::apply(&mut a);
+                        persons::apply_with_db(&mut b, &ctx);
+                    }
+                    "employers" => {
+                        employers::apply(&mut a);
+                        employers::apply_with_db(&mut b, &ctx);
+                    }
+                    _ => {
+                        merchants::apply(&mut a);
+                        merchants::apply_with_db(&mut b, &ctx);
                     }
                 }
                 assert_eq!(a.normalised, b.normalised, "{stage} normalised differs for {payee:?}");
@@ -495,6 +507,120 @@ mod tests {
         let mut r3 = NormalisationResult::new("WLWRTHS MKT");
         expand::apply_with_db(&mut r3, &ctx2);
         assert_eq!(r3.normalised, "WLWRTHS MKT", "no rules => input unchanged");
+    }
+
+    /// Conversion test — **hermetic** (persons). Defines its own person
+    /// rules in the DB and proves `apply_with_db` matches case-insensitively,
+    /// tags `entity_name` + `Person` class, and honours first-match-wins in
+    /// `id` (declaration) order — the specific rule, inserted first, beats
+    /// the generic fallback. Independent of production content.
+    #[test]
+    fn persons_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap(); // schema only
+        // Specific rule first (lower id) so it wins over the generic one.
+        conn.execute(
+            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Jane Cricket', 'JANE CRICKET')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Generic Cricket', 'CRICKET')",
+            [],
+        )
+        .unwrap();
+        let cache = cache::RuleCache::new();
+        let ctx = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("payment jane cricket");
+        persons::apply_with_db(&mut r, &ctx);
+        assert_eq!(
+            r.features.entity_name.as_deref(),
+            Some("Jane Cricket"),
+            "case-insensitive match must pick the specific (first-id) rule"
+        );
+        assert_eq!(r.class(), Some(&PayeeClass::Person));
+
+        // No rules => no match (unseeded DB must not panic or fabricate).
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r2 = NormalisationResult::new("payment jane cricket");
+        persons::apply_with_db(&mut r2, &ctx2);
+        assert_eq!(r2.features.entity_name, None);
+        assert_eq!(r2.class(), None, "no rules => unclassified");
+    }
+
+    /// Conversion test — **hermetic** (employers). Proves `apply_with_db`
+    /// compiles the DB regex, tags `entity_name` + `Employer` class, and
+    /// respects the "skip if already classified" guard.
+    #[test]
+    fn employers_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_employers (canonical, pattern) VALUES ('Acme Corp', '(?i)\\bACME\\b')",
+            [],
+        )
+        .unwrap();
+        let cache = cache::RuleCache::new();
+        let ctx = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("ACME PAYROLL");
+        employers::apply_with_db(&mut r, &ctx);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Acme Corp"));
+        assert_eq!(r.class(), Some(&PayeeClass::Employer));
+
+        // Guard: an already-classified result is left untouched.
+        let mut pre = NormalisationResult::new("ACME PAYROLL");
+        pre.set_class(PayeeClass::Person);
+        employers::apply_with_db(&mut pre, &ctx);
+        assert_eq!(
+            pre.class(),
+            Some(&PayeeClass::Person),
+            "must not override an existing class"
+        );
+        assert_eq!(pre.features.entity_name, None);
+
+        // No rules => no match.
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r2 = NormalisationResult::new("ACME PAYROLL");
+        employers::apply_with_db(&mut r2, &ctx2);
+        assert_eq!(r2.class(), None, "no rules => unclassified");
+    }
+
+    /// Conversion test — **hermetic** (merchants). Mirror of the employers
+    /// template for the merchants stage.
+    #[test]
+    fn merchants_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_merchants (canonical, pattern) VALUES ('Zebra Cafe', '(?i)\\bZEBRA CAFE\\b')",
+            [],
+        )
+        .unwrap();
+        let cache = cache::RuleCache::new();
+        let ctx = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("ZEBRA CAFE SYDNEY");
+        merchants::apply_with_db(&mut r, &ctx);
+        assert_eq!(r.features.entity_name.as_deref(), Some("Zebra Cafe"));
+        assert_eq!(r.class(), Some(&PayeeClass::Merchant));
+
+        // Guard: already-classified => untouched.
+        let mut pre = NormalisationResult::new("ZEBRA CAFE SYDNEY");
+        pre.set_class(PayeeClass::Person);
+        merchants::apply_with_db(&mut pre, &ctx);
+        assert_eq!(
+            pre.class(),
+            Some(&PayeeClass::Person),
+            "must not override an existing class"
+        );
+
+        // No rules => no match.
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r2 = NormalisationResult::new("ZEBRA CAFE SYDNEY");
+        merchants::apply_with_db(&mut r2, &ctx2);
+        assert_eq!(r2.class(), None, "no rules => unclassified");
     }
 
     /// Guards the init consolidation (not the seed *content*): every binary

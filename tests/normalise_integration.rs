@@ -16,6 +16,8 @@ use pocketsmith_sync::test_support::{seed_account, seed_txn};
 fn fresh_db() -> Connection {
     let conn = db::initialize_in_memory().unwrap();
     seed_account(&conn, 1, "Test").unwrap();
+    // The normalisation pipeline reads its rules from the DB; seed them.
+    pocketsmith_sync::rules::load_into_db(&conn).unwrap();
     conn
 }
 
