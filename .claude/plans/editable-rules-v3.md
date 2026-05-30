@@ -611,9 +611,9 @@ be overwhelmed."
 |---|----------|---------|-----------------|
 | 0 | `transactions: only flag "no normalisation" when trace is empty` | Transactions tab views | Verify the pillar text changes for merchant-only payees. **✅ MERGED** |
 | 1 | `db+rules: schema for 8 rule tables + src/rules/*.sql seed loader + dump binary; serve header gains pushed-at chip` | new `src/rules/` module, schema migration, `dump` binary, accessible freshness chips | `cargo run --bin dump` exports the live DB to 8 SQL files; fresh DB seeds correctly; existing DB retains data. Header shows two freshness chips (synced + pushed) with shape-distinct glyphs. **✅ MERGED** |
-| 2 | `normalise: PipelineCtx + RuleCache (no behaviour change)` | `normalise::cache`, `PipelineCtx`, every call site | All existing tests pass; pipeline still uses in-code constants. |
-| 3 | `serve: Pipeline tab shell (queue + empty detail + activity panel)` | new `serve/pipeline/` module, route table, nav | Tab visible in third nav slot; queue lists 8 stages with 2-line tag layout; arrow keys navigate. |
-| 4 | `pipeline(prefix+suffix): convert to DB; tab UI for these two stages incl. Edit/Eval modes + categorical impact` | `prefix.rs`, `suffix.rs`, `pipeline/views.rs` | Edit a prefix rule, click Evaluate, see impact buckets, save, see dirty banner, re-scan, banner clears. |
+| 2 | `normalise: PipelineCtx + RuleCache (no behaviour change)` | `normalise::cache`, `PipelineCtx`, every call site | All existing tests pass; pipeline still uses in-code constants. **✅ MERGED** |
+| 3 | `serve: Pipeline tab shell (queue + empty detail + activity panel)` | new `serve/pipeline/` module, route table, nav | Tab visible in third nav slot; queue lists 8 stages with 2-line tag layout; arrow keys navigate. **✅ MERGED** |
+| 4 | `pipeline(prefix+suffix): convert to DB; tab UI for these two stages incl. Edit/Eval modes + categorical impact` | `prefix.rs`, `suffix.rs`, `pipeline/views.rs` | Edit a prefix rule, click Evaluate, see impact buckets, save, see dirty banner, re-scan, banner clears. **4a ✅ MERGED** (DB conversion + fidelity gate); **4b remaining** (editor UI). |
 | 5 | `pipeline(expand): convert + UI` | `expand.rs`, `pipeline/views.rs` | Same drill for expand. |
 | 6 | `pipeline(persons+employers+merchants): convert + UI for the three first-match-wins stages` | three `*.rs` files, shared UI partial | Add a merchant rule end-to-end. |
 | 7 | `pipeline(locations): convert + UI` | `locations.rs`, `suffix.rs`, `pipeline/views.rs` | Add/remove a suburb, see effect. |

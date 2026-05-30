@@ -11,20 +11,25 @@
 //! `apply_with_db` that consults it. Threading the context through every
 //! call site now means those PRs only touch the one stage they convert.
 
+use std::sync::{Arc, RwLock};
+
+use anyhow::Result;
 use rusqlite::Connection;
 
+use super::prefix::CompiledPrefix;
+use super::suffix::CompiledSuffix;
 use crate::rules::Stage;
 
 /// Process-lifetime cache of compiled rules, keyed by stage.
 ///
 /// Per the plan (§7) there is no global generation counter: a rule edit
 /// invalidates only the affected stage's slot, and the next read of that
-/// stage recompiles just it. Slots are added as each stage is converted
-/// to read from the DB (PR 4+); until then this is an empty skeleton.
+/// stage recompiles just it. A slot is added here as each stage is
+/// converted to read from the DB (PR 4+).
 #[derive(Default)]
 pub struct RuleCache {
-    // Per-stage `RwLock<Option<Arc<Vec<Compiled…>>>>` slots are added by
-    // the conversion PRs. Intentionally empty for now.
+    prefixes: RwLock<Option<Arc<Vec<CompiledPrefix>>>>,
+    suffixes: RwLock<Option<Arc<Vec<CompiledSuffix>>>>,
 }
 
 impl RuleCache {
@@ -32,16 +37,35 @@ impl RuleCache {
         Self::default()
     }
 
+    /// Compiled prefix rules, loading + compiling on first use and on the
+    /// first read after an invalidation.
+    pub(crate) fn prefixes(&self, conn: &Connection) -> Result<Arc<Vec<CompiledPrefix>>> {
+        if let Some(arc) = self.prefixes.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::prefix::load_compiled(conn)?);
+        *self.prefixes.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
+    /// Compiled suffix rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn suffixes(&self, conn: &Connection) -> Result<Arc<Vec<CompiledSuffix>>> {
+        if let Some(arc) = self.suffixes.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::suffix::load_compiled(conn)?);
+        *self.suffixes.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
     /// Drop the cached compilation for one stage so the next read
-    /// recompiles it from the (just-edited) DB rows. No-op while the
-    /// stage has no cache slot yet.
+    /// recompiles it from the (just-edited) DB rows. No-op for stages
+    /// not yet converted to read from the DB.
     pub fn invalidate(&self, stage: Stage) {
-        // No slots populated yet (PR 2). Match exhaustively so adding a
-        // slot in a later PR forces this to be updated.
         match stage {
-            Stage::Prefixes
-            | Stage::Suffixes
-            | Stage::Expansions
+            Stage::Prefixes => *self.prefixes.write().unwrap() = None,
+            Stage::Suffixes => *self.suffixes.write().unwrap() = None,
+            Stage::Expansions
             | Stage::Persons
             | Stage::Employers
             | Stage::Merchants

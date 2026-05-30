@@ -49,19 +49,39 @@ All tests green at each commit (`cargo test --features web`).
     accessors, and `bootstrap_from_constants`/`bootstrap_stage` — the
     `*.sql` files replace the constants→DB bridge.
 
+- **PR 2 — ✅ MERGED.** `normalise: PipelineCtx + RuleCache plumbing (no
+  behaviour change)`. Threaded a `PipelineCtx { conn, cache }` through
+  `normalise()`, `scan`, and the serve views; `RuleCache` is an empty
+  skeleton (no slots yet). Stages still read constants (`let _ = ctx`),
+  so output is byte-identical — proven by scanning the real DB on PR2 vs
+  master (7,236 staged rows identical). `OwnedPipeline::seeded_in_memory`
+  seeds tests from `src/rules/*.sql` via `load_into_db`.
+
+- **PR 3 — ✅ MERGED.** `serve: Pipeline tab shell (queue + stub detail +
+  activity)`. New **Pipeline** nav tab (3rd slot). Read-only shell:
+  `/pipeline/` lists the 8 stages in execution order with live rule
+  counts + semantic tags; `/pipeline/stage/<slug>` is the HTMX detail
+  fragment (records the active stage). Added `rules::count` +
+  `Stage::from_name`. GET-only — editing lands per stage.
+
+- **PR 4a — ✅ MERGED (this PR).** `pipeline(prefix+suffix): convert to
+  DB-backed rules`. Converted the `prefix` and `suffix` stages to read
+  from the DB via `RuleCache` (`apply_with_db` + `load_compiled`; cache
+  slots + `invalidate`). `normalise()` drives those two stages from the
+  rule tables; the other six still use constants. The const `apply()` /
+  `compiled_*` for each converted stage is kept as a `#[cfg(test)]`
+  fidelity oracle (and the `PREFIXES`/`SUFFIXES` const tables are now
+  test-only). New `fidelity` cargo feature + real-DB test:
+  `cargo test --features fidelity` confirms the DB path is byte-identical
+  to the const path across **21,046 payee×stage pairs** (10,523 distinct
+  `original_payee`s × 2 stages).
+  - **4b (REMAINING):** the Pipeline-tab editor UI for prefix/suffix —
+    rule list, Edit/Evaluate card, categorical impact buckets, dirty
+    banner + re-scan, and create/edit/delete/reorder mutations with
+    background dump. Deferred for review (see Decision #5).
+
 ## Review feedback — addressed in PR 1
 
-- **Freshness chips wired in** (dashboard is merged): both `synced` and
-  `pushed` chips render in the header via `freshness::header_chips`.
-  Decision #1 is resolved — no longer waiting on a dashboard branch.
-- **Colour-blind accessibility**: chips encode state with a glyph, not
-  colour alone (leafy-green / fallen-leaf / leafless-tree / ?). NB the
-  leafless-tree glyph is Unicode 16 — it falls back to tofu on older
-  fonts; swap if it doesn't render.
-- **`dump` reads the live DB** (Decision #3 resolved): renamed binary,
-  no longer rebuilds from constants.
-- **Seed-row bridge removed**: the `*.sql` files are canonical; rows
-  carry a baked historical timestamp. (See Decision #3.)
 - **`mod.rs` slimmed**: merged `table()`/`file_stem()` into one `name()`.
 
 ## Decisions
@@ -107,6 +127,17 @@ banking-op patterns and 95 locations (and 118 person *patterns* across 82
 canonicals, 5 employer patterns across 4 canonicals). I seeded faithfully
 from the code (the source of truth), so the counts reflect reality, not
 the plan's prose. No action needed unless the plan's numbers were a target.
+
+### 5. PR 4 split: stage conversion done (4a), editor UI deferred (4b) — ⚠️ STILL OPEN
+
+The plan bundles PR 4 as "convert prefix+suffix to DB **and** build the
+Pipeline-tab editor UI (rule list, Edit/Evaluate, categorical impact,
+dirty banner, re-scan, mutations)" — exactly the surface you wanted to
+review carefully (§10). PR 4a landed the **conversion core** (highest-
+value, fidelity-critical, behaviour-identical, proven against the real
+DB). The editor UI (4b) is deferred so it can be built/steered under
+review. The `RuleCache`/`apply_with_db`/`load_compiled` pattern from 4a
+is the template for converting the remaining six stages (PRs 5–8).
 
 ## Notes / smaller choices
 

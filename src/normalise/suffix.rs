@@ -1,9 +1,13 @@
+#[cfg(test)]
 use std::sync::OnceLock;
 
+use anyhow::Result;
 use regex::Regex;
+use rusqlite::Connection;
 
-use super::{BankingOperation, NormalisationResult};
+use super::{BankingOperation, NormalisationResult, PipelineCtx};
 
+#[cfg(test)]
 const DEFAULT: Suffix = Suffix {
     pattern: "",
     gateway: None,
@@ -16,6 +20,7 @@ const DEFAULT: Suffix = Suffix {
     has_amount: false,
 };
 
+#[cfg(test)]
 struct Suffix {
     pattern: &'static str,
     gateway: Option<&'static str>,
@@ -28,11 +33,11 @@ struct Suffix {
     has_amount: bool,
 }
 
-struct CompiledSuffix {
+pub(crate) struct CompiledSuffix {
     regex: Regex,
-    gateway: Option<&'static str>,
+    gateway: Option<String>,
     operation: Option<BankingOperation>,
-    institution: Option<&'static str>,
+    institution: Option<String>,
     has_account: bool,
     has_date: bool,
     has_location: bool,
@@ -40,20 +45,22 @@ struct CompiledSuffix {
     has_amount: bool,
 }
 
-/// Strip metadata suffixes in a loop (first match wins per iteration).
-pub fn apply(result: &mut NormalisationResult) {
+/// One run of the suffix loop over a compiled rule set (first match wins
+/// per iteration). Shared by [`apply_with_db`] and the test oracle
+/// [`apply`].
+fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledSuffix]) {
     loop {
         let mut matched = false;
-        for pat in compiled_suffixes() {
+        for pat in compiled {
             if let Some(caps) = pat.regex.captures(&result.normalised) {
-                if let Some(gw) = pat.gateway {
-                    result.features.gateway = Some(gw.to_string());
+                if let Some(gw) = &pat.gateway {
+                    result.features.gateway = Some(gw.clone());
                 }
                 if let Some(op) = pat.operation {
                     result.features.operation = Some(op);
                 }
-                if let Some(inst) = pat.institution {
-                    result.features.institution = Some(inst.to_string());
+                if let Some(inst) = &pat.institution {
+                    result.features.institution = Some(inst.clone());
                 }
                 if pat.has_account {
                     if let Some(account) = caps.name("account") {
@@ -97,6 +104,56 @@ pub fn apply(result: &mut NormalisationResult) {
     }
 }
 
+/// Strip metadata suffixes using the DB-backed, cached rule set.
+pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
+    match ctx.cache.suffixes(ctx.conn) {
+        Ok(compiled) => run_loop(result, &compiled),
+        Err(e) => eprintln!("suffix: rule load failed, stage skipped: {e:#}"),
+    }
+}
+
+/// Load and compile the suffix rules from `rule_suffixes` in apply
+/// order (sort_order, then id).
+pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledSuffix>> {
+    let mut stmt = conn.prepare(
+        "SELECT pattern, gateway, operation, institution, has_account, has_date, \
+                has_location, has_currency_code, has_amount \
+           FROM rule_suffixes ORDER BY sort_order, id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, Option<String>>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, i64>(4)? != 0,
+            row.get::<_, i64>(5)? != 0,
+            row.get::<_, i64>(6)? != 0,
+            row.get::<_, i64>(7)? != 0,
+            row.get::<_, i64>(8)? != 0,
+        ))
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        let (pattern, gateway, operation, institution, has_account, has_date, has_location, has_currency_code, has_amount) = r?;
+        let regex = Regex::new(&pattern)
+            .map_err(|e| anyhow::anyhow!("invalid suffix pattern {pattern:?}: {e}"))?;
+        out.push(CompiledSuffix {
+            regex,
+            gateway,
+            operation: operation.as_deref().and_then(BankingOperation::from_display_name),
+            institution,
+            has_account,
+            has_date,
+            has_location,
+            has_currency_code,
+            has_amount,
+        });
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
 const SUFFIXES: &[Suffix] = &[
     // --- Card + date (has_account + has_date) ---
     Suffix { pattern: r",?\s*Card xx(?P<account>\d{4}).*?(?P<date>\d{2}/\d{2}/\d{4}).*$", has_account: true, has_date: true, ..DEFAULT },
@@ -150,6 +207,7 @@ fn parse_amount_cents(s: &str) -> Option<u32> {
     s.replace('.', "").parse().ok()
 }
 
+#[cfg(test)]
 fn compiled_suffixes() -> &'static [CompiledSuffix] {
     static COMPILED: OnceLock<Vec<CompiledSuffix>> = OnceLock::new();
     COMPILED.get_or_init(|| {
@@ -157,9 +215,9 @@ fn compiled_suffixes() -> &'static [CompiledSuffix] {
             .iter()
             .map(|s| CompiledSuffix {
                 regex: Regex::new(s.pattern).expect("invalid suffix pattern"),
-                gateway: s.gateway,
+                gateway: s.gateway.map(|x| x.to_string()),
                 operation: s.operation,
-                institution: s.institution,
+                institution: s.institution.map(|x| x.to_string()),
                 has_account: s.has_account,
                 has_date: s.has_date,
                 has_location: s.has_location,
@@ -170,10 +228,51 @@ fn compiled_suffixes() -> &'static [CompiledSuffix] {
     })
 }
 
+/// Const-backed suffix pass: the original behaviour, kept as the
+/// fidelity oracle the DB-backed path is tested against.
+#[cfg(test)]
+pub(crate) fn apply(result: &mut NormalisationResult) {
+    run_loop(result, compiled_suffixes());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::normalise::NormalisationResult;
+
+    /// DB-backed suffix path must reproduce the const oracle exactly.
+    #[test]
+    fn db_apply_matches_const_oracle() {
+        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        let inputs = [
+            "WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026",
+            "MERCHANT Card 123456xxxxxx7890",
+            "MERCHANT Value Date: 15/03/2026",
+            "SOME MERCHANT NS AUS",
+            "MERCHANT NSW 2140",
+            "MERCHANT AU AUS",
+            "MERCHANT VIC",
+            "COMPANY NAME PTY LTD",
+            "MERCHANT - Alipay",
+            "MERCHANT 12345678",
+            "MERCHANT - Eftpos Purchase - Receipt 123Date01/01",
+            "MERCHANT SGD 12.50",
+            "PAYPAL - paypal-aud@airbnb.com",
+        ];
+        for inp in inputs {
+            let mut a = NormalisationResult::new(inp);
+            apply(&mut a);
+            let mut b = NormalisationResult::new(inp);
+            apply_with_db(&mut b, &ctx);
+            assert_eq!(a.normalised, b.normalised, "normalised differs for {inp:?}");
+            assert_eq!(
+                crate::normalise::features_to_json(&a.features),
+                crate::normalise::features_to_json(&b.features),
+                "features differ for {inp:?}"
+            );
+        }
+    }
 
     #[test]
     fn test_card_and_date() {
