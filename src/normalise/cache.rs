@@ -19,6 +19,9 @@ use rusqlite::Connection;
 use super::prefix::CompiledPrefix;
 use super::suffix::CompiledSuffix;
 use super::expand::CompiledExpansion;
+use super::persons::CompiledPerson;
+use super::employers::CompiledEmployer;
+use super::merchants::CompiledMerchant;
 use crate::rules::Stage;
 
 /// Process-lifetime cache of compiled rules, keyed by stage.
@@ -32,6 +35,9 @@ pub struct RuleCache {
     prefixes: RwLock<Option<Arc<Vec<CompiledPrefix>>>>,
     suffixes: RwLock<Option<Arc<Vec<CompiledSuffix>>>>,
     expansions: RwLock<Option<Arc<Vec<CompiledExpansion>>>>,
+    persons: RwLock<Option<Arc<Vec<CompiledPerson>>>>,
+    employers: RwLock<Option<Arc<Vec<CompiledEmployer>>>>,
+    merchants: RwLock<Option<Arc<Vec<CompiledMerchant>>>>,
 }
 
 impl RuleCache {
@@ -70,6 +76,36 @@ impl RuleCache {
         Ok(arc)
     }
 
+    /// Compiled person rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn persons(&self, conn: &Connection) -> Result<Arc<Vec<CompiledPerson>>> {
+        if let Some(arc) = self.persons.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::persons::load_compiled(conn)?);
+        *self.persons.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
+    /// Compiled employer rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn employers(&self, conn: &Connection) -> Result<Arc<Vec<CompiledEmployer>>> {
+        if let Some(arc) = self.employers.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::employers::load_compiled(conn)?);
+        *self.employers.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
+    /// Compiled merchant rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn merchants(&self, conn: &Connection) -> Result<Arc<Vec<CompiledMerchant>>> {
+        if let Some(arc) = self.merchants.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::merchants::load_compiled(conn)?);
+        *self.merchants.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
     /// Drop the cached compilation for one stage so the next read
     /// recompiles it from the (just-edited) DB rows. No-op for stages
     /// not yet converted to read from the DB.
@@ -78,11 +114,10 @@ impl RuleCache {
             Stage::Prefixes => *self.prefixes.write().unwrap() = None,
             Stage::Suffixes => *self.suffixes.write().unwrap() = None,
             Stage::Expansions => *self.expansions.write().unwrap() = None,
-            Stage::Persons
-            | Stage::Employers
-            | Stage::Merchants
-            | Stage::BankingOps
-            | Stage::Locations => {}
+            Stage::Persons => *self.persons.write().unwrap() = None,
+            Stage::Employers => *self.employers.write().unwrap() = None,
+            Stage::Merchants => *self.merchants.write().unwrap() = None,
+            Stage::BankingOps | Stage::Locations => {}
         }
     }
 }

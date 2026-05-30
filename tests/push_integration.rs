@@ -156,7 +156,11 @@ fn seed_synced_txn(conn: &Connection, id: i64, original_payee: &str) -> Result<(
 }
 
 fn fresh_db() -> Connection {
-    db::initialize_in_memory().unwrap()
+    let conn = db::initialize_in_memory().unwrap();
+    // The normalisation pipeline reads its rules from the DB; seed them so
+    // norm_scan produces the same proposals it did with const rules.
+    pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+    conn
 }
 
 fn unstamped_change_count(conn: &Connection, txn_id: i64, reason: &str) -> i64 {

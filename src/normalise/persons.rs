@@ -1,20 +1,24 @@
+#[cfg(test)]
 use std::sync::OnceLock;
 
+use anyhow::Result;
 use regex::Regex;
+use rusqlite::Connection;
 
-use super::{NormalisationResult, PayeeClass};
+use super::{NormalisationResult, PayeeClass, PipelineCtx};
 
+#[cfg(test)]
 struct Person {
     canonical: &'static str,
     patterns: &'static [&'static str],
 }
 
-struct CompiledPerson {
+pub(crate) struct CompiledPerson {
     regex: Regex,
-    canonical: &'static str,
-    pattern: &'static str,
+    canonical: String,
 }
 
+#[cfg(test)]
 fn compiled_persons() -> &'static [CompiledPerson] {
     static COMPILED: OnceLock<Vec<CompiledPerson>> = OnceLock::new();
     COMPILED.get_or_init(|| {
@@ -22,30 +26,69 @@ fn compiled_persons() -> &'static [CompiledPerson] {
             .iter()
             .flat_map(|p| {
                 p.patterns.iter().map(move |&pat| CompiledPerson {
-                    regex: Regex::new(&format!(
-                        r"(?i)\b{}(?:\b|\s|$)",
-                        regex::escape(pat)
-                    ))
-                    .expect("invalid person pattern"),
-                    canonical: p.canonical,
-                    pattern: pat,
+                    regex: compile_person(pat),
+                    canonical: p.canonical.to_string(),
                 })
             })
             .collect()
     })
 }
 
-pub fn apply(result: &mut NormalisationResult) {
-    for cp in compiled_persons() {
+/// Compile one person pattern the way the const path does: a
+/// case-insensitive literal anchored on a leading word boundary and a
+/// trailing boundary/space/end.
+fn compile_person(pattern: &str) -> Regex {
+    Regex::new(&format!(r"(?i)\b{}(?:\b|\s|$)", regex::escape(pattern)))
+        .expect("invalid person pattern")
+}
+
+/// First-match-wins over the compiled set: set entity_name + class.
+fn run_match(result: &mut NormalisationResult, compiled: &[CompiledPerson]) {
+    for cp in compiled {
         if cp.regex.is_match(&result.normalised) {
-            result.features.entity_name = Some(cp.canonical.to_string());
+            result.features.entity_name = Some(cp.canonical.clone());
             result.set_class(PayeeClass::Person);
-            result.last_matched_pattern = Some(cp.pattern);
             return;
         }
     }
 }
 
+/// DB-backed person match.
+pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
+    match ctx.cache.persons(ctx.conn) {
+        Ok(compiled) => run_match(result, &compiled),
+        Err(e) => eprintln!("persons: rule load failed, stage skipped: {e:#}"),
+    }
+}
+
+/// Load + compile person rules. Ordered by `id` (= declaration /
+/// insertion order) so the order-sensitive generic fallbacks
+/// (`MR`/`MISS`/`MRS`, single-token names) stay last under
+/// first-match-wins. See progress note Decision #2.
+pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledPerson>> {
+    let mut stmt =
+        conn.prepare("SELECT canonical, pattern FROM rule_persons ORDER BY id")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        let (canonical, pattern) = r?;
+        out.push(CompiledPerson {
+            regex: compile_person(&pattern),
+            canonical,
+        });
+    }
+    Ok(out)
+}
+
+/// Const-backed person match: original behaviour, kept as the fidelity
+/// oracle the DB path is tested against.
+#[cfg(test)]
+pub(crate) fn apply(result: &mut NormalisationResult) {
+    run_match(result, compiled_persons());
+}
+#[cfg(test)]
 const KNOWN_PERSONS: &[Person] = &[
     Person { canonical: "A S-W Bywaters", patterns: &["A S-W BYWATERS"] },
     Person { canonical: "A Ventura Mendoza", patterns: &["A VENTURA MENDOZA"] },
@@ -162,6 +205,21 @@ const KNOWN_PERSONS: &[Person] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DB-backed person match must reproduce the const oracle.
+    #[test]
+    fn db_apply_matches_const_oracle() {
+        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        for inp in ["JOHNNY TAM", "NELSON TAM", "MR ANDY CHI-KIT TAN", "WOOLWORTHS STRATHFIELD", "TRANSFER FROM NELSON TAM", "ANNA", "MRS HEA-WON PARK"] {
+            let mut a = NormalisationResult::new(inp);
+            apply(&mut a);
+            let mut b = NormalisationResult::new(inp);
+            apply_with_db(&mut b, &ctx);
+            assert_eq!(a.features.entity_name, b.features.entity_name, "entity differs for {inp:?}");
+            assert_eq!(a.class(), b.class(), "class differs for {inp:?}");
+        }
+    }
 
     #[test]
     fn test_person_johnny_tam() {

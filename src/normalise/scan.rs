@@ -131,6 +131,9 @@ mod tests {
 
     fn setup(conn: &Connection) {
         seed_account(conn, 1, "Test").unwrap();
+        // The pipeline now reads its rules from the DB; seed them so the
+        // scan produces the same proposals it did when rules were const.
+        crate::rules::load_into_db(conn).unwrap();
     }
 
     fn insert_txn_v2(conn: &Connection, id: i64, original_payee: &str, payee: &str) {

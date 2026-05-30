@@ -1,36 +1,70 @@
+#[cfg(test)]
 use std::sync::OnceLock;
 
 use regex::Regex;
 
 use super::{NormalisationResult, PayeeClass};
 
+#[cfg(test)]
 struct Merchant {
     pattern: &'static str,
     canonical: &'static str,
 }
 
-struct CompiledMerchant {
+pub(crate) struct CompiledMerchant {
     regex: Regex,
-    canonical: &'static str,
-    pattern: &'static str,
+    canonical: String,
 }
 
-pub fn apply(result: &mut NormalisationResult) {
+/// First-match-wins over the compiled set, only if unclassified.
+fn run_match(result: &mut NormalisationResult, compiled: &[CompiledMerchant]) {
     if result.class().is_some() {
         return;
     }
-    for cm in compiled_merchants() {
+    for cm in compiled {
         if cm.regex.is_match(&result.normalised) {
-            result.features.entity_name = Some(cm.canonical.to_string());
+            result.features.entity_name = Some(cm.canonical.clone());
             result.set_class(PayeeClass::Merchant);
-            result.last_matched_pattern = Some(cm.pattern);
             return;
         }
     }
 }
 
+/// DB-backed merchant match.
+pub fn apply_with_db(result: &mut NormalisationResult, ctx: &super::PipelineCtx) {
+    match ctx.cache.merchants(ctx.conn) {
+        Ok(compiled) => run_match(result, &compiled),
+        Err(e) => eprintln!("merchants: rule load failed, stage skipped: {e:#}"),
+    }
+}
+
+/// Load + compile merchant rules in declaration order (`id`), so the
+/// "more specific pattern must appear first" invariant is preserved.
+pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<CompiledMerchant>> {
+    let mut stmt =
+        conn.prepare("SELECT canonical, pattern FROM rule_merchants ORDER BY id")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        let (canonical, pattern) = r?;
+        let regex = Regex::new(&pattern)
+            .map_err(|e| anyhow::anyhow!("invalid merchant pattern {pattern:?}: {e}"))?;
+        out.push(CompiledMerchant { regex, canonical });
+    }
+    Ok(out)
+}
+
+/// Const-backed merchant match: fidelity oracle.
+#[cfg(test)]
+pub(crate) fn apply(result: &mut NormalisationResult) {
+    run_match(result, compiled_merchants());
+}
+
 // Sorted alphabetically by canonical name.
 // Where multiple patterns share a prefix, more specific must appear first.
+#[cfg(test)]
 const MERCHANTS: &[Merchant] = &[
     // --- 7 ---
     Merchant { pattern: r"(?i)7-ELEVEN\b", canonical: "7-Eleven" },
@@ -205,6 +239,7 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)YAKITORI JIN", canonical: "Yakitori Jin" },
 ];
 
+#[cfg(test)]
 fn compiled_merchants() -> &'static [CompiledMerchant] {
     static COMPILED: OnceLock<Vec<CompiledMerchant>> = OnceLock::new();
     COMPILED.get_or_init(|| {
@@ -212,8 +247,7 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
             .iter()
             .map(|m| CompiledMerchant {
                 regex: Regex::new(m.pattern).expect("invalid merchant pattern"),
-                canonical: m.canonical,
-                pattern: m.pattern,
+                canonical: m.canonical.to_string(),
             })
             .collect()
     })
@@ -222,6 +256,25 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DB-backed merchant match must reproduce the const oracle.
+    #[test]
+    fn db_apply_matches_const_oracle() {
+        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        for inp in [
+            "WOOLWORTHS STRATHFIELD", "COLES BURWOOD", "ALDI", "ATM", "ATO",
+            "AMAZON PRIME", "AMAZON", "7-ELEVEN", "BUPA", "CHEMIST WAREHOUSE",
+            "SOMETHING UNMATCHED XYZ",
+        ] {
+            let mut a = NormalisationResult::new(inp);
+            apply(&mut a);
+            let mut b = NormalisationResult::new(inp);
+            apply_with_db(&mut b, &ctx);
+            assert_eq!(a.features.entity_name, b.features.entity_name, "entity differs for {inp:?}");
+            assert_eq!(a.class(), b.class(), "class differs for {inp:?}");
+        }
+    }
 
     fn assert_merchant(input: &str, expected: &str) {
         let mut r = NormalisationResult::new(input);
