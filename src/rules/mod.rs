@@ -148,6 +148,63 @@ pub fn count(conn: &Connection, stage: Stage) -> Result<i64> {
     row_count(conn, stage)
 }
 
+/// Columns shown in the read-only Pipeline-tab rule list for a stage,
+/// in display order. A subset/reorder of [`Stage::dump_columns`] chosen
+/// for legibility (drops `sort_order`, which the row order conveys).
+fn display_columns(stage: Stage) -> &'static [&'static str] {
+    match stage {
+        Stage::Prefixes => &["pattern", "gateway", "operation", "has_account", "has_date", "note"],
+        Stage::Suffixes => &[
+            "pattern", "gateway", "operation", "institution", "has_account", "has_date",
+            "has_location", "has_currency_code", "has_amount", "note",
+        ],
+        Stage::Expansions => &["pattern", "canonical", "note"],
+        Stage::Persons => &["canonical", "pattern", "note"],
+        Stage::Employers => &["canonical", "pattern", "note"],
+        Stage::Merchants => &["canonical", "pattern", "note"],
+        Stage::BankingOps => &["operation", "pattern", "has_account", "note"],
+        Stage::Locations => &["location", "note"],
+    }
+}
+
+/// One rule row rendered for display: each cell is `None` for SQL NULL,
+/// else the value stringified (integers as-is, so boolean flag columns
+/// read "0"/"1").
+pub type DisplayRow = Vec<Option<String>>;
+
+/// Fetch a stage's rules for the read-only Pipeline-tab list, in apply
+/// order. Returns the column headers and one [`DisplayRow`] per rule.
+pub fn list_display(conn: &Connection, stage: Stage) -> Result<(Vec<&'static str>, Vec<DisplayRow>)> {
+    let cols = display_columns(stage);
+    let sql = format!(
+        "SELECT {} FROM {} ORDER BY {}",
+        cols.join(", "),
+        stage.table(),
+        stage.dump_order_by()
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let n = cols.len();
+    let rows = stmt.query_map([], |row| {
+        let mut cells: DisplayRow = Vec::with_capacity(n);
+        for i in 0..n {
+            let v: rusqlite::types::Value = row.get(i)?;
+            cells.push(match v {
+                rusqlite::types::Value::Null => None,
+                rusqlite::types::Value::Integer(x) => Some(x.to_string()),
+                rusqlite::types::Value::Real(x) => Some(x.to_string()),
+                rusqlite::types::Value::Text(s) => Some(s),
+                rusqlite::types::Value::Blob(_) => None,
+            });
+        }
+        Ok(cells)
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok((cols.to_vec(), out))
+}
+
 /// Seed any empty rule table on startup (§6.1) from its
 /// `src/rules/<stage>.sql` file. Tables that already hold rows are left
 /// untouched, so an existing DB retains its (possibly UI-edited) data.

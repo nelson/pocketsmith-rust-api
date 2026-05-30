@@ -282,6 +282,34 @@ body {
     line-height: 1.5;
 }
 
+/* Read-only rule list in the Pipeline-tab stage detail. */
+.rule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+    font-size: 11px;
+    margin: 8px 0;
+}
+.rule-table th {
+    text-align: left;
+    font-variant: small-caps;
+    color: var(--fg-dark);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding: 3px 8px 3px 0;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+}
+.rule-table td {
+    padding: 2px 8px 2px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--fg);
+    vertical-align: top;
+    word-break: break-word;
+}
+.rule-cell-null { color: var(--fg-dark); }
+
 .conf-badge {
     font-size: 10px;
     font-weight: 700;

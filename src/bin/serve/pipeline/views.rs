@@ -72,7 +72,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
 
     let queue = render_queue(&stages, active);
     let detail = match active {
-        Some(stage) => render_detail(stage, rules::count(&st.conn, stage).unwrap_or(0)),
+        Some(stage) => render_detail(&st.conn, stage),
         None => empty_detail(),
     };
     let activity = render_activity();
@@ -87,7 +87,7 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) ->
         return html! { div.empty-state { p { "Unknown pipeline stage." } } };
     };
     st.pipeline_active = Some(stage.name().to_string());
-    render_detail(stage, rules::count(&st.conn, stage).unwrap_or(0))
+    render_detail(&st.conn, stage)
 }
 
 /// Build the queue rows (one per stage, in execution order) with live
@@ -139,9 +139,12 @@ fn render_queue_row(sv: &StageView, is_selected: bool) -> Markup {
     }
 }
 
-/// Stage detail. PR 3 stub: title, rule count, and a note that editing
-/// arrives in a later PR. The rule list + editor card land per stage.
-fn render_detail(stage: Stage, count: i64) -> Markup {
+/// Stage detail: header + a read-only table of the stage's rules in
+/// apply order. Editing (the editor card, Edit/Evaluate, impact, and
+/// create/edit/delete/reorder mutations) lands in a later PR.
+fn render_detail(conn: &rusqlite::Connection, stage: Stage) -> Markup {
+    let count = rules::count(conn, stage).unwrap_or(0);
+    let listing = rules::list_display(conn, stage);
     html! {
         div.detail-header {
             div.row {
@@ -154,9 +157,41 @@ fn render_detail(stage: Stage, count: i64) -> Markup {
                 }
             }
         }
+        @match listing {
+            Ok((headers, rows)) => (render_rule_table(&headers, &rows)),
+            Err(_) => div.empty-state { p { "Could not load rules for this stage." } },
+        }
         div.note {
-            "Rule list and editing for this stage land in a later PR. "
-            "This shell lists the stages and their live rule counts."
+            "Read-only for now. Editing (add / edit / delete / reorder), the "
+            "Edit/Evaluate editor card, and categorical impact land in a later PR."
+        }
+    }
+}
+
+/// Render the rule rows as a simple table. Column headers come straight
+/// from the DB column names; NULL cells render as a dim dash.
+fn render_rule_table(headers: &[&str], rows: &[rules::DisplayRow]) -> Markup {
+    html! {
+        table.rule-table {
+            thead {
+                tr {
+                    @for h in headers {
+                        th { (h) }
+                    }
+                }
+            }
+            tbody {
+                @for row in rows {
+                    tr {
+                        @for cell in row {
+                            @match cell {
+                                Some(v) => td { (v) },
+                                None => td.rule-cell-null { "\u{2014}" },
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -241,9 +276,23 @@ mod tests {
 
     #[test]
     fn detail_shows_stage_name_and_count() {
-        let html = render_detail(Stage::Persons, 118).into_string();
+        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
+        pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+        let html = render_detail(&conn, Stage::Persons).into_string();
         assert!(html.contains("Persons"), "{html}");
         assert!(html.contains("118 rules"), "{html}");
+    }
+
+    #[test]
+    fn detail_renders_rule_table_with_headers_and_rows() {
+        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
+        pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+        let html = render_detail(&conn, Stage::Merchants).into_string();
+        // Column headers from the DB.
+        assert!(html.contains("rule-table"), "{html}");
+        assert!(html.contains("canonical") && html.contains("pattern"), "{html}");
+        // A known seeded merchant canonical appears as a cell.
+        assert!(html.contains("Woolworths"), "expected a merchant row: {html}");
     }
 
     #[test]
