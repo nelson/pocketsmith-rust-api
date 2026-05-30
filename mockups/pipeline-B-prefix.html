@@ -1,0 +1,481 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Mockup · Pipeline tab · Prefix stage (loop, captures, sort_order)</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* Same shell as mockup-A but a different stage selected: prefix.
+ * Differences:
+ *   - Order matters (sort_order; drag handles in the rule list).
+ *   - Rules carry capture flags (has_account, has_date, …).
+ *   - Editor exposes the capture-flag matrix.
+ *   - Tester shows what gets stripped + what gets captured per rule. */
+.pipeline-stage-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0,1fr) auto auto;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+}
+.pipeline-stage-row.selected { background: var(--bg-highlight); border-left-color: var(--accent); }
+.pipeline-stage-row .stage-no { color: var(--fg-dim); font-size: 0.7rem; text-align: center; }
+.pipeline-stage-row .stage-name { color: var(--fg); font-weight: 600; }
+.pipeline-stage-row .stage-shape { color: var(--fg-dim); font-size: 0.7rem; }
+.pipeline-stage-row .stage-count { color: var(--fg); font-variant-numeric: tabular-nums; }
+
+.detail-panel { padding: 1rem 1.25rem; overflow-y: auto; }
+.detail-panel h2 { font-size: 0.95rem; font-weight: 600; }
+.detail-panel h3 {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--fg-dim); font-weight: 500; margin: 1rem 0 0.4rem 0;
+}
+.detail-panel .sub { color: var(--fg-dim); font-size: 0.75rem; margin-bottom: 0.4rem; }
+
+.rule-list-ordered {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    max-height: 230px;
+    overflow-y: auto;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+}
+.rule-list-ordered .rule-row {
+    display: grid;
+    grid-template-columns: 18px 28px minmax(0,1fr) auto auto;
+    gap: 6px 12px;
+    align-items: center;
+    padding: 3px 8px;
+    border-bottom: 1px dashed var(--border);
+    cursor: pointer;
+}
+.rule-list-ordered .rule-row.selected { background: var(--bg-highlight); }
+.rule-list-ordered .rule-row:last-child { border-bottom: none; }
+.rule-list-ordered .drag { color: var(--fg-dark); cursor: grab; user-select: none; }
+.rule-list-ordered .ord  { color: var(--fg-dark); font-size: 0.7rem; text-align: right; font-variant-numeric: tabular-nums; }
+.rule-list-ordered .pattern { color: var(--magenta); overflow-wrap: anywhere; }
+.rule-list-ordered .flags { color: var(--cyan); font-size: 0.7rem; white-space: nowrap; }
+.rule-list-ordered .impact { color: var(--fg-dim); font-size: 0.7rem; white-space: nowrap; }
+
+.rule-editor {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 10px;
+}
+.rule-editor h2 {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.editor-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 6px 10px;
+    align-items: baseline;
+}
+.editor-grid label { color: var(--fg-dim); font-size: 0.75rem; }
+.editor-grid input[type=text],
+.editor-grid textarea,
+.editor-grid select {
+    background: var(--bg-highlight);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    width: 100%;
+}
+.editor-grid input[type=text],
+.editor-grid textarea { font-family: "SF Mono", ui-monospace, monospace; }
+.editor-grid textarea { min-height: 2.6rem; resize: vertical; }
+.editor-grid .hint { color: var(--fg-dark); font-size: 0.7rem; }
+
+.cap-flags {
+    display: flex; flex-wrap: wrap; gap: 8px 14px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+}
+.cap-flags label { color: var(--fg-dim); }
+.cap-flags input { margin-right: 4px; }
+.cap-flags label.set { color: var(--cyan); font-weight: 600; }
+
+.tester {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 14px;
+}
+.tester-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.tester-input-row label { color: var(--fg-dim); font-size: 0.75rem; min-width: 70px; }
+.tester-input-row input {
+    flex: 1; background: var(--bg-highlight); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.82rem;
+}
+
+.test-trace {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.76rem;
+    margin-top: 6px;
+}
+.test-trace .step {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px dashed var(--border);
+}
+.test-trace .step:last-child { border-bottom: none; }
+.test-trace .num { color: var(--fg-dark); text-align: right; }
+.test-trace .step.fired { background: rgba(122, 162, 247, 0.06); }
+.test-trace .step.fired .num { color: var(--accent); font-weight: 600; }
+.test-trace .before { color: var(--red); text-decoration: line-through; }
+.test-trace .arrow  { color: var(--fg-dim); }
+.test-trace .after  { color: var(--green); font-weight: 600; }
+.test-trace .feat   { color: var(--cyan); margin-left: 6px; }
+.test-trace .pat    { color: var(--magenta); margin-left: 6px; font-size: 0.7rem; }
+
+.impact-bars {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.75rem;
+    margin-top: 4px;
+}
+.impact-bars .bar {
+    background: var(--bg-highlight);
+    border-radius: 2px;
+    height: 10px;
+    align-self: center;
+    border: 1px solid var(--border);
+    position: relative;
+}
+.impact-bars .bar > span {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: var(--accent); border-radius: 2px;
+}
+.impact-bars .bar > span.added   { background: var(--green); }
+.impact-bars .bar-label { color: var(--fg-dim); white-space: nowrap; }
+
+.impact-samples {
+    list-style: none; padding: 0; margin: 8px 0 0 0;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.74rem;
+}
+.impact-samples li {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 6px;
+    padding: 1px 6px;
+    border-bottom: 1px dashed var(--border);
+    color: var(--fg-dim);
+}
+.impact-samples li:last-child { border-bottom: none; }
+.impact-samples .feat { color: var(--cyan); }
+.impact-samples .acct { color: var(--fg-dark); font-size: 0.7rem; }
+
+.btn-add { color: var(--green); border-color: var(--green); }
+.btn-delete { color: var(--red); border-color: var(--red); }
+
+.search-box {
+    background: var(--bg-highlight);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.78rem;
+    width: 100%;
+    margin-top: 0.4rem;
+    font-family: "SF Mono", ui-monospace, monospace;
+}
+.note-card {
+    color: var(--fg-dim); font-size: 0.75rem;
+    background: var(--bg-highlight); border-radius: 4px;
+    padding: 6px 10px; margin-top: 8px;
+}
+</style>
+</head><body>
+<div class="mock-banner">
+  <span><strong>Mockup · Pipeline tab</strong> · prefix stage selected (loop, captures, sort_order).
+  Differences from merchants: rule list is ordered (drag handles), editor exposes capture-flag matrix,
+  tester shows what gets stripped + captured at each step.</span>
+  <a href="../mockups/index.html">← back</a>
+</div>
+
+<nav class="tab-bar">
+  <a class="tab" href="#">Dashboard</a>
+  <a class="tab" href="#">Transactions</a>
+  <a class="tab" href="#">Transfers</a>
+  <a class="tab" href="#">Normalise</a>
+  <span class="tab active">Pipeline</span>
+</nav>
+
+<div class="layout">
+
+  <!-- ============== Stages queue ============== -->
+  <div class="queue-panel">
+    <div class="queue-header">
+      <h2>Pipeline stages</h2>
+      <div class="sub" style="font-size:0.7rem;color:var(--fg-dim);line-height:1.3">
+        Each stage in execution order. Click to inspect / edit its rules.
+      </div>
+    </div>
+    <div class="queue-list">
+      <div class="pipeline-stage-row selected">
+        <span class="stage-no">1</span>
+        <span><span class="stage-name">prefix</span><br><span class="stage-shape">regex · captures · sort_order</span></span>
+        <span class="stage-shape">loop</span>
+        <span class="stage-count">42</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">2</span>
+        <span><span class="stage-name">suffix</span><br><span class="stage-shape">regex · captures · sort_order</span></span>
+        <span class="stage-shape">loop</span>
+        <span class="stage-count">37</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">3</span>
+        <span><span class="stage-name">expand</span><br><span class="stage-shape">regex → literal · sort_order</span></span>
+        <span class="stage-shape">loop</span>
+        <span class="stage-count">102</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">4</span>
+        <span><span class="stage-name">persons</span><br><span class="stage-shape">literal substring · alphabetical</span></span>
+        <span class="stage-shape">first match</span>
+        <span class="stage-count">82</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">5</span>
+        <span><span class="stage-name">employers</span><br><span class="stage-shape">regex · alphabetical</span></span>
+        <span class="stage-shape">first match</span>
+        <span class="stage-count">4</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">6</span>
+        <span><span class="stage-name">merchants</span><br><span class="stage-shape">regex · alphabetical</span></span>
+        <span class="stage-shape">first match</span>
+        <span class="stage-count">146</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">7</span>
+        <span><span class="stage-name">banking_ops</span><br><span class="stage-shape">regex · grouped by op</span></span>
+        <span class="stage-shape">first match</span>
+        <span class="stage-count">10 ops · 38 patterns</span>
+      </div>
+      <div class="pipeline-stage-row">
+        <span class="stage-no">—</span>
+        <span><span class="stage-name">locations</span><br><span class="stage-shape">literal list (used by suffix)</span></span>
+        <span class="stage-shape">aux</span>
+        <span class="stage-count">91</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== Stage detail ============== -->
+  <div class="detail-panel">
+    <div class="detail-header">
+      <h2>prefix <span style="color:var(--fg-dim);font-weight:400;font-size:0.85rem">· 42 rules · loop / first match per iteration · order matters</span></h2>
+      <div class="sub">
+        Strips metadata prefixes from raw payees in a loop until no rule matches. Each rule may
+        attach features (gateway / operation / account / date) when its named captures fire.
+        Rules are ordered: an earlier match wins per iteration. Drag to reorder; new rules
+        append.
+      </div>
+      <input class="search-box" placeholder="filter by pattern or capture (try: account, BEEM)">
+    </div>
+
+    <h3>Rules <span style="color:var(--fg-dark);font-weight:400">· showing 6 of 42 in pipeline order</span></h3>
+    <div class="rule-list-ordered">
+      <div class="rule-row">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">11</span>
+        <span class="pattern">^(?i)Direct Debit (?:XX)?(?P&lt;account&gt;\d+)\s+</span>
+        <span class="flags">+operation +account</span>
+        <span class="impact">93 hits</span>
+      </div>
+      <div class="rule-row selected">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">12</span>
+        <span class="pattern">^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P&lt;account&gt;\d+)\s+</span>
+        <span class="flags">+operation +account</span>
+        <span class="impact">21 hits</span>
+      </div>
+      <div class="rule-row">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">13</span>
+        <span class="pattern">^ALI\*</span>
+        <span class="flags">+gateway</span>
+        <span class="impact">7 hits</span>
+      </div>
+      <div class="rule-row">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">14</span>
+        <span class="pattern">^Alipay\s</span>
+        <span class="flags">+gateway</span>
+        <span class="impact">3 hits</span>
+      </div>
+      <div class="rule-row">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">15</span>
+        <span class="pattern">^(?i)BEEM IT$</span>
+        <span class="flags">+gateway +operation</span>
+        <span class="impact">14 hits</span>
+      </div>
+      <div class="rule-row">
+        <span class="drag">⋮⋮</span>
+        <span class="ord">16</span>
+        <span class="pattern">^(?i)BEEM IT\b\s*-?\s*</span>
+        <span class="flags">+gateway</span>
+        <span class="impact">8 hits</span>
+      </div>
+    </div>
+
+    <button class="btn btn-add" style="margin-top:8px;">+ Add rule</button>
+
+    <!-- ===== Focused rule editor ===== -->
+    <div class="rule-editor">
+      <h2>Edit rule #12
+        <span class="actions" style="margin:0">
+          <button class="btn btn-confirm">[Y] Save</button>
+          <button class="btn">[N] Cancel</button>
+          <button class="btn btn-delete">Delete</button>
+        </span>
+      </h2>
+      <div class="editor-grid">
+        <label for="r-pat">Pattern</label>
+        <input id="r-pat" type="text" value="^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P<account>\d+)\s+">
+
+        <label for="r-gw">Gateway</label>
+        <input id="r-gw" type="text" value="" placeholder="(none)">
+
+        <label for="r-op">Operation</label>
+        <select id="r-op">
+          <option>(none)</option>
+          <option>Direct Debit</option>
+          <option selected>Direct Credit</option>
+          <option>BPay</option>
+          <option>Transfer</option>
+          <option>Fee</option>
+          <option>Interest</option>
+          <option>Refund</option>
+          <option>Cash</option>
+          <option>Deposit</option>
+          <option>Withdrawal</option>
+          <option>Internal Transfer</option>
+          <option>Account Servicing</option>
+          <option>Loan</option>
+          <option>Credit Card</option>
+          <option>Purchase</option>
+        </select>
+
+        <label>Captures</label>
+        <div class="cap-flags">
+          <label class="set"><input type="checkbox" checked> has_account</label>
+          <label><input type="checkbox"> has_date</label>
+          <span class="hint" style="flex-basis:100%">
+            Tick a flag to use the named capture group of the same name (e.g.
+            <code style="color:var(--magenta)">(?P&lt;account&gt;\d+)</code>) and store the captured
+            value in the corresponding feature.
+          </span>
+        </div>
+
+        <label for="r-ord">Pipeline order</label>
+        <input id="r-ord" type="text" value="12" style="max-width:80px">
+
+        <label for="r-note">Note</label>
+        <textarea id="r-note">Centrelink pensions and similar gov direct credits. The optional PENSION literal lets the same rule cover both the bare “Direct Credit XX1234 …” and “Direct Credit PENSION XX1234 …” shapes.</textarea>
+      </div>
+    </div>
+
+    <!-- ===== Tester ===== -->
+    <div class="tester">
+      <h3 style="margin-top:0">Test against a raw payee</h3>
+      <div class="sub">
+        Runs the full prefix loop using the edited rule set against the input.
+        Highlights the iteration where this rule fires.
+      </div>
+
+      <div class="tester-input-row">
+        <label for="t-string">Raw payee</label>
+        <input id="t-string" type="text" value="Direct Credit PENSION XX12345 Centrelink Pension">
+      </div>
+
+      <div class="test-trace">
+        <div class="step">
+          <span class="num">0</span>
+          <span><span style="color:var(--fg-dim)">start</span> · <span class="before">Direct Credit PENSION XX12345 Centrelink Pension</span></span>
+        </div>
+        <div class="step fired">
+          <span class="num">1</span>
+          <span>
+            rule #12 fired
+            <span class="pat">^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P&lt;account&gt;\d+)\s+</span>
+            <br>
+            <span class="before">Direct Credit PENSION XX12345 Centrelink Pension</span>
+            <span class="arrow"> → </span>
+            <span class="after">Centrelink Pension</span>
+            <span class="feat">+operation (Direct Credit)</span>
+            <span class="feat">+account (12345)</span>
+          </span>
+        </div>
+        <div class="step">
+          <span class="num">2</span>
+          <span>no rule matches · loop terminates · final → <span class="after">Centrelink Pension</span></span>
+        </div>
+      </div>
+
+      <h3>Impact across the database</h3>
+      <div class="impact-bars">
+        <span class="bar"><span style="width:5.0%"></span></span>
+        <span class="bar-label">21 of 423 raw payees match this rule today</span>
+        <span class="bar"><span class="added" style="width:0.5%"></span></span>
+        <span class="bar-label">+2 newly matched (the optional PENSION literal you just added)</span>
+      </div>
+
+      <ul class="impact-samples">
+        <li>
+          Direct Credit PENSION XX12345 Centrelink Pension
+          <span class="feat">→ Centrelink Pension · +account (12345)</span>
+        </li>
+        <li>
+          Direct Credit XX67890 PAYE TAX REFUND
+          <span class="feat">→ PAYE TAX REFUND · +account (67890)</span>
+        </li>
+        <li class="add" style="color:var(--green); background:rgba(158,206,106,0.06)">
+          <span><span style="color:var(--fg-dark)">+</span> Direct Credit PENSION XX55555 Veterans Affairs</span>
+          <span class="feat">→ Veterans Affairs · +account (55555) <span class="acct">(was unmatched before)</span></span>
+        </li>
+        <li style="color:var(--fg-dark);font-style:italic;text-align:center">… 18 more matches not shown</li>
+      </ul>
+
+      <div class="note-card">
+        <strong>Heads up.</strong> The prefix loop runs iteratively, so this rule's “after” string still
+        gets fed back through every other prefix rule before the loop exits. Reordering this rule
+        rarely changes behaviour for this stage; capture flags do.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="activity-panel">
+  <div class="activity-header">
+    <span class="stat">Recent rule changes ·
+      <a href="#" style="color:var(--accent)">re-scan now ↻</a>
+      <span style="color:var(--fg-dim);font-size:0.75rem">(would re-stage 5 payees)</span>
+    </span>
+    <span class="stat">All edits auto-export to <code style="color:var(--magenta)">src/rules/prefix.sql</code> on serve close.</span>
+  </div>
+  <div style="font-family:'SF Mono', monospace; font-size:0.75rem; padding:0.4rem 0">
+    <div>~ edited rule #12 pattern · added optional PENSION literal · 1m ago</div>
+    <div>+ added rule #42 <code style="color:var(--magenta)">^WPP\*</code> +gateway · 2h ago</div>
+  </div>
+</div>
+</body></html>
