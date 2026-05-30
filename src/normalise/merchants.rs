@@ -205,6 +205,18 @@ const MERCHANTS: &[Merchant] = &[
     Merchant { pattern: r"(?i)YAKITORI JIN", canonical: "Yakitori Jin" },
 ];
 
+/// Owned seed rows for `rule_merchants` (one per pattern), in
+/// declaration order (alphabetical by canonical, specific-first).
+pub(crate) fn seed_rows() -> Vec<crate::rules::seed::MerchantSeed> {
+    MERCHANTS
+        .iter()
+        .map(|m| crate::rules::seed::MerchantSeed {
+            pattern: m.pattern.to_string(),
+            canonical: m.canonical.to_string(),
+        })
+        .collect()
+}
+
 fn compiled_merchants() -> &'static [CompiledMerchant] {
     static COMPILED: OnceLock<Vec<CompiledMerchant>> = OnceLock::new();
     COMPILED.get_or_init(|| {

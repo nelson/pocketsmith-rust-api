@@ -146,6 +146,24 @@ const SUFFIXES: &[Suffix] = &[
     Suffix { pattern: r"\s+\d{7,}$", ..DEFAULT },
 ];
 
+/// Owned seed rows for `rule_suffixes`, in declaration order.
+pub(crate) fn seed_rows() -> Vec<crate::rules::seed::SuffixSeed> {
+    SUFFIXES
+        .iter()
+        .map(|s| crate::rules::seed::SuffixSeed {
+            pattern: s.pattern.to_string(),
+            gateway: s.gateway.map(|x| x.to_string()),
+            operation: s.operation.map(|o| o.display_name().to_string()),
+            institution: s.institution.map(|x| x.to_string()),
+            has_account: s.has_account,
+            has_date: s.has_date,
+            has_location: s.has_location,
+            has_currency_code: s.has_currency_code,
+            has_amount: s.has_amount,
+        })
+        .collect()
+}
+
 fn parse_amount_cents(s: &str) -> Option<u32> {
     s.replace('.', "").parse().ok()
 }
