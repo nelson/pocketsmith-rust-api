@@ -18,6 +18,7 @@ use rusqlite::Connection;
 
 use super::prefix::CompiledPrefix;
 use super::suffix::CompiledSuffix;
+use super::expand::CompiledExpansion;
 use crate::rules::Stage;
 
 /// Process-lifetime cache of compiled rules, keyed by stage.
@@ -30,6 +31,7 @@ use crate::rules::Stage;
 pub struct RuleCache {
     prefixes: RwLock<Option<Arc<Vec<CompiledPrefix>>>>,
     suffixes: RwLock<Option<Arc<Vec<CompiledSuffix>>>>,
+    expansions: RwLock<Option<Arc<Vec<CompiledExpansion>>>>,
 }
 
 impl RuleCache {
@@ -58,6 +60,16 @@ impl RuleCache {
         Ok(arc)
     }
 
+    /// Compiled expansion rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn expansions(&self, conn: &Connection) -> Result<Arc<Vec<CompiledExpansion>>> {
+        if let Some(arc) = self.expansions.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::expand::load_compiled(conn)?);
+        *self.expansions.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
     /// Drop the cached compilation for one stage so the next read
     /// recompiles it from the (just-edited) DB rows. No-op for stages
     /// not yet converted to read from the DB.
@@ -65,8 +77,8 @@ impl RuleCache {
         match stage {
             Stage::Prefixes => *self.prefixes.write().unwrap() = None,
             Stage::Suffixes => *self.suffixes.write().unwrap() = None,
-            Stage::Expansions
-            | Stage::Persons
+            Stage::Expansions => *self.expansions.write().unwrap() = None,
+            Stage::Persons
             | Stage::Employers
             | Stage::Merchants
             | Stage::BankingOps
@@ -132,6 +144,91 @@ mod tests {
         for stage in Stage::all() {
             cache.invalidate(stage); // must not panic
         }
+    }
+
+    /// E2E editability contract (the automated form of the manual UAT):
+    /// a live rule edit changes pipeline output, but **only after the
+    /// affected stage's cache slot is invalidated**. Within one process and
+    /// one warm [`RuleCache`] it drives the full read → compile → cache →
+    /// edit → invalidate → recompile path that the 4b editor will use.
+    ///
+    /// Hermetic: defines its own `rule_expansions` row, independent of the
+    /// production seed content. Uses a nonsense token so no downstream
+    /// (still-const) stage rewrites the result.
+    #[test]
+    fn editing_a_rule_takes_effect_only_after_invalidate() {
+        let conn = crate::db::initialize_in_memory().unwrap(); // schema only
+        conn.execute(
+            "INSERT INTO rule_expansions (pattern, canonical, sort_order) VALUES ('ZQX', 'FIRST', 0)",
+            [],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+
+        // First read compiles + caches 'ZQX' -> 'FIRST'.
+        let mut a = crate::normalise::NormalisationResult::new("ZQX SHOP");
+        crate::normalise::expand::apply_with_db(&mut a, &ctx);
+        assert_eq!(a.normalised, "FIRST SHOP", "DB rule must drive the expansion");
+
+        // Edit the rule in the DB underneath the warm cache.
+        conn.execute(
+            "UPDATE rule_expansions SET canonical = 'SECOND' WHERE pattern = 'ZQX'",
+            [],
+        )
+        .unwrap();
+
+        // Until invalidated, the cache must keep serving the pre-edit rule
+        // (otherwise the assertion below would be vacuous).
+        let mut b = crate::normalise::NormalisationResult::new("ZQX SHOP");
+        crate::normalise::expand::apply_with_db(&mut b, &ctx);
+        assert_eq!(
+            b.normalised, "FIRST SHOP",
+            "warm cache must serve the pre-edit rule until its stage is invalidated"
+        );
+
+        // Invalidating only this stage forces the next read to recompile
+        // from the edited rows.
+        cache.invalidate(Stage::Expansions);
+        let mut c = crate::normalise::NormalisationResult::new("ZQX SHOP");
+        crate::normalise::expand::apply_with_db(&mut c, &ctx);
+        assert_eq!(
+            c.normalised, "SECOND SHOP",
+            "after invalidate the edited rule must take effect"
+        );
+    }
+
+    /// Invalidating one stage must not drop another stage's cached
+    /// compilation. Guards against a too-broad `invalidate` match arm.
+    #[test]
+    fn invalidate_is_scoped_to_one_stage() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_expansions (pattern, canonical, sort_order) VALUES ('ZQX', 'FIRST', 0)",
+            [],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+
+        let mut a = crate::normalise::NormalisationResult::new("ZQX SHOP");
+        crate::normalise::expand::apply_with_db(&mut a, &ctx); // warm the expansions slot
+        assert_eq!(a.normalised, "FIRST SHOP");
+
+        conn.execute(
+            "UPDATE rule_expansions SET canonical = 'SECOND' WHERE pattern = 'ZQX'",
+            [],
+        )
+        .unwrap();
+
+        // Invalidating an unrelated stage must leave the expansions slot warm.
+        cache.invalidate(Stage::Prefixes);
+        let mut b = crate::normalise::NormalisationResult::new("ZQX SHOP");
+        crate::normalise::expand::apply_with_db(&mut b, &ctx);
+        assert_eq!(
+            b.normalised, "FIRST SHOP",
+            "invalidating another stage must not evict the expansions cache"
+        );
     }
 
     #[test]

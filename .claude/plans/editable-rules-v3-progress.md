@@ -169,6 +169,9 @@ correctness may depend on their specific content.**
   equals the constants. **Retire them once all stages are converted, and
   necessarily before 4b editing lands** (an edited rule makes const ≠ DB,
   which would fail the fidelity test). Tracked as a cleanup task.
+  - **Cleanup task:** when retiring the oracle, delete the per-module
+    `db_apply_matches_const_oracle` tests (prefix, suffix, expand, …) and
+    their `EXPANSIONS`/`PREFIXES`/`SUFFIXES` `#[cfg(test)]` consts too.
 - **Pipeline example tests** (`test_normalise_woolworths_full`,
   `…_comminsure`, `…_bpay`) assert specific outputs for specific payees,
   i.e. they depend on the current merchant/banking/expand rule content.
