@@ -1,10 +1,16 @@
 # Plan: Editable normalisation rules (v3)
 
 > Branch: `feature/editable-rules` (to be created from `master` after this
-> plan is agreed). Supersedes [`editable-rules-v2.md`](./editable-rules-v2.md),
-> which predates several pipeline additions (persons/employers split,
-> banking_ops, TraceEntry plumbing, the matched-pattern feature).
+> plan is agreed). Supersedes [`editable-rules-v2.md`](./editable-rules-v2.md).
 > Status: **plan only — code starts after sign-off.**
+>
+> Mockups for the new Pipeline tab: [`pipeline-A-merchants.html`](../../mockups/pipeline-A-merchants.html),
+> [`pipeline-B-prefix.html`](../../mockups/pipeline-B-prefix.html).
+>
+> v2 → v3 → v3 (this revision) deltas: see commit history of this file.
+> The biggest shape change in this revision is that all 8 stages get
+> first-class UI in v3 (no more Tier A / Tier B split), housed on a new
+> top-level **Pipeline** tab rather than tucked into Normalise.
 
 ## 1. Trigger and goal
 
@@ -14,28 +20,28 @@ without re-building. Specifically: "let me add normalisation rules,
 merchant, and person names dynamically".
 
 **Goal:** every dictionary that today lives as `const …: &[…] = &[…]`
-in `src/normalise/` becomes a row set in SQLite, editable from the
-Normalise tab. The compiled pipeline keeps doing what it does today;
+in `src/normalise/` becomes a row set in SQLite, editable from a new
+Pipeline tab. The compiled pipeline keeps doing what it does today;
 only the source of its tables changes.
 
-**Non-goal:** scripted/expressive rules (Option D from the old v1
-plan). Rules stay declarative: a pattern, a few flags, a few captures.
-A persisted rule is the same shape as a `const Prefix {…}` today.
+**Non-goal:** scripted/expressive rules. Rules stay declarative: a
+pattern, a few flags, a few captures. A persisted rule is the same
+shape as a `const Prefix {…}` today.
 
 ## 2. What's actually in code today
 
 Eight pipeline stages, in this order ([`src/normalise/mod.rs`](../../src/normalise/mod.rs)):
 
-| # | Stage          | Shape                                          | Count |
-|---|----------------|------------------------------------------------|------:|
-| 1 | `prefix`       | regex + optional gateway/operation + captures  |   42  |
-| 2 | `suffix`       | regex + optional gateway/operation/institution + captures | 37 |
-| 3 | `expand`       | regex → canonical (literal string substitution)|  102  |
-| 4 | `persons`      | canonical + list of literal patterns           |   82  |
-| 5 | `employers`    | canonical + list of regex patterns             |    4  |
-| 6 | `merchants`    | regex → canonical, sets class=Merchant         |  146  |
-| 7 | `banking_ops`  | regex + operation + optional account capture   |   10 (×N patterns each) |
-| 8 | empty-fallback | code, not data                                 |    — |
+| # | Stage          | Shape                                          | Count | Order  |
+|---|----------------|------------------------------------------------|------:|--------|
+| 1 | `prefix`       | regex + optional gateway/operation + captures  |    42 | matters (loop, first-match-per-iter) |
+| 2 | `suffix`       | regex + optional gateway/operation/institution + captures | 37 | matters (loop, first-match-per-iter) |
+| 3 | `expand`       | regex → canonical (literal substitution)       |   102 | matters (loop, first-match-per-iter) |
+| 4 | `persons`      | canonical + literal-substring patterns         |    82 | doesn't matter (alphabetical UI) |
+| 5 | `employers`    | canonical + regex patterns                     |     4 | doesn't matter (alphabetical UI) |
+| 6 | `merchants`    | regex → canonical, sets `class=Merchant`       |   146 | doesn't matter (alphabetical UI) |
+| 7 | `banking_ops`  | regex + operation + optional account capture   |    10 ops × 38 patterns | doesn't matter (grouped by op) |
+| — | `locations`    | literal list, used by `suffix`                 |    91 | n/a |
 
 All eight are pure functions today: `fn apply(&mut NormalisationResult)`.
 The `merchants` / `banking_ops` / `persons` / `employers` stages also
@@ -45,111 +51,199 @@ Three more pieces matter:
 
 - **`run_traced`** in `mod.rs` is the only place that calls a stage. It
   already takes `fn(&mut NormalisationResult)`, snapshots before/after,
-  and appends a `TraceEntry`. The DB transition lets us keep the same
+  and appends a `TraceEntry`. The DB transition keeps the same
   signature.
-- **`scan::scan(conn)`** in `scan.rs` is the entry point that walks
-  every distinct `original_payee` in `transactions` and writes
-  proposals into `payee_normalisations`. This is what `cargo run --bin
-  normalise` calls. We will reuse it verbatim — the change is purely
+- **`scan::scan(conn)`** in `scan.rs` walks every distinct
+  `original_payee` in `transactions` and writes proposals into
+  `payee_normalisations`. We reuse it verbatim; the change is purely
   inside the per-payee `normalise()` call.
 - **`payee_normalisations`** (already a DB table) is the staging buffer
   for proposals. It's the existing data-driven layer. Editable rules
-  just push the *source* of those proposals into the DB too.
+  push the *source* of those proposals into the DB too.
 
 ## 3. Scope of v3
 
-We split the dictionaries into two tiers:
+**Every stage is editable from the UI.** The previous Tier A / Tier B
+split is dropped. Stages do still differ in how their detail panels
+look (capture flags, sort-order semantics), but the framework is one
+piece of code parameterised over the stage's schema.
 
-> Comment: tiers A and B work hand in hand. Some normalisations only make sense if cleaning was
-> done beforehand, so we will need both implemented for it to be useful. So please build it in the
-> following order: prefix+suffix, expand, persons+merchants+employers, locations, banking_ops
+### Build order — by stage, not by tier
 
-### Tier A — first-class editable from the UI
+The user's constraint: "tiers A and B work hand in hand. Some
+normalisations only make sense if cleaning was done beforehand". So we
+build in the order data flows through the pipeline. Each stage is its
+own PR.
 
-The three dictionaries the user named:
+1. **Schema + seed-loader infrastructure** (no stage converted yet)
+2. **`prefix`** + **`suffix`** (paired — they share the loop shape and
+   the capture-flag matrix)
+3. **`expand`**
+4. **`persons`** + **`employers`** + **`merchants`** (the three
+   first-match-wins entity-extraction stages — share the same UI)
+5. **`locations`** (small, plain literal list)
+6. **`banking_ops`** (last because the others feed into it)
 
-1. **`persons`** — list of `(canonical, pattern)` literal-substring rows.
-2. **`merchants`** — list of `(canonical, regex_pattern)` rows.
-3. **`employers`** — list of `(canonical, regex_pattern)` rows.
+This means we get something usable end-to-end after step 2 (you can
+fix prefix/suffix bugs without re-building), and the most valuable
+edits — adding merchants/persons — are unblocked at step 4.
 
-These are the highest-value because (a) they're add-only — most edits
-are "I keep seeing CAFE FOO, please call it Cafe Foo", and (b) their
-shape is trivial: a name and a pattern.
+### Out of scope
 
-### Tier B — moved to DB but only seeded; UI editing deferred
+- **`payee_overrides`** and the **promote-override nudge** — both cut
+  per user comment. The Y/N/S workflow on `payee_normalisations`
+  already gives per-payee control.
+- **The Review-tab "Rules" sub-pane** (from the v2 plan). The Pipeline
+  tab supersedes it.
+- **Version history on rules.** Out. The `_changes` infrastructure can
+  capture it later if we want it.
+- **Auto-re-scan on rule change.** The activity panel surfaces a
+  one-click "re-scan now" link with a count of payees that would be
+  re-staged.
 
-The other five dictionaries:
+### One small Transactions-tab fix in scope
 
-4. **`prefix`** — 42 rows. Editable in v4 (the flag/capture matrix is wider).
-5. **`suffix`** — 37 rows. Editable in v4.
-6. **`expand`** — 102 rows. Editable in v4 (literal-pair, but very dense).
-7. **`banking_ops`** — 10 ops × N patterns. Editable in v4.
-8. **`locations`** (used by `suffix`) — 91-ish suburbs. Editable in v4.
+The Transactions tab today renders "no normalisation rule" whenever
+`norm_status` is missing, which is wrong: a payee that hit a merchant
+rule but had no prefix/suffix to strip still has a non-empty pipeline
+trace. The pillar should only flag "no normalisation" when the trace
+is **completely empty** (no stage transformed the string and no
+features were extracted). Fix as a single commit before the migration
+work begins so the new UI text is honest.
 
-Tier B still moves to the DB in this branch so the seed/migration
-machinery only lands once. But the UI in v3 only exposes Tier A; Tier
-B remains "edit the seed SQL or insert directly".
+## 4. The Pipeline tab
 
-Rationale: Tier A covers 232 of 423 dictionary entries (≈ 55%) and is
-where the user actually wants to act. The non-trivial UI work (regex
-editor, capture-group help text, "test this rule" preview) is paid
-once for Tier A and reused for Tier B in v4.
+A new top-level tab — fifth in nav order. (Mockups:
+[`pipeline-A-merchants.html`](../../mockups/pipeline-A-merchants.html)
+for a single-match stage; [`pipeline-B-prefix.html`](../../mockups/pipeline-B-prefix.html)
+for the loop-with-captures shape.)
 
-> Comment: the UI currently states "no normalisation" for transactions that don't get any prefix
-> or suffix processing, but has a merchant identified. That's not quite accurate. We want to only
-> flag "no normalisation rule" if the pipeline trace is completely empty
+### 4.1 Layout
 
-### Out of scope for v3 (deferred or rejected)
+Same three-pane shell as every other tab.
 
-- **`payee_overrides`** (the per-`original_payee` escape hatch from
-  v2 plan §3.1). Skip. The user already has per-payee control via
-  `payee_normalisations.proposed_payee` and the Y/N/S workflow.
-  Override patterns are the wrong unit anyway — if you keep wanting
-  to override one specific raw string, that's evidence you want a
-  *rule*, which is what this whole branch is about.
-- **The "promote override → rule" nudge** (v2 plan §3.5). Falls out
-  with payee_overrides.
-- **The Review-tab "Rules" sub-pane** (v2 plan §3.4). The Review tab
-  itself isn't built yet. v3 puts the rule UI on the **Normalise** tab
-  (which already has the Y/N/S workflow over per-payee proposals), as
-  a new sub-mode reachable from the active row.
-- **Version history on rules.** Out. Adds schema overhead with no
-  immediate payoff; the `_changes` infrastructure can capture it
-  later if we want.
-- **Auto-re-scan on rule change.** Not automatic. After adding a rule
-  the user clicks a "re-scan" button (or runs `cargo run --bin
-  normalise`). v3 doesn't try to invalidate-and-rebuild on every edit
-  — too easy to make the UI feel laggy. The button is fast (≈ 100ms
-  on the current ~2000-payee DB).
+- **Queue** = one row per pipeline stage in execution order. Each row
+  shows the stage number, name, shape (loop / first-match), and
+  current rule count. Clicking selects the stage; arrow keys
+  navigate.
+- **Detail** = the rule editor for the selected stage (described
+  below).
+- **Activity** = the recent rule-change log for this stage + a
+  "re-scan now" link with the count of payees whose proposal would
+  change.
 
-> Comment: Delete payee_overrides, promote override from the plan.
-> Furthermore, v3 rule UI should not be done in the Normalise tab. It should be a new tab called
-> "Pipeline". The queue will now have one entry for each stage of the normalisation pipeline,
-> organised in chronological order. Clicking the queue item will bring up the detail panel for
-> that pipeline stage. The detail panel is where patterns can be added, deleted, and modified.
-> Provide mockups for this pipeline tab. I'm interested in the details panel. Should it simply
-> show a list of regex patterns, or should it be more interactive - showing the impact of each
-> modified pattern in real time. What's the best way to visualise this?  It would start with a
-> regex tester, but also should show how many transactions it would impact, what the impact looks
-> like, and whether there are any conflicting / overlapping patterns
+Tab order in nav: Dashboard / Transactions / Transfers / Normalise /
+**Pipeline**. The Normalise tab keeps its current job — per-payee
+proposal review with Y/N/S — and stays simple. No rule-editing UI on
+Normalise.
 
-## 4. Schema
+### 4.2 The detail panel: anatomy
 
-Five tables, all with the same `_changes` / `with_operation` discipline
-the rest of the schema uses. Timestamps are SQLite's
-`strftime('%Y-%m-%dT%H:%M:%fZ','now')` to match existing conventions.
+Three sections from top to bottom, all server-rendered Maud, all live
+inside `#detail`:
 
-> Comment: `note` and `sort_order` correct. Ensure note is editable. Allow Pipeline tab to modify
-> sort order for stages that have it. For person, merchants, and employers - use alphabetical
-> order
+1. **Stage header** — name, rule count, shape ("first match wins" /
+   "loop, order matters"), one-line description, and a search box.
+2. **Rule list** — the rules in the stage's natural order
+   (alphabetical for persons/employers/merchants/banking-ops, by
+   `sort_order` for prefix/suffix/expand). Click selects a rule.
+3. **Focused-rule editor** — fields for the rule's pattern, canonical,
+   capture flags (when applicable), `sort_order` (when applicable),
+   and an editable `note`. Y / N / S = save / cancel / delete.
+4. **Tester + impact preview** — described in §4.3.
+
+The choice between "list of regex patterns" and "more interactive"
+goes hard towards interactive. The mockups show:
+
+- **Regex tester.** Paste a candidate raw string, see `✓ matches → canonical: …` or `✗ misses` *as you type*. For loop-shape stages
+  (prefix/suffix/expand) the tester runs the full stage loop and
+  shows the per-iteration trace, marking the iteration where the
+  edited rule fires.
+- **Impact bars.** Three numbers, all as horizontal bars over the
+  same denominator (= count of distinct `original_payee` in the DB):
+  - **Hit count** — how many raw payees this rule's pattern matches
+    today.
+  - **+N newly matched** — payees the *edited* pattern catches that
+    the saved version doesn't.
+  - **−N no longer matched** — payees that fall through after the
+    edit.
+- **Sample matches.** First ~5 of each (kept, newly added, newly
+  removed), each with the txn count and account so the user can
+  judge "is this a real win?". Loop stages show what the rule
+  would extract as features.
+- **Conflict / overlap detection.** For first-match-wins stages, list
+  any payee the edited rule would catch that's currently caught by a
+  *different* rule in the same stage. The card explains the
+  alphabetical-order tie-break and how to resolve it (rename or
+  tighten one of the patterns). For loop stages, conflict detection
+  is omitted — multiple rules in the same iteration can compose
+  legitimately.
+
+The tester reuses `cache.merchants(conn)` (etc.) — same cache the
+production pipeline uses, just temporarily overlaid with the in-flight
+edit so the preview matches what would happen on save. Implementation:
+build a one-shot `RuleSet` value that the regex compiler can take, run
+it against the cached set of distinct `original_payee` strings, return
+the diff. ≈ 100 ms for a 423-payee × ~150-rule stage on the dev
+machine.
+
+### 4.3 What "conflict" means precisely
+
+- **First-match-wins stages.** Two rules conflict when they both match
+  some `original_payee`. The earlier-sorted rule wins. Surface the
+  conflicting payees and the winning rule's name.
+- **Loop stages.** No conflict concept. Reorder freely; the loop runs
+  to fixed point either way for most realistic edits. The mockup
+  surfaces a "heads up" note instead of a conflict card.
+- **Cross-stage** conflicts (e.g. a person-stage rule shadowing a
+  merchant-stage rule) are not surfaced. The pipeline order is fixed
+  and the reviewer can see in the trace which stage caught a payee.
+
+### 4.4 The "no rule matched" affordance from Normalise / Transactions
+
+When the user is on a Transactions or Normalise detail panel and the
+active row's pipeline trace shows no entity_name was extracted, the
+detail panel shows a single button:
+
+```
+[ + Add rule for this payee ]
+```
+
+No three-button picker; no modal. Clicking it navigates to the
+Pipeline tab with the appropriate stage pre-selected and the rule
+editor pre-filled. The stage is auto-chosen by these heuristics, in
+order:
+
+1. If the post-pipeline string is a single recognisable name
+   (alphabetic-only, ≤ 4 words), default to **persons**.
+2. Else if it contains common merchant-y tokens (`PTY`, `LTD`, `INC`,
+   `LLC`, all-caps short tokens, digits) — default to **merchants**.
+3. Else default to **merchants** anyway.
+
+The user can change the stage in the editor before saving (a small
+stage selector at the top of the rule-editor card) — the heuristic is
+a starting point, not a lock-in. This keeps the affordance "one
+button" without forcing the wrong stage.
+
+If the heuristic is contentious, an alternative is a single
+`[+ Add rule]` button with a stage selector in the URL fragment
+(`/pipeline/?stage=merchants&prefill=AMAZON+MARKETPLACE`); same
+single-button feel, lets the user override before any DB write
+happens.
+
+## 5. Schema
+
+Eight tables. All have `note TEXT`, `created_at`, `updated_at`. Stages
+where order matters add `sort_order INTEGER NOT NULL`. `sort_order` is
+editable from the UI for those stages.
 
 ```sql
--- Tier A
+-- ===== entity-extraction (alphabetical, order doesn't matter) =====
 CREATE TABLE rule_persons (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     canonical   TEXT NOT NULL,
     pattern     TEXT NOT NULL,              -- literal substring (case-insensitive)
-    note        TEXT,                       -- optional human note
+    note        TEXT,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     UNIQUE (canonical, pattern)
@@ -175,15 +269,16 @@ CREATE TABLE rule_employers (
     UNIQUE (pattern)
 );
 
--- Tier B (seeded only; no UI in v3)
+-- ===== loop stages (sort_order matters) =====
 CREATE TABLE rule_prefixes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     pattern     TEXT NOT NULL UNIQUE,       -- regex source
-    gateway     TEXT,                       -- optional
-    operation   TEXT,                       -- one of BankingOperation::display_name() or NULL
-    has_account INTEGER NOT NULL DEFAULT 0, -- 0/1
+    gateway     TEXT,
+    operation   TEXT,                       -- BankingOperation::display_name() or NULL
+    has_account INTEGER NOT NULL DEFAULT 0,
     has_date    INTEGER NOT NULL DEFAULT 0,
-    sort_order  INTEGER NOT NULL,           -- preserves the existing in-code order
+    note        TEXT,
+    sort_order  INTEGER NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -199,6 +294,7 @@ CREATE TABLE rule_suffixes (
     has_location      INTEGER NOT NULL DEFAULT 0,
     has_currency_code INTEGER NOT NULL DEFAULT 0,
     has_amount        INTEGER NOT NULL DEFAULT 0,
+    note              TEXT,
     sort_order        INTEGER NOT NULL,
     created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -207,103 +303,161 @@ CREATE TABLE rule_suffixes (
 CREATE TABLE rule_expansions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     pattern     TEXT NOT NULL UNIQUE,       -- regex source
-    canonical   TEXT NOT NULL,              -- literal replacement
+    canonical   TEXT NOT NULL,
+    note        TEXT,
     sort_order  INTEGER NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- ===== first-match-wins, grouped by op =====
 CREATE TABLE rule_banking_ops (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     operation   TEXT NOT NULL,              -- BankingOperation::display_name()
     pattern     TEXT NOT NULL,              -- regex source
     has_account INTEGER NOT NULL DEFAULT 0,
-    sort_order  INTEGER NOT NULL,
+    note        TEXT,
+    sort_order  INTEGER NOT NULL,           -- preserves "patterns within an op" order
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     UNIQUE (operation, pattern)
 );
 
+-- ===== aux =====
 CREATE TABLE rule_locations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    location    TEXT NOT NULL UNIQUE,       -- e.g. "NORTH STRATHFIELD"
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    location    TEXT NOT NULL UNIQUE,       -- "NORTH STRATHFIELD"
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 ```
 
 Notes:
 
-- `sort_order` lets the seeded data preserve the existing in-code order
-  exactly. New rows the UI inserts get `MAX(sort_order)+1`, which puts
-  them at the end. Order matters for `prefix`/`suffix`/`expand` where
-  multiple patterns can match and "first wins".
-- `persons` / `merchants` / `employers` order is **not** semantically
-  meaningful — the existing code iterates and "first match wins" but
-  the rules don't overlap, so we sort by `canonical` in the UI for
-  scanability.
-- Every table has `(created_at, updated_at)` so the UI can show "added
-  3 days ago" / "edited yesterday" without a separate audit table.
+- `note` is editable from the UI for all stages.
+- `sort_order` is editable for prefix / suffix / expand / banking_ops.
+  Insertion appends with `MAX(sort_order)+1`; explicit edits update.
+- For persons / merchants / employers, the UI shows alphabetical
+  order. The underlying iteration order is still "first-match wins
+  in the order returned by the SELECT", so the SQL is
+  `ORDER BY canonical COLLATE NOCASE, id`. New rules slot in
+  alphabetically; the user is not asked to think about iteration
+  order.
+- No `_changes` audit table. Mutations write through `with_operation`
+  with a fresh `reason` ("rule-edit"); the row history rolls up via
+  `updated_at` for the UI's "edited 3d ago" stamp.
 
-## 5. Loading + caching
+## 6. The `rules` module — file-system canonical store
 
-Compile-time pattern cost today is "compile once via `OnceLock`,
-amortise across the whole process lifetime". We can't quite do that
-post-migration (rules change while the server runs), but the cost we
-actually want is:
+User raised: "We need the serialised set because the database may be
+blown away from time to time, but we don't ever want to lose the
+rules. The canonical rules will be written to
+`src/rules/[pipeline-stage].sql`."
 
-- One `SELECT` per stage per pipeline-run is fine (cheap).
-- Re-compiling 100+ regexes on every transaction is not (≈ 1 ms
-  per regex × 423 rules × 2000 payees = 14 minutes).
+**Verdict: yes, do it. It's the right size for what's needed.**
+Argument:
 
-So: **lazy + invalidatable cache** keyed on a generation counter.
+- Without it, the rule store is "the SQLite file on this machine",
+  which is exactly the failure mode the user named.
+- A SQL file per stage is the smallest representation that's both
+  human-readable (so git diffs are reviewable) and machine-readable
+  (so the seed loader is a `conn.execute_batch(&fs::read_to_string(...))`).
+- Stage-per-file scopes diffs to "I edited merchants this week" and
+  keeps each file ≤ 200 lines today, ≤ 1000 in any plausible future.
+- Deterministic dump (sort by canonical / sort_order; pretty-print
+  with one row per line) means the on-disk diff is meaningful and
+  not just "everything moved by one byte".
+
+But I'd refine the lifecycle the user proposed. Re-dumping on serve
+*close* is fragile — process kills, panics, OOMs all skip the cleanup
+path, and rule edits silently disappear from disk. Instead:
+
+```
+on serve startup:
+    if rule tables are empty (or schema-version bumped):
+        load src/rules/*.sql into the rule tables.
+    cache.bump()
+
+on every rule mutation (create / edit / delete / reorder):
+    write to DB inside with_operation("rule-edit", …)
+    after the transaction commits:
+        re-dump *that stage's* SQL file to src/rules/<stage>.sql
+        cache.bump_for(stage)
+
+on serve shutdown:
+    nothing special — disk is already up to date.
+```
+
+This makes the SQL files the always-current canonical form,
+cheap to git-diff, and safe against ungraceful exit. The dump cost is
+trivial (one stage = one SELECT + a couple hundred `INSERT` lines, ≈
+1 ms) and runs in a background task so it doesn't block the HTTP
+response.
+
+A new module `src/rules/mod.rs` exposes:
+
+- `pub fn load_into_db(conn: &Connection) -> Result<()>` — runs once
+  on serve startup if the rule tables are empty.
+- `pub fn dump_stage(conn: &Connection, stage: Stage) -> Result<()>`
+  — fires after a mutation. Idempotent.
+- `pub fn dump_all(conn: &Connection) -> Result<()>` — for a one-shot
+  CLI binary used during the initial seed bootstrap.
+
+Schema-versioning: a `schema_version` row in `_operations` (or a new
+`_meta` k/v table) lets us re-load when the in-tree SQL files
+introduce a new column. Only triggers a load when the on-disk version
+> the DB's stored version.
+
+(One caveat: `serve` is the only writer in our deployment model. If
+the user ever runs `cargo run --bin normalise` while serve is also
+running, the SQL dump can race. We sidestep this by having the CLI
+binary read-only when it comes to rule tables: only `serve` mutates
+them.)
+
+## 7. Caching
+
+User asked: "why is the generation counter needed?".
+
+You're right — it isn't. The simpler design works:
 
 ```rust
-// In normalise::cache (new module)
 pub struct RuleCache {
-    generation: AtomicU64,
-    persons: RwLock<Option<(u64, Arc<Vec<CompiledPerson>>)>>,
-    merchants: RwLock<Option<(u64, Arc<Vec<CompiledMerchant>>)>>,
-    // … one slot per table.
+    persons:     RwLock<Option<Arc<Vec<CompiledPerson>>>>,
+    merchants:   RwLock<Option<Arc<Vec<CompiledMerchant>>>>,
+    employers:   RwLock<Option<Arc<Vec<CompiledEmployer>>>>,
+    prefixes:    RwLock<Option<Arc<Vec<CompiledPrefix>>>>,
+    suffixes:    RwLock<Option<Arc<Vec<CompiledSuffix>>>>,
+    expansions:  RwLock<Option<Arc<Vec<CompiledExpansion>>>>,
+    banking_ops: RwLock<Option<Arc<Vec<CompiledBankingOp>>>>,
+    locations:   RwLock<Option<Arc<Vec<String>>>>,
 }
 
 impl RuleCache {
     pub fn merchants(&self, conn: &Connection) -> Result<Arc<Vec<CompiledMerchant>>> {
-        // Fast path: cached + same generation as DB.
-        // Slow path: SELECT + compile + store + return.
+        // Read lock → Some(arc) → return clone of arc.
+        // None → upgrade to write lock, SELECT + compile + store.
     }
-    pub fn bump(&self) { self.generation.fetch_add(1, Ordering::SeqCst); }
-}
-```
-
-Every rule mutation (`POST /normalise/rules/...`) calls `cache.bump()`
-before responding. Reads inside `serve` go through a process-wide
-`OnceLock<RuleCache>`; CLI binaries get a fresh cache per invocation
-(which costs one extra round of compile, negligible at < 200 patterns
-per stage).
-
-The cache is intentionally *not* thread-local: `serve` is
-single-threaded today (tiny_http one-thread-per-request handler in a
-single loop), and `Arc<Vec<…>>` makes a future multi-thread switch
-free.
-
-> Comment: why is the generation counter needed? Shouldn't the cache just be regenerated on every
-> rule edit, and nothing else? We could limit the cache generation to the edited pipeline stage
-> only.
-
-## 6. Pipeline integration
-
-Each Tier A/B stage gains a sibling that takes `&Connection` and a
-`&RuleCache`:
-
-```rust
-// merchants.rs
-pub fn apply_with_db(result: &mut NormalisationResult, conn: &Connection, cache: &RuleCache) {
-    let compiled = cache.merchants(conn).expect("merchants load");
-    for cm in compiled.iter() {
-        if cm.regex.is_match(&result.normalised) { … return; }
+    pub fn invalidate(&self, stage: Stage) {
+        match stage { Stage::Merchants => *self.merchants.write() = None, … }
     }
 }
 ```
+
+Per-stage invalidation, no generation counter. A rule edit on
+merchants only invalidates `merchants`; the next read recompiles just
+that stage's regex set. No global lock-step.
+
+The original generation-counter design assumed concurrent readers and
+writers in flight, which was overkill — `serve` is single-threaded
+today and even if it weren't, an `Arc<Vec<…>>` swap is the right
+primitive, not a counter.
+
+## 8. Pipeline integration
+
+Each stage gains a sibling `apply_with_db(result, conn, cache)`. The
+pure-function `apply()` is kept temporarily as a shim so a partial
+migration compiles, but is deleted at the end of the stage's PR.
 
 `normalise()` (the public entry point) changes from:
 
@@ -317,253 +471,211 @@ to:
 pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult { … }
 ```
 
-where `PipelineCtx` bundles `&Connection + &RuleCache`. **Every call
-site in the workspace gets touched** — but it's a small set:
+`PipelineCtx` bundles `&Connection + &RuleCache`. Call sites (≈ 30,
+mostly tests) get touched.
 
-- `scan::scan` (the bulk re-scanner)
-- `transactions::views::render_active_detail` (per-row pipeline trace)
-- `transactions::views::render_detail_fragment` (same)
-- `normalise::views::render_page_shell` (active row pipeline trace)
-- All `cargo test` sites that call `normalise()` directly
+For tests, `PipelineCtx::with_seeded_in_memory()` constructs an
+in-memory DB and runs the seed. Hot tests that don't care about rules
+keep using a process-wide `OnceLock<PipelineCtx>` so they share a
+seeded DB and don't pay setup cost per test.
 
-For tests and CLI, we ship a `PipelineCtx::with_seeded_in_memory()`
-constructor that creates an in-memory DB and runs the seed. Production
-code uses `PipelineCtx::new(&conn)`. Backward-compatibility shim:
-`normalise_for_test(original: &str)` keeps the no-arg signature for
-existing test files (forwards to the seeded ctx).
+## 9. Persisting `matched_rule_id` on proposals — **deferred**
 
-This is the most invasive part of the branch. ≈ 30 call sites, but
-all mechanical.
+User pushback: "Why is this needed? What would be the consequence of
+not doing it. If possible I would like to defer to limit scope."
 
-## 7. Seed strategy
+I'm convinced. Cutting it from v3.
 
-A `bin/dump_rules.rs` binary prints the current in-code tables as
-`INSERT INTO rule_…` statements. The output is committed as
-`src/db/seed_rules.sql` and loaded by `db::initialize` exactly once
-when the corresponding table is empty (so existing DBs adopt the
-seeds, and fresh DBs start with the same rule set).
+The only thing it bought was the "edit / delete this rule" link from
+a Transactions detail panel ("the rule that gave me this payee →
+fix it"). Without `matched_rule_id`, you reach the same outcome via:
 
-The in-code constants are then **deleted** (the seed file is the
-source of truth). The dump binary stays in the repo so future
-regeneration is possible if we ever need to round-trip back to code.
+- The pipeline trace already shows which stage and which pattern
+  fired for the active row (commit `87f2ba5`).
+- Click-through from the Transactions detail to the Pipeline tab
+  could jump to the matched stage with the matched pattern
+  pre-selected (string-match the pattern in the stage's rule list).
+- "Re-apply this stage's rules to the affected payees" is just a
+  full re-scan, which already exists.
 
-Sanity check: a test loads the freshly seeded DB and runs every test
-fixture from the pre-migration test suite through the new pipeline,
-asserting bitwise-identical output. This is the fidelity gate before
-we can delete the in-code constants.
+The schema change was also genuinely confusing — each rule table has
+its own auto-increment id, so `matched_rule_id INTEGER` without
+`matched_stage TEXT` is ambiguous, and `matched_stage` doesn't help
+because multiple stages contribute to a single proposal (a payee can
+be processed by prefix → expand → merchants in the same pipeline
+run, all of which "matter"). Storing one stage's rule id throws away
+everything the other stages did.
 
-> Comment: add a new rust module `rules`. It is the interface between the database used by `serve`, and
-> a serialised set of rules. We need the serialised set because the database may be blown away from
-> time to time, but we don't ever want to lose the rules. So the canonical rules will be written
-> to `src/rules/[pipeline-stage].sql`. When `serve` starts, it will load rules into the pocketsmith
-> database, initiate the cache, etc. When `serve` closes, it needs to re-dump the rules back to the
-> SQL files during its cleanup path. Is this fine, or overengineering?
+If we ever want this, the right schema is a separate
+`payee_normalisation_rule_hits (proposal_id, stage, rule_id)` row
+*per stage that fired*, not a column on the proposal. That's a v4
+problem.
 
-## 8. UI (Tier A only in v3)
+## 10. Build order — one PR per step
 
-The Normalise tab gains a third sub-mode on the active row's detail
-panel. Today the detail shows:
+User asked: "one stage one PR; or multiple stages one PR per stage?
+I would like to do code reviews and don't want to be overwhelmed by
+very long PRs. I also want to do user acceptance testing at
+appropriate times."
 
-```
-[ Pipeline trace ]
-[ N sibling transactions ]
-[ Y/N/S buttons ]
-```
+Multi-PR. One PR per step below. Each PR is independently reviewable
+and acceptance-testable. Steps 1–3 are the "infrastructure" PRs
+(small, mechanical, no UI change); steps 4–10 are the "stage
+conversion + UI" PRs (each adds behaviour you can poke at). PR
+sizes are deliberately bounded.
 
-After v3, when the active row's pipeline produced an entity_name via
-merchants/persons/employers (visible in the trace's `+entity_name (…)`
-chip), the detail panel grows a fourth section:
+| # | PR title | Touches | Acceptance test |
+|---|----------|---------|-----------------|
+| 0 | `transactions: only flag "no normalisation" when trace is empty` | Transactions tab views | Verify the pillar text changes for merchant-only payees. |
+| 1 | `db+rules: schema for 8 rule tables + src/rules/*.sql seed loader + dump_all CLI` | new `src/rules/` module, schema migration, `dump_rules` binary | `cargo run --bin dump_rules` writes 8 SQL files; fresh DB seeds correctly; `pocketsmith.db` already-populated DB retains its data. |
+| 2 | `normalise: PipelineCtx + RuleCache (no behaviour change yet)` | `normalise::cache`, `PipelineCtx`, every call site | All existing tests pass; pipeline still uses in-code constants. |
+| 3 | `serve: Pipeline tab shell (queue + empty detail + activity panel)` | new `serve/pipeline/` module, route table, nav | Tab visible; queue lists 8 stages; clicking selects one. |
+| 4 | `pipeline(prefix+suffix): convert to DB; tab UI for these two stages` | `prefix.rs`, `suffix.rs`, `pipeline/views.rs` | Edit a prefix rule, see impact preview, save, re-scan, see proposals change. |
+| 5 | `pipeline(expand): convert + UI` | `expand.rs`, `pipeline/views.rs` | Same drill for expand. |
+| 6 | `pipeline(persons+employers+merchants): convert + UI for the three first-match-wins stages` | three `*.rs` files, shared UI partial | Add a merchant rule from the empty-state Transactions affordance, see it land. |
+| 7 | `pipeline(locations): convert + UI` | `locations.rs`, `suffix.rs` (uses it), `pipeline/views.rs` | Add/remove a suburb, see its effect on suffix matching. |
+| 8 | `pipeline(banking_ops): convert + UI` | `banking_ops.rs`, `pipeline/views.rs` | Same. |
+| 9 | `pipeline: re-scan banner + sample-impact preview + conflict detection` | `pipeline/views.rs`, `scan::rescan_for_stage` | Edit a rule, banner shows N affected, click re-scan, banner clears. |
+| 10 | `transactions: "+ Add rule for this payee" affordance + heuristic stage selector` | Transactions detail | The single-button no-modal flow described in §4.4. |
 
-```
-[ Rule that matched this payee ]
-  merchants  +entity_name (Amazon)
-  pattern:   (?i)AMAZON\b
-  canonical: Amazon
-  [ Edit ]  [ Delete ]
-```
+Each PR has a fidelity-test gate: every `cargo test` from before the
+PR still passes after it. Steps 4–8 also gate on a "production-DB
+fidelity" test (`cargo run --bin normalise --features fidelity-check`)
+that asserts every distinct `original_payee` produces the same
+`payee_normalisations` row before vs. after the conversion.
 
-> Comment: Keep Normalise tab simple. If a rule matched the payee, it should only have Y/N/S as
-> shortcuts
+Estimated cost: ~5–6 days total spread across 11 PRs. Each PR is ≤ 1
+day of work; most are half a day.
 
-When **no** rule matched (the common "I want to add a rule" case), the
-detail panel shows:
+## 11. Test strategy — pyramid
 
-```
-[ No rule matched ]
-  Original: AMAZON MARKETPLACE
-  After other stages: AMAZON MARKETPLACE
-  [ Add merchant rule ]  [ Add person rule ]  [ Add employer rule ]
-```
+User constraint: "Use test pyramid strategy. Rely on a large volume
+of unit tests that runs quickly and with few dependencies. Use a
+medium volume of integration tests that validates user flows and
+functionality across modules, potentially using mocks. Use a small
+number of end-to-end tests that hits the real API."
 
-> Comment: This one makes sense. I don't want to have three buttons to add a rule though. How can
-> we do this with a single button? No modal.
+Concretely:
 
-The Add buttons open a form pre-filled with a sensible default
-pattern (literal-escape of the post-stage string) and a blank
-canonical name. Submit writes the rule, calls `cache.bump()`, re-runs
-the pipeline on the active row, and re-renders the detail panel. No
-full page re-scan happens automatically — a yellow chip in the page
-header says "12 payees might match new rules — re-scan?" with a
-button.
+### 11.1 Unit (the broad base) — fast, isolated, lots of them
 
-A separate top-level URL `/normalise/rules/<stage>` lists the rule
-table for browsing/editing:
+- One test per stage's `apply_with_db` against a hand-written
+  fixture set of rules + a single input payee. Asserts string + features +
+  class. No DB beyond a `:memory:` SQLite with the schema.
+- One test per `RuleCache::<stage>` for the load / invalidate /
+  reload contract.
+- One test per `dump_stage` round-trip: insert rows → dump → re-load
+  into a fresh DB → assert table contents bitwise equal.
+- Pipeline-tab view tests in the same shape as the existing
+  serve smoke tests: Markup-only assertions, no HTTP, no real DB.
+- Conflict-detection / impact-preview helpers tested as pure
+  functions over a fixture rule set + a fixture payee corpus.
 
-- `GET /normalise/rules/merchants` — full table, sortable by canonical
-  or by "how many txns currently match this rule" (computed by joining
-  to `payee_normalisations.matched_pattern` once we persist it; see §9).
-- `GET /normalise/rules/persons` and `…/employers` — same shape.
-- `POST /normalise/rules/<stage>` — create.
-- `POST /normalise/rules/<stage>/<id>/edit` — update.
-- `POST /normalise/rules/<stage>/<id>/delete` — delete.
+### 11.2 Integration (the medium tier) — user flows, multi-module
 
-The list views are read-mostly; they reuse the existing queue/detail
-shell so they pick up the keyboard nav for free.
+- `serve` integration tests that walk a fixture DB through:
+  - Open Pipeline tab → click stage → select rule → edit pattern
+    → save → re-scan → assert proposal count changed.
+  - Add merchant rule from Transactions empty-state → assert rule
+    landed in DB and dumped to `src/rules/merchants.sql`.
+  - Reorder a prefix rule via the drag handle (POST endpoint) →
+    assert pipeline output changes for an affected payee.
+- The big fidelity test: `cargo test --features fidelity --test
+  pipeline_fidelity` runs the full pipeline against every distinct
+  `original_payee` in `pocketsmith.db` (skipped if no real DB
+  present), asserts `(proposed_payee, class, features_json)` matches
+  a snapshot taken before the migration. This is the gate for
+  deleting the in-code constants and is run manually before each
+  stage-conversion PR ships.
 
-## 9. Persisting matched-pattern in proposals
+### 11.3 End-to-end (the narrow top) — few, real, slow
 
-For the "delete this rule" / "edit this rule" actions on a transaction
-to know *which* rule fired, we need to store the matched pattern on
-the proposal. Today `last_matched_pattern` is computed at trace time
-but discarded; the staging table doesn't keep it.
+- Already covered: `cargo run --bin sync` against the real
+  PocketSmith API. We don't add new e2e tests for editable rules —
+  rule editing is a local-only concern.
 
-Add a column:
+### 11.4 Red-green TDD discipline per PR
 
-```sql
-ALTER TABLE payee_normalisations
-  ADD COLUMN matched_rule_id INTEGER,
-  ADD COLUMN matched_stage   TEXT;
-```
+User constraint: "make use of red green TDD in each commit."
 
-`scan::scan` writes both when the pipeline reports them. The UI then
-joins to the rule tables to render the "rule that matched" card. On
-rule delete, the matched-rule column is `NULL`-set in a follow-up
-`UPDATE … WHERE matched_rule_id = ?` and the affected proposals get
-re-staged on the next scan.
+For every PR:
 
-> Comment: Why is this needed? What would be the consequence of not doing it. If possible I would
-> like to defer to limit scope. You can convince me otherwise
+1. Write the smallest failing unit test that captures the new
+   behaviour.
+2. Implement just enough to make it pass.
+3. Refactor for clarity / consistency with existing modules; tests
+   still pass.
 
-> Comment: What is matched_rule_id? Each rule table has its own id. How is this meant to uniquely
-> identify a role? If using `matched_stage`, the problem is that a normalised payee results from 
-> multiple matched rule and stages. Help me understand why this schema change is actually correct
+For PR sizes ≥ 200 LOC, the commit log within the PR shows that
+red-green sequence (commit per failing test → commit making it pass
+→ commit refactoring). Reviewer can step through.
 
-## 10. Build order
+Naming + structure consistency across the codebase:
 
-Each step is a small commit; the whole thing ships as a single
-`feature/editable-rules` branch with ~15 commits.
-
-1. **Schema.** Create the eight tables. `db::initialize` adds them
-   idempotently. No code reads them yet.
-2. **`dump_rules` binary.** Generate `src/db/seed_rules.sql` from the
-   current in-code constants. Commit the SQL file.
-3. **Seed loader.** `db::initialize` runs `seed_rules.sql` when the
-   tables are empty. Tests assert seed → table contents.
-4. **`RuleCache`.** New module `normalise::cache`. Generation counter,
-   per-stage RwLock slots, lazy compile. Unit tests on
-   load/bump/reload.
-5. **`PipelineCtx`.** Threads `&Connection + &RuleCache` through
-   `normalise()`. All call sites updated; tests adapted via the
-   `with_seeded_in_memory()` ctx. Pipeline still uses the in-code
-   constants — this commit only changes signatures.
-6. **Convert `merchants` stage** to read from `rule_merchants`. Drop
-   the in-code `MERCHANTS` constant. Fidelity test: every existing
-   merchant test passes unchanged.
-7. **Convert `persons` stage** to read from `rule_persons`. Same drill.
-8. **Convert `employers` stage** to read from `rule_employers`.
-9. **Convert Tier B stages** (`prefix`, `suffix`, `expand`,
-   `banking_ops`, `locations`) in five separate commits. No UI yet,
-   purely an internal switch.
-10. **Persist `matched_rule_id` + `matched_stage`** on
-    `payee_normalisations`. Update `scan::scan`. UI not consuming yet.
-11. **Detail-panel "rule that matched" card** (Normalise + Transactions
-    tabs). Read-only.
-12. **Detail-panel "add merchant/person/employer rule" buttons.** Forms
-    submit to `POST /normalise/rules/<stage>` and re-render the active
-    row.
-13. **Rule list views** (`GET /normalise/rules/<stage>`). Sortable
-    table. CRUD endpoints.
-14. **Re-scan banner.** Page header detects "new rules since last scan"
-    and offers a one-click re-scan.
-
-Steps 1–10 are infrastructure (no user-visible change). Steps 11–14
-are the new UI.
-
-> Comment: make use of red greed TDD in each commit. Pick minimal implementations, reuse code where
-> practical. Structure and name code consistently across the codebase.
-
-## 11. Test strategy
-
-- **Per-stage fidelity tests.** For each stage being converted: pick
-  10 representative payees from `pocketsmith.db`, snapshot the
-  pre-conversion `NormalisationResult` (string + features + class),
-  and assert the post-conversion run produces the same result.
-- **Pipeline-end-to-end fidelity.** Run the full pipeline against
-  every distinct `original_payee` in the production DB, before and
-  after conversion. Assert identical `payee_normalisations` rows
-  would result (i.e. same `proposed_payee`, `class`, `features_json`).
-  This is the gate for deleting the in-code constants.
-- **Cache invalidation.** Insert a rule → assert next pipeline run
-  picks it up. Delete a rule → assert next run no longer matches.
-- **UI smoke tests** for the new endpoints, in the same shape as the
-  existing serve smoke tests.
-- **Migration test.** Fresh DB → `db::initialize` → assert rule tables
-  contain the seed.
-
-> Comment: Use test pyramid strategy. Rely on a large volume of unit tests that runs quickly
-> and with few dependencies. Use a medium volume of integration tests that validates user flows
-> and functionality across modules, potentially using mocks. Use a small number of end-to-end tests
-> that hits the real API
+- Module shape: `src/normalise/<stage>.rs` keeps owning the stage's
+  pipeline function. Rule-table SQL helpers go in
+  `src/rules/<stage>.rs` (loader + dumper + Compiled type). The
+  Pipeline tab views go in `src/bin/serve/pipeline/<stage>.rs` only
+  if the stage's UI is meaningfully different from the framework
+  default — most stages will share `pipeline/views.rs`.
+- Function names: `<stage>::apply_with_db`, `<stage>::compiled`,
+  `rules::<stage>::load`, `rules::<stage>::dump`. Mirrors the
+  existing `<stage>::apply` convention.
 
 ## 12. Cost estimate
 
-- Steps 1–5 (infra without behaviour change): ≈ 1 day.
-- Steps 6–9 (per-stage conversion + fidelity tests): ≈ 1 day.
-- Steps 10–14 (UI): ≈ 1.5 days.
+- PR 0 (Transactions tab fix): half a day.
+- PR 1–3 (infra): 1.5 days.
+- PR 4–8 (stage conversions, including UI per stage): 3 days.
+- PR 9–10 (polish + Transactions affordance): 1 day.
 
-Total: ~3.5 days. The big-bang fidelity test in step 9 is what makes
-this safe — if it passes, we can delete the in-code constants without
-fearing a regression.
+Total: ~5–6 days. Distributed across ~2 weeks of evening work would
+be a comfortable pace; "intensive" mode would compress to about a
+week.
 
-> Comment: Do you recommend doing this in one stage, one PR; or multiple stages, one PR per
-> stage? I would like to do code reviews and don't want to be overwhelmed by very long PRs. I also
-> want to do user acceptance testing at appropriate times
+## 13. Open questions (post-revision)
 
-## 13. Open questions for the user before coding starts
+The following user comments were unanswered or need confirmation:
 
-1. **Class assignment.** Today `merchants::apply` sets
-   `PayeeClass::Merchant`. Should the rule_merchants table allow
-   overriding the class (e.g. a row that sets class=Other)? Default
-   answer: no — keep one stage = one class for simplicity.
+1. **Re-scan scope.** §13.3 of the v2 plan was left blank. Two options:
+   (a) re-scan all payees on every rule change (simple, ~100 ms);
+   (b) re-scan only payees that *might* be affected (the ones whose
+   pipeline trace touches the edited stage). Recommend (a) unless
+   re-scan time becomes a bottleneck — and at 100 ms it won't, even
+   on a 20 000-payee DB. **Confirm: (a) or (b)?**
 
-> Comment: Correct. One class, one stage
+2. **Pipeline tab nav order.** Plan currently says fifth position
+   (Dashboard / Transactions / Transfers / Normalise / Pipeline).
+   Alternative: fourth, between Normalise and Transfers, since
+   Pipeline is "rules that produce Normalise's data". Or first,
+   right after Dashboard, if you reach for it more than once a day.
+   **Where should it sit?**
 
-2. **Rule notes vs commit messages.** v2 plan added a `note` column.
-   Worth it, or is git history enough? Default answer: keep `note`;
-   the UI is the audit log for the people who never read git logs.
+3. **Auto-dumping to `src/rules/*.sql` after every edit.** §6
+   recommends post-commit dump (not on shutdown). This means every
+   click in the Pipeline tab triggers a file write. Is this OK for
+   your dev environment, or would you prefer batched dumps (e.g.
+   debounce 5s after the last edit, or explicit "save to disk"
+   button)? **Recommend post-commit per-stage; flag if you'd
+   prefer otherwise.**
 
-> Comment: Keep note. This is important context for entities
+4. **Single "Add rule" button: heuristic vs explicit picker (§4.4).**
+   Two designs: heuristic-with-override, or a single button that
+   navigates to a "pick a stage" sub-view of the Pipeline tab.
+   Mockup-A doesn't show this flow — should I make a third mockup
+   that compares the two? **Heuristic, picker, or third option?**
 
-3. **Re-scan scope.** When a rule changes, do we re-scan all payees
-   or just the ones whose existing proposal's `matched_rule_id`
-   equals the changed rule? Default answer: just the affected ones,
-   for speed. The "12 payees might match" banner uses the count of
-   payees with `matched_rule_id IS NULL AND payee_normalisations.status
-   = 'pending'`.
+5. **Live impact preview cost.** The mockup shows "as you type"
+   recomputation. On a 423-payee × 150-rule stage that's ~1 ms with
+   precompiled regex — negligible. On a stage where the user is
+   editing a regex that doesn't compile (transient state), the
+   preview should show "syntax error: …" and not fail loudly.
+   **Confirm UX for invalid-regex states.**
 
-> Comment: 
+6. **Conflict detection scope.** §4.3 limits it to same-stage,
+   first-match-wins stages. **Want any cross-stage warnings?** (E.g.
+   a new merchant rule whose pattern is a strict superset of an
+   existing person rule's pattern → "this merchant rule will steal 7
+   payees from the persons stage".) Recommendation: defer.
 
-4. **Order semantics for persons/employers/merchants.** Today first
-   match wins. Do we keep that, or switch to "most-specific wins"
-   (longest pattern)? Default answer: keep first-match-wins, sort UI
-   by canonical, and document that overlap is the user's responsibility.
-
-> Comment: Keep first match wins. Order alphabetically. User ensures no overlap
-
-5. **Tier B UI in v3 or v4?** Current plan says v4. If you want
-   prefix/suffix/expand editable now, the cost roughly doubles
-   (regex-capture form is fiddly).
-
-> Comment: Needs to be in v3
-
-Sign-off on these → start at step 1.
+Sign-off on these → start at PR 0.
