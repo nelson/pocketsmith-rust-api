@@ -694,6 +694,7 @@ body {
 .g-pair-rejected::before  { content: "\2702\FE0F"; }        /* scissors */
 .g-norm-confirmed::before { content: "\2705"; }       /* white heavy check mark */
 .g-norm-pending::before   { content: "\1F50D"; }      /* magnifying glass */
+.g-norm-clean::before     { content: "\1F3F7\FE0F"; } /* label/tag -- normalised, nothing pending */
 .g-norm-missing::before   { content: "\2753"; }       /* red question mark */
 .g-norm-rejected::before  { content: "\1F6AB"; }      /* prohibited */
 .g-cat-confirmed::before  { content: "\1F5C4\FE0F"; } /* file cabinet */
@@ -702,7 +703,7 @@ body {
 .g-cat-rejected::before   { content: "\1F5D1\FE0F"; } /* wastebasket */
 .g-none::before           { content: "\B7"; opacity: 0.4; }
 .g-pair-confirmed, .g-pair-pending, .g-pair-rejected, .g-pair-orphan,
-.g-norm-confirmed, .g-norm-pending, .g-norm-rejected, .g-norm-missing,
+.g-norm-confirmed, .g-norm-pending, .g-norm-rejected, .g-norm-missing, .g-norm-clean,
 .g-cat-confirmed, .g-cat-pending, .g-cat-rejected, .g-cat-missing,
 .g-none {
     display: inline-block;
