@@ -1,0 +1,390 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Mockup · Pipeline tab · Merchants stage · Evaluate mode</title>
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="pipeline-A-merchants.css">
+<style>
+/* Same shell + classes as pipeline-A. This mockup just shows the editor
+ * card after the user has clicked [E] Evaluate: the form is read-only,
+ * the test-string + categorical impact appears, and the action row
+ * becomes [Y] Save / [B] Back to edit / Delete. */
+
+/* Inline copy of pipeline-A-merchants.html styles so this file is self-contained. */
+.header { display: flex; align-items: center; gap: 12px; margin: 0 0 0.75rem 0; }
+.header .tab-bar { margin: 0; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.freshness-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--fg-dim);
+    font-family: "SF Mono", ui-monospace, monospace;
+    cursor: help;
+}
+.freshness-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-dim); }
+.freshness-chip.fresh .freshness-chip-dot { background: var(--green); }
+.freshness-chip.stale .freshness-chip-dot { background: var(--yellow); }
+.freshness-chip-label .lbl { color: var(--fg-dark); margin-right: 4px; }
+.hints-trigger { background:var(--bg-surface);color:var(--fg-dim);border:1px solid var(--border);width:26px;height:26px;border-radius:50%;cursor:pointer;font-weight:700; }
+
+.pipeline-stage-row {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+}
+.pipeline-stage-row.selected { background: var(--bg-highlight); border-left-color: var(--accent); }
+.pipeline-stage-row .stage-no { color: var(--fg-dim); font-size: 0.7rem; text-align: center; }
+.pipeline-stage-row .stage-name { color: var(--fg); font-weight: 600; }
+.pipeline-stage-row .stage-count { color: var(--fg); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+.pipeline-stage-row .stage-tags { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px; }
+.stage-tag {
+    display: inline-block; padding: 0px 6px; border-radius: 3px;
+    border: 1px solid var(--border); color: var(--fg-dim);
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
+    background: var(--bg); line-height: 1.5;
+}
+.stage-tag.shape { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); }
+.stage-tag.order { color: var(--cyan); border-color: rgba(125, 207, 255, 0.4); }
+.stage-tag.aux   { color: var(--fg-dark); }
+
+.detail-panel { padding: 1rem 1.25rem; overflow-y: auto; }
+.detail-panel h2 { font-size: 0.95rem; font-weight: 600; }
+.detail-panel h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-dim); font-weight: 500; margin: 0.7rem 0 0.4rem 0; }
+.detail-panel .sub { color: var(--fg-dim); font-size: 0.75rem; margin-bottom: 0.4rem; }
+
+.detail-2col { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 8px; }
+
+.rules-pane { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.rules-pane h3 { margin-top: 0; }
+
+.rule-list {
+    display: grid;
+    grid-template-columns: max-content max-content 1fr;
+    gap: 3px 10px;
+    align-items: baseline;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    overflow-y: auto; flex: 1;
+    max-height: 580px;
+}
+.rule-list .rule-row { display: contents; cursor: pointer; }
+.rule-list .rule-row > * { padding: 2px 0; }
+.rule-list .rule-row.selected > * { background: var(--bg-highlight); border-radius: 3px; }
+.rule-list .canonical { color: var(--fg); font-weight: 600; }
+.rule-list .pattern   { color: var(--magenta); overflow-wrap: anywhere; }
+.rule-list .impact    { color: var(--fg-dim); white-space: nowrap; font-size: 0.72rem; }
+
+.search-box {
+    background: var(--bg-highlight); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 8px; font-size: 0.78rem; width: 100%;
+    margin-bottom: 0.4rem; font-family: "SF Mono", ui-monospace, monospace;
+}
+
+.btn-add { color: var(--green); border-color: var(--green); }
+.btn-delete { color: var(--red); border-color: var(--red); }
+.btn-evaluate { color: var(--accent); border-color: var(--accent); }
+.btn-confirm { color: var(--green); border-color: var(--green); background: rgba(158, 206, 106, 0.15); }
+.btn-back { color: var(--fg-dim); }
+
+.editor-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    position: sticky; top: 0;
+}
+.editor-card h2 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.editor-card .mode-pill {
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 6px; border-radius: 3px;
+    border: 1px solid var(--border); color: var(--fg-dim);
+}
+.editor-card.mode-edit .mode-pill { color: var(--cyan); border-color: rgba(125, 207, 255, 0.4); }
+.editor-card.mode-eval .mode-pill { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); }
+
+.editor-grid { display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; align-items: baseline; }
+.editor-grid label { color: var(--fg-dim); font-size: 0.75rem; }
+.editor-grid input[type=text], .editor-grid select {
+    background: var(--bg-highlight); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.82rem; width: 100%;
+}
+.editor-grid input[disabled] { opacity: 0.7; cursor: not-allowed; }
+.editor-grid .hint { color: var(--fg-dark); font-size: 0.7rem; }
+.editor-grid .read-only-val {
+    background: var(--bg-highlight); color: var(--fg);
+    border: 1px dashed var(--border); border-radius: 4px;
+    padding: 4px 8px; font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+}
+
+.editor-actions {
+    display: flex; gap: 6px; margin-top: 12px;
+    padding-top: 10px; border-top: 1px solid var(--border);
+}
+
+.eval-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.eval-section .sub { font-size: 0.72rem; color: var(--fg-dark); }
+
+.tester-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.tester-input-row label { color: var(--fg-dim); font-size: 0.74rem; min-width: 60px; }
+.tester-input-row input {
+    flex: 1; background: var(--bg-highlight); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px;
+    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.78rem;
+}
+.tester-result { font-family: "SF Mono", ui-monospace, monospace; font-size: 0.76rem; padding: 4px 0; }
+.tester-hit  { color: var(--green); font-weight: 600; }
+.tester-miss { color: var(--red); font-weight: 600; }
+
+.impact-summary {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 8px 16px; margin: 6px 0 10px 0;
+}
+.impact-summary .stat {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--fg-dim);
+}
+.impact-summary .stat .num {
+    font-size: 1.15rem; color: var(--fg); font-weight: 700;
+    margin-right: 4px; font-variant-numeric: tabular-nums;
+}
+.impact-summary .stat .num.pos  { color: var(--green); }
+.impact-summary .stat .num.neg  { color: var(--red); }
+.impact-summary .stat .num.move { color: var(--yellow); }
+
+.impact-cat {
+    margin-top: 6px; border: 1px solid var(--border);
+    border-radius: 5px; background: var(--bg-highlight); overflow: hidden;
+}
+.impact-cat header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 10px;
+    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.74rem;
+    cursor: pointer;
+}
+.impact-cat header .label { font-weight: 600; }
+.impact-cat header .label .marker { display: inline-block; width: 14px; }
+.impact-cat header .count { color: var(--fg-dim); font-size: 0.7rem; }
+.impact-cat.added   header .label { color: var(--green); }
+.impact-cat.move    header .label { color: var(--yellow); }
+.impact-cat.removed header .label { color: var(--red); }
+.impact-cat.same    header .label { color: var(--fg-dim); }
+.impact-cat ul {
+    list-style: none; padding: 4px 10px; margin: 0;
+    border-top: 1px solid var(--border);
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.7rem; max-height: 110px; overflow-y: auto;
+}
+.impact-cat li {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 8px; padding: 1px 0; color: var(--fg-dim);
+}
+.impact-cat li .acct { color: var(--fg-dark); font-size: 0.66rem; }
+.impact-cat li .from { color: var(--fg-dark); }
+.impact-cat .truncated { color: var(--fg-dark); font-style: italic; padding: 2px 0; text-align: center; }
+</style>
+</head><body>
+
+<div class="header">
+  <nav class="tab-bar">
+    <a class="tab" href="#">Dashboard</a>
+    <a class="tab" href="#">Transactions</a>
+    <span class="tab active">Pipeline</span>
+    <a class="tab" href="#">Transfers</a>
+    <a class="tab" href="#">Normalise</a>
+  </nav>
+  <div class="header-right">
+    <span class="freshness-chip fresh"><span class="freshness-chip-dot"></span><span class="freshness-chip-label"><span class="lbl">synced</span>3h ago</span></span>
+    <span class="freshness-chip stale"><span class="freshness-chip-dot"></span><span class="freshness-chip-label"><span class="lbl">pushed</span>3d ago</span></span>
+    <button class="hints-trigger">?</button>
+  </div>
+</div>
+
+<div class="mock-banner" style="margin: 0 0 0.5rem 0;">
+  <span><strong>Mockup · Pipeline tab</strong> · merchants stage · editor in <em>evaluate mode</em>.
+  Field row read-only; categorical impact rendered; Save now appears.</span>
+  <a href="../mockups/index.html">← back</a>
+</div>
+
+<div class="layout">
+
+  <!-- queue: same as A -->
+  <div class="queue-panel">
+    <div class="queue-header">
+      <h2>Pipeline stages</h2>
+      <div class="sub" style="font-size:0.7rem;color:var(--fg-dim);line-height:1.3">
+        Each stage in execution order. Click to inspect / edit its rules.
+      </div>
+    </div>
+    <div class="queue-list">
+      <div class="pipeline-stage-row"><span class="stage-no">1</span><div><span class="stage-name">prefix</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span><span class="stage-tag">captures</span></div></div><span class="stage-count">42 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">2</span><div><span class="stage-name">suffix</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span><span class="stage-tag">captures</span></div></div><span class="stage-count">37 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">3</span><div><span class="stage-name">expand</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span></div></div><span class="stage-count">102 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">4</span><div><span class="stage-name">persons</span><div class="stage-tags"><span class="stage-tag shape">first match</span><span class="stage-tag">literal</span></div></div><span class="stage-count">82 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">5</span><div><span class="stage-name">employers</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">4 rules</span></div>
+      <div class="pipeline-stage-row selected"><span class="stage-no">6</span><div><span class="stage-name">merchants</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">146 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">7</span><div><span class="stage-name">banking_ops</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">38 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">—</span><div><span class="stage-name">locations</span><div class="stage-tags"><span class="stage-tag aux">aux · used by suffix</span></div></div><span class="stage-count">91 rules</span></div>
+    </div>
+  </div>
+
+  <!-- detail -->
+  <div class="detail-panel">
+    <div class="detail-header">
+      <h2>merchants
+        <span style="color:var(--fg-dim);font-weight:400;font-size:0.85rem">
+          · 146 rules · first match wins · sets <code style="color:var(--magenta)">class=Merchant</code>
+        </span>
+      </h2>
+    </div>
+
+    <div class="detail-2col">
+      <!-- LEFT: rule list (same shape as A) -->
+      <div class="rules-pane">
+        <input class="search-box" placeholder="filter by canonical or pattern (try: amazon)">
+        <h3>146 rules · showing 5 matching “amazon”
+          <span style="float:right">
+            <button class="btn btn-add" style="font-size:0.72rem;padding:1px 8px">+ Add rule</button>
+          </span>
+        </h3>
+        <div class="rule-list">
+          <div class="rule-row"><span class="canonical">Amazon</span><span class="pattern">(?i)AMAZON\b</span><span class="impact">412 txns</span></div>
+          <div class="rule-row selected"><span class="canonical">Amazon Marketplace</span><span class="pattern">(?i)AMAZON MARKETPLACE</span><span class="impact">38 txns</span></div>
+          <div class="rule-row"><span class="canonical">Amazon Prime</span><span class="pattern">(?i)AMAZON PRIME</span><span class="impact">12 txns</span></div>
+          <div class="rule-row"><span class="canonical">Amazon AU</span><span class="pattern">(?i)AMAZON\.COM\.AU</span><span class="impact">5 txns</span></div>
+          <div class="rule-row"><span class="canonical">Amazon Web Services</span><span class="pattern">(?i)\bAWS\b</span><span class="impact">3 txns</span></div>
+          <div style="grid-column:1/-1;color:var(--fg-dark);font-style:italic;text-align:center;padding:6px 0">…</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: editor card in EVALUATE MODE -->
+      <div class="editor-card mode-eval">
+        <h2>
+          Edit rule
+          <span class="mode-pill">evaluate mode</span>
+        </h2>
+        <div class="editor-grid">
+          <label>Canonical</label>
+          <div class="read-only-val">Amazon Marketplace</div>
+
+          <label>Pattern</label>
+          <div class="read-only-val">(?i)AMAZON\s+MARKETPLACE</div>
+        </div>
+
+        <!-- Single-string tester. Cheap. -->
+        <div class="eval-section">
+          <h3>Test against a string</h3>
+          <div class="tester-input-row">
+            <label for="t-string">String</label>
+            <input id="t-string" type="text" value="AMAZON MARKETPLACE PTY">
+          </div>
+          <div class="tester-result">
+            <span class="tester-hit">✓ matches</span>
+            <span style="color:var(--fg-dim)">→ canonical: <strong style="color:var(--fg)">Amazon Marketplace</strong></span>
+          </div>
+        </div>
+
+        <!-- Categorical impact: lists, not bars. -->
+        <div class="eval-section">
+          <h3>Impact across the database</h3>
+          <div class="sub">
+            Compared to the saved version of this rule, against
+            <strong>423</strong> distinct raw payees in your DB.
+          </div>
+
+          <div class="impact-summary">
+            <div class="stat"><span class="num pos">+7</span> newly matched</div>
+            <div class="stat"><span class="num neg">−2</span> new fallthrough</div>
+            <div class="stat"><span class="num move">3</span> stolen from other rules</div>
+            <div class="stat"><span class="num">31</span> matched, unchanged</div>
+          </div>
+
+          <!-- Each category: a collapsible list of payees that fall in that bucket. -->
+          <div class="impact-cat added">
+            <header>
+              <span class="label"><span class="marker">+</span> Newly matched (unmatched → matched)</span>
+              <span class="count">7 payees · 14 txns · $312</span>
+            </header>
+            <ul>
+              <li><span>AMAZON MARKETPLACE *MK4F2DC03</span><span class="acct">3 txns · $120 · Amex</span></li>
+              <li><span>AMAZON MARKETPLACE PTY LIMITED</span><span class="acct">1 txn · $45 · Cheque</span></li>
+              <li><span>AMAZON MARKETPLACE *AB1234XYZ</span><span class="acct">2 txns · $67 · Amex</span></li>
+              <li><span>AMAZON MARKETPLACE FBA</span><span class="acct">1 txn · $14 · Amex</span></li>
+              <li><span>AMAZON MARKETPLACE.UK</span><span class="acct">2 txns · $26 · Amex</span></li>
+              <li class="truncated">… 2 more</li>
+            </ul>
+          </div>
+
+          <div class="impact-cat move">
+            <header>
+              <span class="label"><span class="marker">→</span> Stolen from another rule (was matched by, now matched by this)</span>
+              <span class="count">3 payees · 5 txns</span>
+            </header>
+            <ul>
+              <li><span>AMAZON MARKETPLACE PRIME</span><span class="from">was: Amazon Prime</span></li>
+              <li><span>AMAZON MARKETPLACE-PRIME-RENEW</span><span class="from">was: Amazon Prime</span></li>
+              <li><span>AMAZON MARKETPLACE STOREFRONT</span><span class="from">was: Amazon</span></li>
+            </ul>
+          </div>
+
+          <div class="impact-cat removed">
+            <header>
+              <span class="label"><span class="marker">−</span> New fallthrough (matched → unmatched)</span>
+              <span class="count">2 payees · 3 txns</span>
+            </header>
+            <ul>
+              <li><span>AMAZON MK PRIME RENEWAL</span><span class="acct">1 txn · $8.99</span></li>
+              <li><span>AMAZON MK ELECTRONICS</span><span class="acct">2 txns · $112</span></li>
+            </ul>
+          </div>
+
+          <div class="impact-cat same">
+            <header>
+              <span class="label"><span class="marker">=</span> Already matched by this rule (unchanged)</span>
+              <span class="count">31 payees · 28 txns</span>
+            </header>
+            <ul>
+              <li><span>AMAZON MARKETPLACE</span><span class="acct">12 txns</span></li>
+              <li><span>AMAZON MARKETPLACE.AU</span><span class="acct">4 txns</span></li>
+              <li class="truncated">… 29 more</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-confirm">[Y] Save</button>
+          <button class="btn btn-back">[B] Back to edit</button>
+          <button class="btn btn-delete" style="margin-left:auto">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="activity-panel">
+  <div class="activity-header">
+    <span class="stat">
+      <span style="color:var(--yellow);font-weight:600">⚠ 18 payees would re-stage</span>
+      since the last scan ·
+      <a href="#" style="color:var(--accent)">re-scan now ↻</a>
+    </span>
+    <span class="stat" style="color:var(--fg-dim);font-size:0.74rem">
+      Edits auto-export to <code style="color:var(--magenta)">src/rules/merchants.sql</code> on commit
+      (background thread).
+    </span>
+  </div>
+</div>
+</body></html>
