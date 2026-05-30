@@ -172,20 +172,58 @@ pub fn class_tag(class: Option<&PayeeClass>) -> Option<&'static str> {
     }
 }
 
+/// One [`Features`] field's storage key plus its two serialisations:
+/// `display` for the pipeline trace and `json` for `features_json`.
+/// Both are `Some` exactly when the field is set.
+struct FeatureEntry {
+    key: &'static str,
+    display: Option<String>,
+    json: Option<serde_json::Value>,
+}
+
+/// Canonical enumeration of [`Features`] fields, in declaration order.
+/// This is the single source of truth for the field list: it drives
+/// [`features_to_json`], the populated-key snapshots, and the per-key
+/// trace values in [`run_traced`]. Add a field here once and all three
+/// pick it up.
+fn feature_entries(f: &Features) -> Vec<FeatureEntry> {
+    use serde_json::Value;
+    fn text(key: &'static str, v: &Option<String>) -> FeatureEntry {
+        FeatureEntry {
+            key,
+            display: v.clone(),
+            json: v.clone().map(Value::String),
+        }
+    }
+    vec![
+        text("entity_name", &f.entity_name),
+        text("location", &f.location),
+        FeatureEntry {
+            key: "operation",
+            display: f.operation.as_ref().map(|o| o.display_name().to_string()),
+            json: f.operation.as_ref().map(|o| Value::String(o.display_name().into())),
+        },
+        text("reason", &f.reason),
+        text("institution", &f.institution),
+        text("gateway", &f.gateway),
+        text("account", &f.account),
+        text("date", &f.date),
+        text("currency_code", &f.currency_code),
+        FeatureEntry {
+            key: "amount_in_cents",
+            display: f.amount_in_cents.map(|c| format!("{c}c")),
+            json: f.amount_in_cents.map(|c| Value::Number(c.into())),
+        },
+    ]
+}
+
 /// Serialise [`Features`] to a compact JSON string suitable for storage in
 /// `payee_normalisations.features_json`. Only set fields are included.
 pub fn features_to_json(f: &Features) -> String {
-    let mut map = serde_json::Map::new();
-    if let Some(v) = &f.entity_name { map.insert("entity_name".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.location { map.insert("location".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.operation { map.insert("operation".into(), serde_json::Value::String(v.display_name().into())); }
-    if let Some(v) = &f.reason { map.insert("reason".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.institution { map.insert("institution".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.gateway { map.insert("gateway".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.account { map.insert("account".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.date { map.insert("date".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = &f.currency_code { map.insert("currency_code".into(), serde_json::Value::String(v.clone())); }
-    if let Some(v) = f.amount_in_cents { map.insert("amount_in_cents".into(), serde_json::Value::Number(v.into())); }
+    let map: serde_json::Map<String, serde_json::Value> = feature_entries(f)
+        .into_iter()
+        .filter_map(|e| e.json.map(|j| (e.key.to_string(), j)))
+        .collect();
     serde_json::Value::Object(map).to_string()
 }
 
@@ -232,15 +270,17 @@ fn run_traced(
     let before_class = result.class.clone();
     result.last_matched_pattern = None;
     apply(result);
-    let after_keys = populated_feature_keys(&result.features);
-    let features_added: Vec<&'static str> = after_keys
+    // Entries the stage newly populated, each carrying its own display
+    // string, so the added keys and their trace values come from one
+    // pass over the canonical field list.
+    let feature_values: Vec<(&'static str, String)> = feature_entries(&result.features)
         .into_iter()
-        .filter(|k| !before_keys.contains(k))
+        .filter_map(|e| match e.display {
+            Some(d) if !before_keys.contains(&e.key) => Some((e.key, d)),
+            _ => None,
+        })
         .collect();
-    let feature_values: Vec<(&'static str, String)> = features_added
-        .iter()
-        .filter_map(|k| feature_value(&result.features, k).map(|v| (*k, v)))
-        .collect();
+    let features_added: Vec<&'static str> = feature_values.iter().map(|(k, _)| *k).collect();
     let class_set = if before_class.is_none() && result.class.is_some() {
         result.class.clone()
     } else {
@@ -260,41 +300,14 @@ fn run_traced(
     }
 }
 
-/// String form of a single populated feature value, suitable for the
-/// pipeline-trace render. Returns `None` for keys whose value is
-/// unset — keeps `feature_values` aligned with what the stage actually
-/// populated.
-fn feature_value(f: &Features, key: &str) -> Option<String> {
-    match key {
-        "entity_name" => f.entity_name.clone(),
-        "location" => f.location.clone(),
-        "operation" => f.operation.as_ref().map(|o| o.display_name().to_string()),
-        "reason" => f.reason.clone(),
-        "institution" => f.institution.clone(),
-        "gateway" => f.gateway.clone(),
-        "account" => f.account.clone(),
-        "date" => f.date.clone(),
-        "currency_code" => f.currency_code.clone(),
-        "amount_in_cents" => f.amount_in_cents.map(|c| format!("{c}c")),
-        _ => None,
-    }
-}
-
 /// Names of the [`Features`] fields that are currently populated. Order
 /// matches the field order in [`Features`] for deterministic output.
 fn populated_feature_keys(f: &Features) -> Vec<&'static str> {
-    let mut out = Vec::new();
-    if f.entity_name.is_some() { out.push("entity_name"); }
-    if f.location.is_some() { out.push("location"); }
-    if f.operation.is_some() { out.push("operation"); }
-    if f.reason.is_some() { out.push("reason"); }
-    if f.institution.is_some() { out.push("institution"); }
-    if f.gateway.is_some() { out.push("gateway"); }
-    if f.account.is_some() { out.push("account"); }
-    if f.date.is_some() { out.push("date"); }
-    if f.currency_code.is_some() { out.push("currency_code"); }
-    if f.amount_in_cents.is_some() { out.push("amount_in_cents"); }
-    out
+    feature_entries(f)
+        .into_iter()
+        .filter(|e| e.display.is_some())
+        .map(|e| e.key)
+        .collect()
 }
 
 /// 16-char lowercase hex of XXH3-64 hash of `original_payee`. Stable across
