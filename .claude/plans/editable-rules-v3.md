@@ -115,7 +115,7 @@ Three-pane shell as on every other tab:
     rules" for consistency with the others).
   - Selected via click or arrow keys.
 - **Detail** — two-column inside:
-  - **Left column (taller):** rule list + search box + "+ Add rule"
+  - **Left column (taller):** rule list + search box + `[A] Add rule`
     button. The two-column split makes this list noticeably taller
     than the single-column variant we had earlier.
   - **Right column:** the focused-rule editor card. Sticky to the top
@@ -124,9 +124,38 @@ Three-pane shell as on every other tab:
 - **Activity** — recent rule-change log + a "re-scan now" link
   surfaced **only when there are dirty rules** (described in §4.5).
 
-Mockup A shows merchants stage in this layout. Mockup B shows prefix
-stage (which adds a per-rule `sort_order` and capture-flag matrix in
-the editor).
+#### 4.3.1 Rule list shape — same across all stages
+
+The rule list uses the same row geometry on every stage. A list with
+order-irrelevant rules (persons / merchants / employers / banking_ops)
+looks visually identical to one with reorderable rules (prefix /
+suffix / expand) except for an extra leading drag-handle column.
+No dotted lines vs solid lines; no per-stage row gap; no sequence
+numbers.
+
+Column layout:
+
+```
+stage         | columns
+--------------|-----------------------------------------------
+merchants     | [drag spacer] Canonical  Pattern  Impact (right)
+persons       | [drag spacer] Canonical  Pattern  Impact (right)
+employers     | [drag spacer] Canonical  Pattern  Impact (right)
+banking_ops   | [drag spacer] Operation  Pattern  Captures · Impact (right)
+prefix        | [⋮⋮ handle]  Pattern  Captures · Impact (right)
+suffix        | [⋮⋮ handle]  Pattern  Captures · Impact (right)
+expand        | [⋮⋮ handle]  Pattern  Canonical  Impact (right)
+locations     | [drag spacer] Location  Impact (right)
+```
+
+A column-header row sits above every list (`Canonical / Pattern /
+Impact` or equivalent), styled as small-caps in `var(--fg-dark)` so
+it reads as scaffold not data. The header row uses the same grid
+template as the data rows so columns align without per-stage CSS.
+
+The `Impact` and `Captures` columns are **right-aligned**. "412 txns
+· $8.4k" reads as a number, so it hugs the right edge of the row;
+same for capture-flag tags like `+op +acct`.
 
 ### 4.4 Editor card — two states
 
@@ -156,6 +185,33 @@ Save physically doesn't exist outside Evaluate mode.
 so the textbox is replaced by a `+ add note` link. Clicking expands
 the textbox; rules that already have a note render expanded. Same
 shape on every stage's editor.
+
+**No explicit `sort_order` field in the editor.** For loop stages
+(prefix / suffix / expand / banking_ops) the rule's pipeline order is
+implicit in its row position in the rule list. Reorder via the
+drag-handle column at the left of each row; the persisted
+`sort_order` is a server-side concern the UI never surfaces as a
+number. Removes the "two sources of truth" failure where the user
+edits both the input and the position and they disagree.
+
+#### 4.4.1 Buttons + keyboard shortcuts
+
+Every button in the Pipeline tab uses the `[X] Label` motif and binds
+a single-key shortcut, consistent with the rest of the app:
+
+| Button | Where | Shortcut |
+|--------|-------|----------|
+| `[A] Add rule` | rule-list header (every stage) | `A` |
+| `[E] Evaluate` | edit mode action row | `E` |
+| `[N] Cancel` | edit mode action row | `N` |
+| `[Y] Save` | evaluate mode action row | `Y` |
+| `[B] Back to edit` | evaluate mode action row | `B` |
+| `Delete` | both modes | (no shortcut; mouse-only to avoid mishit) |
+
+The global `?` overlay (already shipped) gains entries for `A`, `E`,
+`B` when the active tab is Pipeline. `Y / N` already exist globally
+for confirm/reject; in Pipeline-tab evaluate mode `Y` binds to Save
+and `N` to Cancel.
 
 ### 4.5 Re-scan = user-triggered, surfaced only when dirty
 
@@ -675,10 +731,10 @@ A few details surfaced during this revision that may need a call:
    (a) dismisses the chip (purely visual) or (b) reverts the
    dropdown to the heuristic's default if the user changed it.
    Default: (a). Semantics-free.
-4. **Drag-to-reorder UX for sort_order stages.** Mockup B shows
-   `⋮⋮` handles. Is HTML5 native drag-and-drop acceptable, or
-   would you rather have explicit `↑ / ↓` buttons per row to keep
-   keyboard-only nav working? Default: implement both — drag for
-   mouse, J/K-style nudge for keyboard.
+4. **Keyboard reorder for sort_order stages.** Drag-and-drop covers
+   the mouse case. For keyboard-only, `Alt+↑` / `Alt+↓` on the
+   selected rule nudges it up/down one position and persists to
+   `sort_order` on each nudge. No explicit number to type.
+   Default: implement both — drag for mouse, Alt-arrow for keyboard.
 
 Sign-off on these (or pick alternatives) → start at PR 0.

@@ -55,17 +55,36 @@
 .rules-pane { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
 .rules-pane h3 { margin-top: 0; }
 
-.rule-list {
-    display: grid; grid-template-columns: max-content max-content 1fr;
-    gap: 3px 10px; align-items: baseline;
-    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.78rem;
-    overflow-y: auto; flex: 1; max-height: 580px;
+.rule-list-header,
+.rule-list .rule-row {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1.1fr) minmax(0, 1.4fr) max-content;
+    gap: 4px 12px;
+    align-items: baseline;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
 }
-.rule-list .rule-row { display: contents; }
-.rule-list .rule-row > * { padding: 2px 0; }
+.rule-list-header {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 4px 5px 4px;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-dark);
+    font-weight: 500;
+}
+.rule-list-header .impact { text-align: right; }
+
+.rule-list { overflow-y: auto; flex: 1; max-height: 580px; }
+.rule-list .rule-row {
+    cursor: pointer;
+    padding: 3px 4px;
+    border-bottom: 1px solid var(--border);
+}
+.rule-list .rule-row:last-child { border-bottom: none; }
 .rule-list .canonical { color: var(--fg); font-weight: 600; }
 .rule-list .pattern   { color: var(--magenta); overflow-wrap: anywhere; }
-.rule-list .impact    { color: var(--fg-dim); white-space: nowrap; font-size: 0.72rem; }
+.rule-list .impact    { color: var(--fg-dim); white-space: nowrap; font-size: 0.72rem; text-align: right; }
 
 .search-box {
     background: var(--bg-highlight); color: var(--fg);
@@ -73,6 +92,18 @@
     padding: 3px 8px; font-size: 0.78rem; width: 100%;
     margin-bottom: 0.4rem; font-family: "SF Mono", ui-monospace, monospace;
 }
+
+.btn-shortcut {
+    color: var(--fg);
+    background: var(--bg-highlight);
+    border-color: var(--border);
+    font-size: 0.74rem;
+    padding: 2px 10px;
+}
+.btn-shortcut:hover { border-color: var(--accent); }
+.btn-shortcut.add { color: var(--green); border-color: rgba(158, 206, 106, 0.4); background: rgba(158, 206, 106, 0.08); }
+.btn-shortcut.eval { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); background: rgba(122, 162, 247, 0.08); }
+.btn-shortcut.cancel { color: var(--fg-dim); }
 
 .btn-add { color: var(--green); border-color: var(--green); }
 .btn-evaluate { color: var(--accent); border-color: var(--accent); }
@@ -207,12 +238,18 @@
       <div class="rules-pane">
         <input class="search-box" placeholder="filter by canonical or pattern">
         <h3>Existing rules</h3>
+        <div class="rule-list-header" style="opacity:0.55">
+          <span></span>
+          <span>Canonical</span>
+          <span>Pattern</span>
+          <span class="impact">Impact</span>
+        </div>
         <div class="rule-list" style="opacity:0.55">
-          <div class="rule-row"><span class="canonical">7-Eleven</span><span class="pattern">(?i)7-ELEVEN\b</span><span class="impact">28 txns</span></div>
-          <div class="rule-row"><span class="canonical">ALDI</span><span class="pattern">(?i)ALDI\b</span><span class="impact">94 txns</span></div>
-          <div class="rule-row"><span class="canonical">Amazon</span><span class="pattern">(?i)AMAZON\b</span><span class="impact">412 txns</span></div>
-          <div class="rule-row"><span class="canonical">Amazon Prime</span><span class="pattern">(?i)AMAZON PRIME</span><span class="impact">12 txns</span></div>
-          <div class="rule-row"><span class="canonical">American Express</span><span class="pattern">(?i)AMERICAN EXPRESS\b</span><span class="impact">7 txns</span></div>
+          <div class="rule-row"><span></span><span class="canonical">7-Eleven</span><span class="pattern">(?i)7-ELEVEN\b</span><span class="impact">28 txns</span></div>
+          <div class="rule-row"><span></span><span class="canonical">ALDI</span><span class="pattern">(?i)ALDI\b</span><span class="impact">94 txns</span></div>
+          <div class="rule-row"><span></span><span class="canonical">Amazon</span><span class="pattern">(?i)AMAZON\b</span><span class="impact">412 txns</span></div>
+          <div class="rule-row"><span></span><span class="canonical">Amazon Prime</span><span class="pattern">(?i)AMAZON PRIME</span><span class="impact">12 txns</span></div>
+          <div class="rule-row"><span></span><span class="canonical">American Express</span><span class="pattern">(?i)AMERICAN EXPRESS\b</span><span class="impact">7 txns</span></div>
           <div style="grid-column:1/-1;color:var(--fg-dark);font-style:italic;text-align:center;padding:6px 0">…</div>
         </div>
         <div style="font-size:0.7rem;color:var(--fg-dark);margin-top:6px;font-style:italic">
@@ -265,8 +302,8 @@
         <button class="note-toggle">+ add note</button>
 
         <div class="editor-actions">
-          <button class="btn btn-evaluate">[E] Evaluate</button>
-          <button class="btn btn-back">[N] Cancel</button>
+          <button class="btn btn-shortcut eval">[E] Evaluate</button>
+          <button class="btn btn-shortcut cancel">[N] Cancel</button>
         </div>
 
         <div class="heuristic-explain">
