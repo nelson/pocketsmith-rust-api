@@ -24,7 +24,7 @@ use rusqlite::Connection;
 use crate::db::payee_normalisations::{
     self as pn, PayeeNormalisationRow,
 };
-use crate::normalise::{class_tag, features_to_json, format_payee, normalise};
+use crate::normalise::{class_tag, features_to_json, format_payee, normalise, PipelineCtx, RuleCache};
 use crate::transfers::Status;
 
 /// Counts returned from a scan run. Useful for CLI summary and tests.
@@ -57,6 +57,11 @@ pub fn scan(conn: &Connection) -> Result<ScanStats> {
 
     let mut stats = ScanStats::default();
 
+    // One cache for the whole scan: the rule tables don't change
+    // mid-scan, so every payee shares the same compiled rules.
+    let cache = RuleCache::new();
+    let ctx = PipelineCtx::new(conn, &cache);
+
     // Pre-load existing rows into a map so we don't issue N+1 queries.
     let existing: HashMap<String, PayeeNormalisationRow> = pn::list_all(conn)?
         .into_iter()
@@ -65,7 +70,7 @@ pub fn scan(conn: &Connection) -> Result<ScanStats> {
 
     crate::db::with_operation(conn, "normalise-scan", |conn| {
         for (original_payee, current_payee, txn_count) in &groups {
-            let result = normalise(original_payee);
+            let result = normalise(original_payee, &ctx);
             let proposed = format_payee(&result);
             let class = class_tag(result.class()).map(|s| s.to_string());
             let features_json = features_to_json(&result.features);

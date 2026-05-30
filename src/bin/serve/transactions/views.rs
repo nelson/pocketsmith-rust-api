@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, TraceEntry};
+use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx, TraceEntry};
 
 use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::state::{AppState, Decision};
@@ -39,7 +39,7 @@ pub struct QueueRowView {
 /// [`NormState`] (`Clean` vs `Missing`). Running the pipeline once per
 /// distinct payee keeps this ~tens of ms even on a full 1000-row
 /// queue.
-fn build_trace_memo(rows: &[TxnQueueRow]) -> HashMap<String, bool> {
+fn build_trace_memo(rows: &[TxnQueueRow], ctx: &PipelineCtx) -> HashMap<String, bool> {
     let mut memo: HashMap<String, bool> = HashMap::new();
     for r in rows {
         if r.norm_status.is_some() {
@@ -47,7 +47,7 @@ fn build_trace_memo(rows: &[TxnQueueRow]) -> HashMap<String, bool> {
         }
         if let Some(op) = r.original_payee.as_deref() {
             memo.entry(op.to_string())
-                .or_insert_with(|| !run_normalise(op).trace.is_empty());
+                .or_insert_with(|| !run_normalise(op, ctx).trace.is_empty());
         }
     }
     memo
@@ -75,7 +75,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
     // No per-row SQL needed -- pair_status and norm_status arrive
     // pre-fetched via LEFT JOIN in filtered_transactions.
-    let trace_memo = build_trace_memo(&rows);
+    let trace_memo = build_trace_memo(&rows, &PipelineCtx::new(&st.conn, &st.rule_cache));
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
@@ -113,9 +113,10 @@ fn render_active_detail(
     let Some(id) = active_id else {
         return html! { div.empty-state { p { "Select a transaction from the queue." } } };
     };
+    let ctx = PipelineCtx::new(&state.conn, &state.rule_cache);
     // Cheap path: the active row is in the rendered queue subset.
     if let Some(v) = views.iter().find(|x| x.row.id == id) {
-        let pipeline = v.row.original_payee.as_deref().map(run_normalise);
+        let pipeline = v.row.original_payee.as_deref().map(|op| run_normalise(op, &ctx));
         let siblings = v
             .row
             .original_payee
@@ -134,7 +135,7 @@ fn render_active_detail(
     };
     let pair = super::state::derive_pair_state(&state.conn, row.id, row.is_transfer)
         .unwrap_or(PairState::NotApplicable);
-    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let pipeline = row.original_payee.as_deref().map(|op| run_normalise(op, &ctx));
     let trace_nonempty = pipeline.as_ref().map(|p| !p.trace.is_empty()).unwrap_or(false);
     let norm = super::state::derive_norm_state(&state.conn, row.original_payee.as_deref(), trace_nonempty)
         .unwrap_or(NormState::Missing);
@@ -203,7 +204,7 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, filter_str: &str) -> 
     st.txn_filter = filter_str.to_string();
     let filter = TxnFilter::parse(filter_str);
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
-    let trace_memo = build_trace_memo(&rows);
+    let trace_memo = build_trace_memo(&rows, &PipelineCtx::new(&st.conn, &st.rule_cache));
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
@@ -638,7 +639,10 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Mark
 
     let pair = super::state::derive_pair_state(&st.conn, row.id, row.is_transfer)
         .unwrap_or(PairState::NotApplicable);
-    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let pipeline = row
+        .original_payee
+        .as_deref()
+        .map(|op| run_normalise(op, &PipelineCtx::new(&st.conn, &st.rule_cache)));
     let trace_nonempty = pipeline.as_ref().map(|p| !p.trace.is_empty()).unwrap_or(false);
     let norm = super::state::derive_norm_state(&st.conn, row.original_payee.as_deref(), trace_nonempty)
         .unwrap_or(NormState::Missing);
