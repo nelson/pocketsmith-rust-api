@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<title>Mockup · Pipeline tab · Prefix stage (loop, captures, sort_order)</title>
+<title>Mockup · Pipeline tab · "Add rule for this payee" entry from Transactions</title>
 <link rel="stylesheet" href="mock.css">
 <style>
 .header { display: flex; align-items: center; gap: 12px; margin: 0 0 0.75rem 0; }
@@ -55,28 +55,17 @@
 .rules-pane { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
 .rules-pane h3 { margin-top: 0; }
 
-/* Prefix-specific rule list: drag handle, sort_order. */
-.rule-list-ordered {
-    display: flex; flex-direction: column;
-    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.76rem;
-    overflow-y: auto; max-height: 580px;
+.rule-list {
+    display: grid; grid-template-columns: max-content max-content 1fr;
+    gap: 3px 10px; align-items: baseline;
+    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.78rem;
+    overflow-y: auto; flex: 1; max-height: 580px;
 }
-.rule-list-ordered .rule-row {
-    display: grid;
-    grid-template-columns: 16px 26px minmax(0,1fr) auto;
-    gap: 4px 8px;
-    align-items: center;
-    padding: 2px 4px;
-    border-bottom: 1px dashed var(--border);
-    cursor: pointer;
-}
-.rule-list-ordered .rule-row.selected { background: var(--bg-highlight); }
-.rule-list-ordered .rule-row:last-child { border-bottom: none; }
-.rule-list-ordered .drag    { color: var(--fg-dark); cursor: grab; user-select: none; text-align: center; }
-.rule-list-ordered .ord     { color: var(--fg-dark); font-size: 0.7rem; text-align: right; }
-.rule-list-ordered .pattern { color: var(--magenta); overflow-wrap: anywhere; }
-.rule-list-ordered .flags-impact { color: var(--fg-dim); font-size: 0.7rem; white-space: nowrap; text-align: right; }
-.rule-list-ordered .flags-impact .flag { color: var(--cyan); margin-right: 6px; }
+.rule-list .rule-row { display: contents; }
+.rule-list .rule-row > * { padding: 2px 0; }
+.rule-list .canonical { color: var(--fg); font-weight: 600; }
+.rule-list .pattern   { color: var(--magenta); overflow-wrap: anywhere; }
+.rule-list .impact    { color: var(--fg-dim); white-space: nowrap; font-size: 0.72rem; }
 
 .search-box {
     background: var(--bg-highlight); color: var(--fg);
@@ -86,24 +75,37 @@
 }
 
 .btn-add { color: var(--green); border-color: var(--green); }
-.btn-delete { color: var(--red); border-color: var(--red); }
 .btn-evaluate { color: var(--accent); border-color: var(--accent); }
 .btn-back { color: var(--fg-dim); }
 
 .editor-card {
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: 2px solid var(--green);   /* highlighted because this is a new-rule flow */
     border-radius: 6px;
     padding: 12px 14px;
     position: sticky; top: 0;
+    box-shadow: 0 0 0 4px rgba(158, 206, 106, 0.08);
 }
-.editor-card h2 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.editor-card h2 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .editor-card .mode-pill {
     font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 1px 6px; border-radius: 3px;
-    border: 1px solid var(--border); color: var(--fg-dim);
+    border: 1px solid var(--green); color: var(--green);
+    background: rgba(158, 206, 106, 0.12);
 }
-.editor-card.mode-edit .mode-pill { color: var(--cyan); border-color: rgba(125, 207, 255, 0.4); }
+
+.from-banner {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(122, 162, 247, 0.08);
+    border: 1px solid rgba(122, 162, 247, 0.3);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--fg-dim);
+    margin-bottom: 8px;
+}
+.from-banner .lbl { color: var(--accent); font-weight: 600; }
 
 .editor-grid { display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; align-items: baseline; }
 .editor-grid label { color: var(--fg-dim); font-size: 0.75rem; }
@@ -111,24 +113,27 @@
 .editor-grid select {
     background: var(--bg-highlight); color: var(--fg);
     border: 1px solid var(--border); border-radius: 4px;
-    padding: 4px 8px;
-    font-family: "SF Mono", ui-monospace, monospace;
+    padding: 4px 8px; font-family: "SF Mono", ui-monospace, monospace;
     font-size: 0.82rem; width: 100%;
 }
+.editor-grid select { font-family: -apple-system, sans-serif; }
 .editor-grid .hint { color: var(--fg-dark); font-size: 0.7rem; }
 
-.cap-flags {
-    display: flex; flex-wrap: wrap; gap: 6px 10px;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 0.74rem;
+.stage-picker-row {
+    display: flex; gap: 6px; align-items: center;
 }
-.cap-flags label {
-    color: var(--fg-dim);
-    padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px;
-    background: var(--bg-highlight);
+.stage-picker-row select { flex: 1; }
+.stage-picker-row .heuristic-tag {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(122, 162, 247, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(122, 162, 247, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
 }
-.cap-flags label.set { color: var(--cyan); border-color: rgba(125, 207, 255, 0.45); }
-.cap-flags input { margin-right: 3px; }
 
 .note-toggle {
     color: var(--fg-dim); font-size: 0.74rem; cursor: pointer;
@@ -141,11 +146,14 @@
     padding-top: 10px; border-top: 1px solid var(--border);
 }
 
-.note-card {
-    color: var(--fg-dim); font-size: 0.72rem;
-    background: var(--bg-highlight); border-radius: 4px;
-    padding: 6px 10px; margin-top: 10px;
+.heuristic-explain {
+    background: var(--bg-highlight);
+    border-radius: 4px; padding: 8px 10px;
+    font-size: 0.7rem; color: var(--fg-dim);
+    margin-top: 10px;
+    line-height: 1.5;
 }
+.heuristic-explain code { color: var(--magenta); }
 </style>
 </head><body>
 
@@ -165,8 +173,9 @@
 </div>
 
 <div class="mock-banner" style="margin: 0 0 0.5rem 0;">
-  <span><strong>Mockup · Pipeline tab</strong> · prefix stage selected. Two-column detail.
-  Editor in <em>edit mode</em>. Capture-flag matrix; drag-to-reorder rules.</span>
+  <span><strong>Mockup · Pipeline tab</strong> · single-button "Add rule for this payee"
+  affordance from Transactions has dropped the user here. Default stage = <strong>merchants</strong>;
+  the stage selector is right at the top of the editor for quick override.</span>
   <a href="../mockups/index.html">← back</a>
 </div>
 
@@ -174,12 +183,12 @@
   <div class="queue-panel">
     <div class="queue-header"><h2>Pipeline stages</h2><div class="sub" style="font-size:0.7rem;color:var(--fg-dim);line-height:1.3">Each stage in execution order.</div></div>
     <div class="queue-list">
-      <div class="pipeline-stage-row selected"><span class="stage-no">1</span><div><span class="stage-name">prefix</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span><span class="stage-tag">captures</span></div></div><span class="stage-count">42 rules</span></div>
+      <div class="pipeline-stage-row"><span class="stage-no">1</span><div><span class="stage-name">prefix</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span><span class="stage-tag">captures</span></div></div><span class="stage-count">42 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">2</span><div><span class="stage-name">suffix</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span><span class="stage-tag">captures</span></div></div><span class="stage-count">37 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">3</span><div><span class="stage-name">expand</span><div class="stage-tags"><span class="stage-tag shape">loop</span><span class="stage-tag order">order matters</span></div></div><span class="stage-count">102 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">4</span><div><span class="stage-name">persons</span><div class="stage-tags"><span class="stage-tag shape">first match</span><span class="stage-tag">literal</span></div></div><span class="stage-count">82 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">5</span><div><span class="stage-name">employers</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">4 rules</span></div>
-      <div class="pipeline-stage-row"><span class="stage-no">6</span><div><span class="stage-name">merchants</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">146 rules</span></div>
+      <div class="pipeline-stage-row selected"><span class="stage-no">6</span><div><span class="stage-name">merchants</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">146 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">7</span><div><span class="stage-name">banking_ops</span><div class="stage-tags"><span class="stage-tag shape">first match</span></div></div><span class="stage-count">38 rules</span></div>
       <div class="pipeline-stage-row"><span class="stage-no">—</span><div><span class="stage-name">locations</span><div class="stage-tags"><span class="stage-tag aux">aux · used by suffix</span></div></div><span class="stage-count">91 rules</span></div>
     </div>
@@ -187,103 +196,70 @@
 
   <div class="detail-panel">
     <div class="detail-header">
-      <h2>prefix
+      <h2>merchants
         <span style="color:var(--fg-dim);font-weight:400;font-size:0.85rem">
-          · 42 rules · loop, first-match-per-iteration · order matters
+          · 146 rules · first match wins
         </span>
       </h2>
-      <div class="sub">
-        Strips metadata prefixes from raw payees in a loop until no rule matches.
-        Each rule may attach features (gateway / operation / account / date) when
-        named captures fire.
-      </div>
     </div>
 
     <div class="detail-2col">
-      <!-- LEFT: ordered rule list with drag handles -->
       <div class="rules-pane">
-        <input class="search-box" placeholder="filter by pattern or capture (try: account, BEEM)">
-        <h3>42 rules · in pipeline order
-          <span style="float:right">
-            <button class="btn btn-add" style="font-size:0.72rem;padding:1px 8px">+ Add rule</button>
-          </span>
-        </h3>
-        <div class="rule-list-ordered">
-          <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">11</span>
-            <span class="pattern">^(?i)Direct Debit (?:XX)?(?P&lt;account&gt;\d+)\s+</span>
-            <span class="flags-impact"><span class="flag">+op +acct</span>93 hits</span>
-          </div>
-          <div class="rule-row selected">
-            <span class="drag">⋮⋮</span><span class="ord">12</span>
-            <span class="pattern">^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P&lt;account&gt;\d+)\s+</span>
-            <span class="flags-impact"><span class="flag">+op +acct</span>21 hits</span>
-          </div>
-          <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">13</span>
-            <span class="pattern">^ALI\*</span>
-            <span class="flags-impact"><span class="flag">+gw</span>7 hits</span>
-          </div>
-          <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">14</span>
-            <span class="pattern">^Alipay\s</span>
-            <span class="flags-impact"><span class="flag">+gw</span>3 hits</span>
-          </div>
-          <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">15</span>
-            <span class="pattern">^(?i)BEEM IT$</span>
-            <span class="flags-impact"><span class="flag">+gw +op</span>14 hits</span>
-          </div>
-          <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">16</span>
-            <span class="pattern">^(?i)BEEM IT\b\s*-?\s*</span>
-            <span class="flags-impact"><span class="flag">+gw</span>8 hits</span>
-          </div>
-          <div style="color:var(--fg-dark);font-style:italic;text-align:center;padding:6px 0">…</div>
+        <input class="search-box" placeholder="filter by canonical or pattern">
+        <h3>Existing rules</h3>
+        <div class="rule-list" style="opacity:0.55">
+          <div class="rule-row"><span class="canonical">7-Eleven</span><span class="pattern">(?i)7-ELEVEN\b</span><span class="impact">28 txns</span></div>
+          <div class="rule-row"><span class="canonical">ALDI</span><span class="pattern">(?i)ALDI\b</span><span class="impact">94 txns</span></div>
+          <div class="rule-row"><span class="canonical">Amazon</span><span class="pattern">(?i)AMAZON\b</span><span class="impact">412 txns</span></div>
+          <div class="rule-row"><span class="canonical">Amazon Prime</span><span class="pattern">(?i)AMAZON PRIME</span><span class="impact">12 txns</span></div>
+          <div class="rule-row"><span class="canonical">American Express</span><span class="pattern">(?i)AMERICAN EXPRESS\b</span><span class="impact">7 txns</span></div>
+          <div style="grid-column:1/-1;color:var(--fg-dark);font-style:italic;text-align:center;padding:6px 0">…</div>
+        </div>
+        <div style="font-size:0.7rem;color:var(--fg-dark);margin-top:6px;font-style:italic">
+          New rule will slot in alphabetically once you save.
         </div>
       </div>
 
-      <!-- RIGHT: editor in edit mode (capture flags shown) -->
-      <div class="editor-card mode-edit">
+      <!-- RIGHT: editor card in NEW-RULE state, prefilled from Transactions -->
+      <div class="editor-card">
         <h2>
-          Edit rule #12
-          <span class="mode-pill">edit mode</span>
+          New rule
+          <span class="mode-pill">new · prefilled</span>
         </h2>
+
+        <div class="from-banner">
+          <span class="lbl">From:</span>
+          <span>Transaction <code>#73491</code> · "STARBUCKS COFFEE 1024 GRANVILLE" · −$8.50 · 2026-04-22</span>
+        </div>
+
         <div class="editor-grid">
-          <label for="r-pat">Pattern</label>
-          <input id="r-pat" type="text" value="^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P<account>\d+)\s+">
-
-          <label for="r-gw">Gateway</label>
-          <input id="r-gw" type="text" value="" placeholder="(none)">
-
-          <label for="r-op">Operation</label>
-          <select id="r-op">
-            <option>(none)</option>
-            <option>Direct Debit</option>
-            <option selected>Direct Credit</option>
-            <option>BPay</option>
-            <option>Transfer</option>
-            <option>Fee</option>
-            <option>Interest</option>
-            <option>Refund</option>
-            <option>Cash</option>
-          </select>
-
-          <label>Captures</label>
-          <div class="cap-flags">
-            <label class="set"><input type="checkbox" checked> has_account</label>
-            <label><input type="checkbox"> has_date</label>
+          <label for="r-stage">Stage</label>
+          <div class="stage-picker-row">
+            <select id="r-stage">
+              <option value="prefix">prefix</option>
+              <option value="suffix">suffix</option>
+              <option value="expand">expand</option>
+              <option value="persons">persons</option>
+              <option value="employers">employers</option>
+              <option value="merchants" selected>merchants</option>
+              <option value="banking_ops">banking_ops</option>
+              <option value="locations">locations</option>
+            </select>
+            <span class="heuristic-tag" title="Default chosen by heuristic; click to dismiss">heuristic ✓</span>
           </div>
+
+          <label for="r-canon">Canonical</label>
+          <input id="r-canon" type="text" placeholder="e.g. Starbucks" autofocus>
+
+          <label for="r-pat">Pattern</label>
+          <input id="r-pat" type="text" value="(?i)STARBUCKS COFFEE 1024 GRANVILLE">
 
           <span></span>
           <span class="hint">
-            Tick a flag to use the named capture group of the same name (e.g.
-            <code style="color:var(--magenta)">(?P&lt;account&gt;\d+)</code>) and store the captured value
-            in the corresponding feature.
+            Pattern is prefilled with the current post-pipeline string, regex-escaped.
+            Generalise it (e.g. <code style="color:var(--magenta)">(?i)STARBUCKS\b</code>) before saving
+            so other Starbucks payees match too. Click <strong>Evaluate</strong> to preview.
           </span>
-
-          <label for="r-ord">Pipeline order</label>
-          <input id="r-ord" type="text" value="12" style="max-width:80px">
         </div>
 
         <button class="note-toggle">+ add note</button>
@@ -291,13 +267,14 @@
         <div class="editor-actions">
           <button class="btn btn-evaluate">[E] Evaluate</button>
           <button class="btn btn-back">[N] Cancel</button>
-          <button class="btn btn-delete" style="margin-left:auto">Delete</button>
         </div>
 
-        <div class="note-card">
-          <strong>Heads up.</strong> The prefix loop runs iteratively, so this rule's “after” string still
-          gets fed back through every other prefix rule before the loop exits. Reordering this rule
-          rarely changes behaviour for this stage; capture flags do.
+        <div class="heuristic-explain">
+          <strong>Why merchants?</strong> The post-pipeline string had no
+          <code>Mr / Mrs / Ms / Miss / Dr</code> title prefix, so the heuristic chose
+          <code>merchants</code>. You can switch to <code>persons</code> /
+          <code>employers</code> from the Stage dropdown above. The destination is sticky once
+          you choose, but cancellation discards the new rule entirely.
         </div>
       </div>
     </div>
@@ -306,13 +283,8 @@
 
 <div class="activity-panel">
   <div class="activity-header">
-    <span class="stat">
-      <span style="color:var(--yellow);font-weight:600">⚠ 5 payees would re-stage</span>
-      since the last scan ·
-      <a href="#" style="color:var(--accent)">re-scan now ↻</a>
-    </span>
-    <span class="stat" style="color:var(--fg-dim);font-size:0.74rem">
-      Edits auto-export to <code style="color:var(--magenta)">src/rules/prefix.sql</code> on commit.
+    <span class="stat" style="color:var(--fg-dim)">
+      Adding a new rule. Save will appear after Evaluate confirms what this catches.
     </span>
   </div>
 </div>
