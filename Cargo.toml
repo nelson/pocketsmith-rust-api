@@ -5,6 +5,8 @@ edition = "2021"
 
 [features]
 web = ["tiny_http", "maud"]
+# Opt-in heavy tests that run the pipeline against the real pocketsmith.db.
+fidelity = []
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }

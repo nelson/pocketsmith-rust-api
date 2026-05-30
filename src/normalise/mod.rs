@@ -50,6 +50,30 @@ impl BankingOperation {
             Self::Cash => "Cash",
         }
     }
+
+    /// Inverse of [`display_name`](Self::display_name): map a stored
+    /// `operation` string (as kept in the rule tables) back to the enum.
+    /// Returns `None` for an unrecognised name.
+    pub fn from_display_name(s: &str) -> Option<Self> {
+        Some(match s {
+            "Interest" => Self::Interest,
+            "Credit Card" => Self::CreditCard,
+            "Transfer" => Self::Transfer,
+            "Account Servicing" => Self::AccountServicing,
+            "Loan" => Self::Loan,
+            "Deposit" => Self::Deposit,
+            "Withdrawal" => Self::Withdrawal,
+            "Direct Debit" => Self::DirectDebit,
+            "Direct Credit" => Self::DirectCredit,
+            "BPay" => Self::BPay,
+            "Internal Transfer" => Self::InternalTransfer,
+            "Fee" => Self::Fee,
+            "Purchase" => Self::Purchase,
+            "Refund" => Self::Refund,
+            "Cash" => Self::Cash,
+            _ => return None,
+        })
+    }
 }
 
 /// Listed in order of priority for classification.
@@ -237,10 +261,9 @@ pub use cache::{OwnedPipeline, PipelineCtx, RuleCache};
 /// `ctx` is threaded but not yet consulted; each conversion PR (4–8)
 /// flips one stage to read from the DB via `ctx`.
 pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
-    let _ = ctx;
     let mut result = NormalisationResult::new(original);
-    run_traced(&mut result, "prefix", prefix::apply);
-    run_traced(&mut result, "suffix", suffix::apply);
+    run_traced(&mut result, "prefix", |r| prefix::apply_with_db(r, ctx));
+    run_traced(&mut result, "suffix", |r| suffix::apply_with_db(r, ctx));
     run_traced(&mut result, "expand", expand::apply);
     run_traced(&mut result, "persons", persons::apply);
     run_traced(&mut result, "employers", employers::apply);
@@ -271,7 +294,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
 fn run_traced(
     result: &mut NormalisationResult,
     stage: &'static str,
-    apply: fn(&mut NormalisationResult),
+    mut apply: impl FnMut(&mut NormalisationResult),
 ) {
     let before_str = result.normalised.clone();
     let before_keys = populated_feature_keys(&result.features);
@@ -329,6 +352,52 @@ pub fn slug_for(original_payee: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heavy fidelity gate (`cargo test --features fidelity`): for every
+    /// distinct `original_payee` in the real `pocketsmith.db`, the
+    /// DB-backed prefix+suffix stages must produce byte-identical output
+    /// to the const oracle. Skipped silently if the DB isn't present.
+    #[cfg(feature = "fidelity")]
+    #[test]
+    fn prefix_suffix_db_matches_const_on_real_payees() {
+        let Ok(conn) = rusqlite::Connection::open("pocketsmith.db") else {
+            eprintln!("pocketsmith.db absent \u{2014} skipping fidelity test");
+            return;
+        };
+        let payees: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT DISTINCT original_payee FROM transactions WHERE original_payee IS NOT NULL")
+                .unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().map(|r| r.unwrap()).collect()
+        };
+        let p = OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        let mut checked = 0usize;
+        for payee in &payees {
+            for stage in ["prefix", "suffix"] {
+                let mut a = NormalisationResult::new(payee);
+                let mut b = NormalisationResult::new(payee);
+                match stage {
+                    "prefix" => {
+                        prefix::apply(&mut a);
+                        prefix::apply_with_db(&mut b, &ctx);
+                    }
+                    _ => {
+                        suffix::apply(&mut a);
+                        suffix::apply_with_db(&mut b, &ctx);
+                    }
+                }
+                assert_eq!(a.normalised, b.normalised, "{stage} normalised differs for {payee:?}");
+                assert_eq!(
+                    features_to_json(&a.features),
+                    features_to_json(&b.features),
+                    "{stage} features differ for {payee:?}"
+                );
+                checked += 1;
+            }
+        }
+        eprintln!("fidelity: checked {} payee\u{00d7}stage pairs", checked);
+    }
 
     #[test]
     fn test_features_default() {
