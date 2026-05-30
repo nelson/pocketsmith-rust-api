@@ -8,6 +8,7 @@
 //! endpoints exposed by the `transfers` and `normalise` tabs (plus the
 //! new `/transfer-decisions/*` endpoints once they land).
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
@@ -31,6 +32,38 @@ pub struct QueueRowView {
     pub cat: CatState,
 }
 
+/// Build a memo from `original_payee` to "does the pipeline trace
+/// transform this payee at all" for the rows that need it. Only rows
+/// with no staging row (`norm_status` is `None`) are computed, since
+/// that's the only case where trace-emptiness changes the derived
+/// [`NormState`] (`Clean` vs `Missing`). Running the pipeline once per
+/// distinct payee keeps this ~tens of ms even on a full 1000-row
+/// queue.
+fn build_trace_memo(rows: &[TxnQueueRow]) -> HashMap<String, bool> {
+    let mut memo: HashMap<String, bool> = HashMap::new();
+    for r in rows {
+        if r.norm_status.is_some() {
+            continue;
+        }
+        if let Some(op) = r.original_payee.as_deref() {
+            memo.entry(op.to_string())
+                .or_insert_with(|| !run_normalise(op).trace.is_empty());
+        }
+    }
+    memo
+}
+
+/// Look up the memoised trace-emptiness for a row. Rows that carry a
+/// staging row (`norm_status.is_some()`) never need this, so a missing
+/// memo entry safely reads as `false`.
+fn trace_nonempty(memo: &HashMap<String, bool>, r: &TxnQueueRow) -> bool {
+    r.original_payee
+        .as_deref()
+        .and_then(|op| memo.get(op))
+        .copied()
+        .unwrap_or(false)
+}
+
 /// Render the full `/transactions/` page. Fetches transactions
 /// matching the active filter, decorates each with its three-pillar
 /// cleaning state, and renders the queue panel. The detail panel
@@ -42,11 +75,12 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
     // No per-row SQL needed -- pair_status and norm_status arrive
     // pre-fetched via LEFT JOIN in filtered_transactions.
+    let trace_memo = build_trace_memo(&rows);
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
             let pair = super::state::pair_state_from_status(r.pair_status, r.is_transfer);
-            let norm = super::state::norm_state_from_status(r.norm_status);
+            let norm = super::state::norm_state_from_status(r.norm_status, trace_nonempty(&trace_memo, &r));
             let cat = super::state::derive_cat_state(r.category_id);
             QueueRowView { row: r, pair, norm, cat }
         })
@@ -100,10 +134,11 @@ fn render_active_detail(
     };
     let pair = super::state::derive_pair_state(&state.conn, row.id, row.is_transfer)
         .unwrap_or(PairState::NotApplicable);
-    let norm = super::state::derive_norm_state(&state.conn, row.original_payee.as_deref())
+    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let trace_nonempty = pipeline.as_ref().map(|p| !p.trace.is_empty()).unwrap_or(false);
+    let norm = super::state::derive_norm_state(&state.conn, row.original_payee.as_deref(), trace_nonempty)
         .unwrap_or(NormState::Missing);
     let cat = super::state::derive_cat_state(row.category_id);
-    let pipeline = row.original_payee.as_deref().map(run_normalise);
     let siblings = row
         .original_payee
         .as_deref()
@@ -168,11 +203,12 @@ pub fn render_queue_fragment(state: &Arc<Mutex<AppState>>, filter_str: &str) -> 
     st.txn_filter = filter_str.to_string();
     let filter = TxnFilter::parse(filter_str);
     let rows = super::helpers::filtered_transactions(&st.conn, filter, 1000).unwrap_or_default();
+    let trace_memo = build_trace_memo(&rows);
     let views: Vec<QueueRowView> = rows
         .into_iter()
         .map(|r| {
             let pair = super::state::pair_state_from_status(r.pair_status, r.is_transfer);
-            let norm = super::state::norm_state_from_status(r.norm_status);
+            let norm = super::state::norm_state_from_status(r.norm_status, trace_nonempty(&trace_memo, &r));
             let cat = super::state::derive_cat_state(r.category_id);
             QueueRowView { row: r, pair, norm, cat }
         })
@@ -298,6 +334,7 @@ fn norm_glyph_with_tooltip_clickable(s: NormState, txn_id: i64) -> Markup {
     let (cls, title) = match s {
         NormState::Confirmed => ("g-norm-confirmed", "normalisation rule confirmed"),
         NormState::Pending => ("g-norm-pending", "normalisation pending review"),
+        NormState::Clean => ("g-norm-clean", "payee normalised \u{2014} no rule pending"),
         NormState::Missing => ("g-norm-missing", "no normalisation rule"),
         NormState::Rejected => ("g-norm-rejected", "normalisation rejected"),
     };
@@ -601,10 +638,11 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, txn_id: i64) -> Mark
 
     let pair = super::state::derive_pair_state(&st.conn, row.id, row.is_transfer)
         .unwrap_or(PairState::NotApplicable);
-    let norm = super::state::derive_norm_state(&st.conn, row.original_payee.as_deref())
+    let pipeline = row.original_payee.as_deref().map(run_normalise);
+    let trace_nonempty = pipeline.as_ref().map(|p| !p.trace.is_empty()).unwrap_or(false);
+    let norm = super::state::derive_norm_state(&st.conn, row.original_payee.as_deref(), trace_nonempty)
         .unwrap_or(NormState::Missing);
     let cat = super::state::derive_cat_state(row.category_id);
-    let pipeline = row.original_payee.as_deref().map(run_normalise);
     let siblings = row
         .original_payee
         .as_deref()
@@ -925,6 +963,11 @@ fn render_norm_card(s: NormState, txn_id: i64) -> Markup {
             "Normalisation rule pending review",
             "The pipeline produced a proposal \u{2014} your call to confirm.",
         ),
+        NormState::Clean => (
+            CardStatus::Ok,
+            "Payee normalised",
+            "The pipeline normalises this payee and nothing is pending review.",
+        ),
         NormState::Missing => (
             CardStatus::Bad,
             "No normalisation rule",
@@ -975,6 +1018,7 @@ fn norm_glyph_class(s: NormState) -> &'static str {
     match s {
         NormState::Confirmed => "g-norm-confirmed",
         NormState::Pending => "g-norm-pending",
+        NormState::Clean => "g-norm-clean",
         NormState::Missing => "g-norm-missing",
         NormState::Rejected => "g-norm-rejected",
     }
@@ -1095,5 +1139,40 @@ mod detail_tests {
             html.contains("AMAZON MARKETPLACE"),
             "expected raw original_payee chip, html:\n{html}"
         );
+    }
+
+    #[test]
+    fn norm_card_clean_does_not_flag_no_normalisation() {
+        // PR 0: a payee whose pipeline matched (non-empty trace) but has
+        // no staging row is Clean, not Missing. Its pillar must NOT read
+        // "No normalisation rule".
+        let html = render_norm_card(NormState::Clean, 0).into_string();
+        assert!(
+            !html.contains("No normalisation rule"),
+            "Clean state must not flag 'No normalisation rule', html:\n{html}"
+        );
+        assert!(
+            html.contains("Payee normalised"),
+            "Clean state should read 'Payee normalised', html:\n{html}"
+        );
+        // Clean is a benign (ok) pillar, not the red 'bad' variant.
+        assert!(html.contains("card-status-ok"), "Clean pillar should be 'ok', html:\n{html}");
+    }
+
+    #[test]
+    fn norm_card_missing_still_flags_no_normalisation() {
+        // Only a completely empty trace (Missing) keeps the old text.
+        let html = render_norm_card(NormState::Missing, 0).into_string();
+        assert!(
+            html.contains("No normalisation rule"),
+            "Missing state should still flag 'No normalisation rule', html:\n{html}"
+        );
+    }
+
+    #[test]
+    fn norm_glyph_clean_has_distinct_class_and_tooltip() {
+        let html = norm_glyph_with_tooltip(NormState::Clean).into_string();
+        assert!(html.contains("g-norm-clean"), "html:\n{html}");
+        assert!(!html.contains("no normalisation rule"), "html:\n{html}");
     }
 }

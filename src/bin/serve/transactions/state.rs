@@ -12,6 +12,7 @@
 //!
 //! Norm      Confirmed -> g-norm-confirmed (tag)
 //!           Pending   -> g-norm-pending   (memo)
+//!           Clean     -> g-norm-clean     (label)
 //!           Missing   -> g-norm-missing   (question mark)
 //!           Rejected  -> g-norm-rejected  (prohibited)
 //!
@@ -53,7 +54,16 @@ pub enum NormState {
     Pending,
     /// `payee_normalisations` row exists with `status = rejected`.
     Rejected,
-    /// No `payee_normalisations` row exists for this `original_payee`.
+    /// No `payee_normalisations` row exists, but the pipeline still
+    /// transforms this payee (its trace is non-empty). This is the
+    /// steady state after a rule was confirmed and applied (the
+    /// staging row is then drained) or when a payee was imported
+    /// already-normalised. Nothing is pending review — the payee is
+    /// clean.
+    Clean,
+    /// No `payee_normalisations` row exists *and* the pipeline produces
+    /// no transformation at all (its trace is completely empty: no
+    /// stage changed the string and no feature was extracted).
     /// Reading: "the pipeline has nothing to say about this payee yet —
     /// either teach it a new rule, or the payee is so unique it doesn't
     /// merit one."
@@ -82,13 +92,17 @@ pub fn pair_state_from_status(status: Option<i32>, is_transfer: bool) -> PairSta
 }
 
 /// Pure variant of [`derive_norm_state`]: takes the pre-fetched
-/// status code (None when no pn row exists). Same N+1-avoidance
-/// motivation as `pair_state_from_status`.
-pub fn norm_state_from_status(status: Option<i32>) -> NormState {
+/// status code (None when no pn row exists) plus whether the pipeline
+/// trace is non-empty for this payee. Same N+1-avoidance motivation as
+/// `pair_state_from_status`. When no staging row exists we distinguish
+/// `Clean` (pipeline still transforms the payee) from `Missing`
+/// (pipeline does nothing at all).
+pub fn norm_state_from_status(status: Option<i32>, trace_nonempty: bool) -> NormState {
     match status.and_then(Status::from_i32) {
         Some(Status::Confirmed) => NormState::Confirmed,
         Some(Status::Pending) => NormState::Pending,
         Some(Status::Rejected) => NormState::Rejected,
+        None if trace_nonempty => NormState::Clean,
         None => NormState::Missing,
     }
 }
@@ -125,7 +139,11 @@ pub fn derive_pair_state(conn: &Connection, txn_id: i64, is_transfer: bool) -> R
 /// its `original_payee` in `payee_normalisations`. Pass `None` for a
 /// row whose `original_payee` is NULL — such a row can never have a
 /// rule, so the answer is always `Missing`.
-pub fn derive_norm_state(conn: &Connection, original_payee: Option<&str>) -> Result<NormState> {
+pub fn derive_norm_state(
+    conn: &Connection,
+    original_payee: Option<&str>,
+    trace_nonempty: bool,
+) -> Result<NormState> {
     let Some(op) = original_payee else {
         return Ok(NormState::Missing);
     };
@@ -136,15 +154,7 @@ pub fn derive_norm_state(conn: &Connection, original_payee: Option<&str>) -> Res
             |row| row.get(0),
         )
         .ok();
-    Ok(match status {
-        Some(s) => match Status::from_i32(s) {
-            Some(Status::Confirmed) => NormState::Confirmed,
-            Some(Status::Pending) => NormState::Pending,
-            Some(Status::Rejected) => NormState::Rejected,
-            None => NormState::Missing,
-        },
-        None => NormState::Missing,
-    })
+    Ok(norm_state_from_status(status, trace_nonempty))
 }
 
 /// Derive the category state. Pure function of the supplied
@@ -263,7 +273,7 @@ mod tests {
         let conn = fresh();
         seed_pn(&conn, "WOOLIES", "Woolworths", Status::Confirmed, 5).unwrap();
         assert_eq!(
-            derive_norm_state(&conn, Some("WOOLIES")).unwrap(),
+            derive_norm_state(&conn, Some("WOOLIES"), true).unwrap(),
             NormState::Confirmed
         );
     }
@@ -273,7 +283,7 @@ mod tests {
         let conn = fresh();
         seed_pn(&conn, "WOOLIES", "Woolworths", Status::Pending, 5).unwrap();
         assert_eq!(
-            derive_norm_state(&conn, Some("WOOLIES")).unwrap(),
+            derive_norm_state(&conn, Some("WOOLIES"), true).unwrap(),
             NormState::Pending
         );
     }
@@ -283,16 +293,28 @@ mod tests {
         let conn = fresh();
         seed_pn(&conn, "WOOLIES", "Woolworths", Status::Rejected, 5).unwrap();
         assert_eq!(
-            derive_norm_state(&conn, Some("WOOLIES")).unwrap(),
+            derive_norm_state(&conn, Some("WOOLIES"), true).unwrap(),
             NormState::Rejected
         );
     }
 
     #[test]
-    fn norm_state_missing_when_no_pn_row() {
+    fn norm_state_clean_when_no_pn_row_but_trace_nonempty() {
+        // A payee with no staging row but a non-empty pipeline trace
+        // (e.g. a confirmed-and-applied merchant rule) is Clean, not
+        // Missing — the pipeline still has something to say about it.
         let conn = fresh();
         assert_eq!(
-            derive_norm_state(&conn, Some("UNKNOWN PAYEE")).unwrap(),
+            derive_norm_state(&conn, Some("WOOLWORTHS 1624 STRATHF"), true).unwrap(),
+            NormState::Clean
+        );
+    }
+
+    #[test]
+    fn norm_state_missing_when_no_pn_row_and_trace_empty() {
+        let conn = fresh();
+        assert_eq!(
+            derive_norm_state(&conn, Some("UNKNOWN PAYEE"), false).unwrap(),
             NormState::Missing
         );
     }
@@ -302,7 +324,28 @@ mod tests {
         let conn = fresh();
         // A NULL original_payee can never have a rule: the answer
         // must be Missing without touching the database.
-        assert_eq!(derive_norm_state(&conn, None).unwrap(), NormState::Missing);
+        assert_eq!(
+            derive_norm_state(&conn, None, false).unwrap(),
+            NormState::Missing
+        );
+    }
+
+    // --- norm_state_from_status (pure) ---
+
+    #[test]
+    fn norm_state_from_status_pure_clean_vs_missing() {
+        // No staging row: trace-emptiness decides Clean vs Missing.
+        assert_eq!(norm_state_from_status(None, true), NormState::Clean);
+        assert_eq!(norm_state_from_status(None, false), NormState::Missing);
+        // A staging row always wins regardless of trace.
+        assert_eq!(
+            norm_state_from_status(Some(Status::Pending as i32), false),
+            NormState::Pending
+        );
+        assert_eq!(
+            norm_state_from_status(Some(Status::Confirmed as i32), false),
+            NormState::Confirmed
+        );
     }
 
     // --- CatState ---
