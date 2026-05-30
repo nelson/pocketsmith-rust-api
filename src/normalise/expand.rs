@@ -1,23 +1,29 @@
 use regex::Regex;
+#[cfg(test)]
 use std::sync::OnceLock;
 
-use super::NormalisationResult;
+use anyhow::Result;
+use rusqlite::Connection;
 
+use super::{NormalisationResult, PipelineCtx};
+
+#[cfg(test)]
 struct Expansion {
     pattern: &'static str,
     canonical: &'static str,
 }
 
-struct CompiledExpansion {
+pub(crate) struct CompiledExpansion {
     regex: Regex,
-    canonical: &'static str,
+    canonical: String,
 }
 
-/// Expand truncated words and country codes using word-boundary matching.
-pub fn apply(result: &mut NormalisationResult) {
+/// One run of the expand loop over a compiled rule set. Shared by
+/// [`apply_with_db`] and the const test oracle [`apply`].
+fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledExpansion]) {
     loop {
         let mut matched = false;
-        for exp in compiled_expansions() {
+        for exp in compiled {
             if let Some(m) = exp.regex.find(&result.normalised) {
                 result.normalised = format!(
                     "{}{}{}",
@@ -35,6 +41,42 @@ pub fn apply(result: &mut NormalisationResult) {
     }
 }
 
+/// Expand truncated words / country codes using the DB-backed rule set.
+pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
+    match ctx.cache.expansions(ctx.conn) {
+        Ok(compiled) => run_loop(result, &compiled),
+        Err(e) => eprintln!("expand: rule load failed, stage skipped: {e:#}"),
+    }
+}
+
+/// Compile a single expansion pattern the same way the const path does:
+/// case-insensitive, anchored on word boundaries.
+fn compile_expansion(pattern: &str) -> Result<Regex> {
+    Regex::new(&format!("(?i)\\b{}\\b", regex::escape(pattern)))
+        .map_err(|e| anyhow::anyhow!("invalid expansion pattern {pattern:?}: {e}"))
+}
+
+/// Load + compile the expansion rules from `rule_expansions` in apply
+/// order (sort_order, then id).
+pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledExpansion>> {
+    let mut stmt = conn.prepare(
+        "SELECT pattern, canonical FROM rule_expansions ORDER BY sort_order, id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        let (pattern, canonical) = r?;
+        out.push(CompiledExpansion {
+            regex: compile_expansion(&pattern)?,
+            canonical,
+        });
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
 const EXPANSIONS: &[Expansion] = &[
     // --- Suburb expansions (alphabetical by canonical, longer patterns first) ---
     Expansion { pattern: "ASHFIEL", canonical: "ASHFIELD" },
@@ -143,6 +185,7 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "USA", canonical: "United States" },
 ];
 
+#[cfg(test)]
 fn compiled_expansions() -> &'static [CompiledExpansion] {
     static COMPILED: OnceLock<Vec<CompiledExpansion>> = OnceLock::new();
     COMPILED.get_or_init(|| {
@@ -150,16 +193,51 @@ fn compiled_expansions() -> &'static [CompiledExpansion] {
             .iter()
             .map(|e| CompiledExpansion {
                 regex: Regex::new(&format!("(?i)\\b{}\\b", regex::escape(e.pattern))).unwrap(),
-                canonical: e.canonical,
+                canonical: e.canonical.to_string(),
             })
             .collect()
     })
+}
+
+/// Const-backed expand pass: original behaviour, kept as the fidelity
+/// oracle the DB-backed path is tested against.
+#[cfg(test)]
+pub(crate) fn apply(result: &mut NormalisationResult) {
+    run_loop(result, compiled_expansions());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::normalise::NormalisationResult;
+
+    /// DB-backed expand path must reproduce the const oracle exactly.
+    #[test]
+    fn db_apply_matches_const_oracle() {
+        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        let inputs = [
+            "MERCHANT NSWAU",
+            "MERCHANT NLD",
+            "MERCHANT SGP",
+            "MERCHANT USA",
+            "MCARE BENEFITS 024037941",
+            "PLINE PH STRATHFIELD",
+            "CHILDASSISTPYMT",
+            "AMZNPRIMEAU MEMBERSHIP",
+            "WOOLWORTHS 1624 STRATHF",
+            "COLES BURWOO",
+            "DISCOUNT PHARMCY",
+            "SHOP NORTH STRATHF",
+        ];
+        for inp in inputs {
+            let mut a = NormalisationResult::new(inp);
+            apply(&mut a);
+            let mut b = NormalisationResult::new(inp);
+            apply_with_db(&mut b, &ctx);
+            assert_eq!(a.normalised, b.normalised, "normalised differs for {inp:?}");
+        }
+    }
 
     #[test]
     fn test_expand_nswau() {

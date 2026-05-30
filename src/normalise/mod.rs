@@ -264,7 +264,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
     let mut result = NormalisationResult::new(original);
     run_traced(&mut result, "prefix", |r| prefix::apply_with_db(r, ctx));
     run_traced(&mut result, "suffix", |r| suffix::apply_with_db(r, ctx));
-    run_traced(&mut result, "expand", expand::apply);
+    run_traced(&mut result, "expand", |r| expand::apply_with_db(r, ctx));
     run_traced(&mut result, "persons", persons::apply);
     run_traced(&mut result, "employers", employers::apply);
     run_traced(&mut result, "merchants", merchants::apply);
@@ -359,7 +359,7 @@ mod tests {
     /// to the const oracle. Skipped silently if the DB isn't present.
     #[cfg(feature = "fidelity")]
     #[test]
-    fn prefix_suffix_db_matches_const_on_real_payees() {
+    fn converted_stages_db_matches_const_on_real_payees() {
         let Ok(conn) = rusqlite::Connection::open("pocketsmith.db") else {
             eprintln!("pocketsmith.db absent \u{2014} skipping fidelity test");
             return;
@@ -374,7 +374,7 @@ mod tests {
         let ctx = p.ctx();
         let mut checked = 0usize;
         for payee in &payees {
-            for stage in ["prefix", "suffix"] {
+            for stage in ["prefix", "suffix", "expand"] {
                 let mut a = NormalisationResult::new(payee);
                 let mut b = NormalisationResult::new(payee);
                 match stage {
@@ -382,9 +382,13 @@ mod tests {
                         prefix::apply(&mut a);
                         prefix::apply_with_db(&mut b, &ctx);
                     }
-                    _ => {
+                    "suffix" => {
                         suffix::apply(&mut a);
                         suffix::apply_with_db(&mut b, &ctx);
+                    }
+                    _ => {
+                        expand::apply(&mut a);
+                        expand::apply_with_db(&mut b, &ctx);
                     }
                 }
                 assert_eq!(a.normalised, b.normalised, "{stage} normalised differs for {payee:?}");
@@ -448,6 +452,49 @@ mod tests {
         suffix::apply_with_db(&mut r, &ctx);
         assert_eq!(r.normalised, "SOME SHOP", "suffix must be stripped using the DB rule");
         assert_eq!(r.features.account.as_deref(), Some("9999"));
+    }
+
+    /// Conversion test — **hermetic** (expand). Mirror of
+    /// [`prefix_stage_reads_its_rules_from_the_db`] for the expand stage.
+    /// Defines its own expansion rules in the DB (unrelated to the
+    /// production `src/rules/expansions.sql`) and proves `apply_with_db`
+    /// loads + compiles + word-boundary-replaces from exactly the DB rows,
+    /// applying multiple rules in one pass via the expand loop.
+    #[test]
+    fn expand_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap(); // schema only
+        // Two independent rules exercise the multi-rule loop in one call.
+        conn.execute(
+            "INSERT INTO rule_expansions (pattern, canonical, sort_order) VALUES (?1, ?2, 0)",
+            ["WLWRTHS", "WOOLWORTHS"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO rule_expansions (pattern, canonical, sort_order) VALUES (?1, ?2, 1)",
+            ["MKT", "MARKET"],
+        )
+        .unwrap();
+        let cache = cache::RuleCache::new();
+        let ctx = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("WLWRTHS MKT");
+        expand::apply_with_db(&mut r, &ctx);
+        assert_eq!(
+            r.normalised, "WOOLWORTHS MARKET",
+            "both DB expansions must be applied in one pass"
+        );
+        // Word-boundary anchored: a pattern embedded in a larger word is
+        // left untouched.
+        let mut r2 = NormalisationResult::new("WLWRTHSX");
+        expand::apply_with_db(&mut r2, &ctx);
+        assert_eq!(r2.normalised, "WLWRTHSX", "no \\b match => unchanged");
+
+        // No rules => no-op (unseeded DB must not panic or fabricate).
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r3 = NormalisationResult::new("WLWRTHS MKT");
+        expand::apply_with_db(&mut r3, &ctx2);
+        assert_eq!(r3.normalised, "WLWRTHS MKT", "no rules => input unchanged");
     }
 
     /// Guards the init consolidation (not the seed *content*): every binary
