@@ -16,5 +16,7 @@
 //! activity panel) are deliberately deferred until this baseline is
 //! in anger.
 
+pub mod breakdown;
 pub mod helpers;
+pub mod sankey;
 pub mod views;

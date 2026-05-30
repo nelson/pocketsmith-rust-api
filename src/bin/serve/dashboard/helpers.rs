@@ -141,11 +141,72 @@ pub fn month_category_breakdown(conn: &Connection, ym: &str) -> Result<Vec<Categ
     Ok(rows)
 }
 
+/// Choose the month to show: explicit user selection if it's still
+/// present in the data, else the most recent month with data, else
+/// `None` (empty DB).
+pub fn pick_active_month(stash: &Option<String>, months: &[MonthRow]) -> Option<String> {
+    if let Some(s) = stash {
+        if months.iter().any(|m| &m.month == s) {
+            return Some(s.clone());
+        }
+    }
+    months.first().map(|m| m.month.clone())
+}
+
+/// Map a hygiene fraction (0.0–1.0) to the CSS class for its dot.
+pub fn hyg_class(frac: f64) -> &'static str {
+    if frac >= 0.9 {
+        "hyg-on"
+    } else if frac >= 0.5 {
+        "hyg-warn"
+    } else {
+        "hyg-bad"
+    }
+}
+
+/// Format a `YYYY-MM` string as `Month YYYY` (e.g. "April 2026").
+/// Anything that doesn't parse passes through unchanged.
+pub fn pretty_month(ym: &str) -> String {
+    let mut parts = ym.split('-');
+    let (Some(y), Some(m)) = (parts.next(), parts.next()) else { return ym.to_string() };
+    let name = match m {
+        "01" => "January", "02" => "February", "03" => "March", "04" => "April",
+        "05" => "May", "06" => "June", "07" => "July", "08" => "August",
+        "09" => "September", "10" => "October", "11" => "November", "12" => "December",
+        _ => return ym.to_string(),
+    };
+    format!("{name} {y}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pocketsmith_sync::db;
     use rusqlite::params;
+
+    #[test]
+    fn pretty_month_handles_known_months() {
+        assert_eq!(pretty_month("2026-04"), "April 2026");
+        assert_eq!(pretty_month("2025-12"), "December 2025");
+        // Unknown shape passes through.
+        assert_eq!(pretty_month("garbage"), "garbage");
+    }
+
+    #[test]
+    fn pick_active_month_falls_back_to_most_recent() {
+        let months = vec![
+            MonthRow { month: "2026-04".into(), total_in: 0.0, total_out: 0.0, net: 0.0,
+                txn_count: 0, frac_categorised: 1.0, frac_normalised: 1.0 },
+            MonthRow { month: "2026-03".into(), total_in: 0.0, total_out: 0.0, net: 0.0,
+                txn_count: 0, frac_categorised: 1.0, frac_normalised: 1.0 },
+        ];
+        assert_eq!(pick_active_month(&None, &months), Some("2026-04".to_string()));
+        assert_eq!(pick_active_month(&Some("2026-03".into()), &months), Some("2026-03".into()));
+        // Stale stash falls back to newest.
+        assert_eq!(pick_active_month(&Some("1999-01".into()), &months), Some("2026-04".into()));
+        // Empty data => None.
+        assert_eq!(pick_active_month(&None, &[]), None);
+    }
 
     fn fresh_conn() -> rusqlite::Connection {
         db::initialize_in_memory().unwrap()
