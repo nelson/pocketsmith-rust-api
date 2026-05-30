@@ -55,28 +55,45 @@
 .rules-pane { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
 .rules-pane h3 { margin-top: 0; }
 
-/* Prefix-specific rule list: drag handle, sort_order. */
-.rule-list-ordered {
-    display: flex; flex-direction: column;
-    font-family: "SF Mono", ui-monospace, monospace; font-size: 0.76rem;
-    overflow-y: auto; max-height: 580px;
-}
+/* Same row geometry as merchants, plus a drag handle. Sequence number
+ * dropped — order is implicit in row position. */
+.rule-list-header,
 .rule-list-ordered .rule-row {
     display: grid;
-    grid-template-columns: 16px 26px minmax(0,1fr) auto;
-    gap: 4px 8px;
-    align-items: center;
-    padding: 2px 4px;
-    border-bottom: 1px dashed var(--border);
-    cursor: pointer;
+    grid-template-columns: 16px minmax(0, 2fr) max-content;
+    gap: 4px 12px;
+    align-items: baseline;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
 }
-.rule-list-ordered .rule-row.selected { background: var(--bg-highlight); }
+.rule-list-header {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 4px 5px 4px;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-dark);
+    font-weight: 500;
+}
+.rule-list-header .flags-impact { text-align: right; }
+
+.rule-list-ordered { overflow-y: auto; max-height: 580px; }
+.rule-list-ordered .rule-row {
+    cursor: pointer;
+    padding: 3px 4px;
+    border-bottom: 1px solid var(--border);
+}
 .rule-list-ordered .rule-row:last-child { border-bottom: none; }
+.rule-list-ordered .rule-row.selected { background: var(--bg-highlight); border-radius: 3px; }
 .rule-list-ordered .drag    { color: var(--fg-dark); cursor: grab; user-select: none; text-align: center; }
-.rule-list-ordered .ord     { color: var(--fg-dark); font-size: 0.7rem; text-align: right; }
 .rule-list-ordered .pattern { color: var(--magenta); overflow-wrap: anywhere; }
-.rule-list-ordered .flags-impact { color: var(--fg-dim); font-size: 0.7rem; white-space: nowrap; text-align: right; }
-.rule-list-ordered .flags-impact .flag { color: var(--cyan); margin-right: 6px; }
+.rule-list-ordered .flags-impact {
+    color: var(--fg-dim);
+    font-size: 0.72rem;
+    white-space: nowrap;
+    text-align: right;
+}
+.rule-list-ordered .flags-impact .flag { color: var(--cyan); margin-right: 8px; }
 
 .search-box {
     background: var(--bg-highlight); color: var(--fg);
@@ -84,6 +101,19 @@
     padding: 3px 8px; font-size: 0.78rem; width: 100%;
     margin-bottom: 0.4rem; font-family: "SF Mono", ui-monospace, monospace;
 }
+
+.btn-shortcut {
+    color: var(--fg);
+    background: var(--bg-highlight);
+    border-color: var(--border);
+    font-size: 0.74rem;
+    padding: 2px 10px;
+}
+.btn-shortcut:hover { border-color: var(--accent); }
+.btn-shortcut.add { color: var(--green); border-color: rgba(158, 206, 106, 0.4); background: rgba(158, 206, 106, 0.08); }
+.btn-shortcut.eval { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); background: rgba(122, 162, 247, 0.08); }
+.btn-shortcut.cancel { color: var(--fg-dim); }
+.btn-shortcut.del { color: var(--red); border-color: rgba(247, 118, 142, 0.4); }
 
 .btn-add { color: var(--green); border-color: var(--green); }
 .btn-delete { color: var(--red); border-color: var(--red); }
@@ -205,37 +235,42 @@
         <input class="search-box" placeholder="filter by pattern or capture (try: account, BEEM)">
         <h3>42 rules · in pipeline order
           <span style="float:right">
-            <button class="btn btn-add" style="font-size:0.72rem;padding:1px 8px">+ Add rule</button>
+            <button class="btn btn-shortcut add" title="Add a new rule (A)">[A] Add rule</button>
           </span>
         </h3>
+        <div class="rule-list-header">
+          <span></span>
+          <span>Pattern</span>
+          <span class="flags-impact">Captures · Impact</span>
+        </div>
         <div class="rule-list-ordered">
           <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">11</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^(?i)Direct Debit (?:XX)?(?P&lt;account&gt;\d+)\s+</span>
             <span class="flags-impact"><span class="flag">+op +acct</span>93 hits</span>
           </div>
           <div class="rule-row selected">
-            <span class="drag">⋮⋮</span><span class="ord">12</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^(?i)Direct Credit (?:PENSION )?(?:XX)?(?P&lt;account&gt;\d+)\s+</span>
             <span class="flags-impact"><span class="flag">+op +acct</span>21 hits</span>
           </div>
           <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">13</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^ALI\*</span>
             <span class="flags-impact"><span class="flag">+gw</span>7 hits</span>
           </div>
           <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">14</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^Alipay\s</span>
             <span class="flags-impact"><span class="flag">+gw</span>3 hits</span>
           </div>
           <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">15</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^(?i)BEEM IT$</span>
             <span class="flags-impact"><span class="flag">+gw +op</span>14 hits</span>
           </div>
           <div class="rule-row">
-            <span class="drag">⋮⋮</span><span class="ord">16</span>
+            <span class="drag">⋮⋮</span>
             <span class="pattern">^(?i)BEEM IT\b\s*-?\s*</span>
             <span class="flags-impact"><span class="flag">+gw</span>8 hits</span>
           </div>
@@ -246,7 +281,7 @@
       <!-- RIGHT: editor in edit mode (capture flags shown) -->
       <div class="editor-card mode-edit">
         <h2>
-          Edit rule #12
+          Edit rule
           <span class="mode-pill">edit mode</span>
         </h2>
         <div class="editor-grid">
@@ -281,23 +316,21 @@
             <code style="color:var(--magenta)">(?P&lt;account&gt;\d+)</code>) and store the captured value
             in the corresponding feature.
           </span>
-
-          <label for="r-ord">Pipeline order</label>
-          <input id="r-ord" type="text" value="12" style="max-width:80px">
         </div>
 
         <button class="note-toggle">+ add note</button>
 
         <div class="editor-actions">
-          <button class="btn btn-evaluate">[E] Evaluate</button>
-          <button class="btn btn-back">[N] Cancel</button>
-          <button class="btn btn-delete" style="margin-left:auto">Delete</button>
+          <button class="btn btn-shortcut eval">[E] Evaluate</button>
+          <button class="btn btn-shortcut cancel">[N] Cancel</button>
+          <button class="btn btn-shortcut del" style="margin-left:auto">Delete</button>
         </div>
 
         <div class="note-card">
-          <strong>Heads up.</strong> The prefix loop runs iteratively, so this rule's “after” string still
-          gets fed back through every other prefix rule before the loop exits. Reordering this rule
-          rarely changes behaviour for this stage; capture flags do.
+          <strong>Heads up.</strong> Pipeline order is implicit in the rule list — drag a row up or
+          down to change it; no number to manage. The prefix loop runs iteratively, so this rule's
+          “after” string still gets fed back through every other prefix rule before the loop exits;
+          reordering rarely changes behaviour for this stage, but capture flags do.
         </div>
       </div>
     </div>
