@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup};
 
 use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
-use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, TraceEntry};
+use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx, TraceEntry};
 use pocketsmith_sync::review::Status;
 
 use crate::helpers::{format_dollars, format_short_date};
@@ -60,7 +60,7 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Marku
         Ok(Some(row)) => {
             let txns = matching_transactions(&st.conn, &row.original_payee);
             let is_skipped = st.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
-            let pipeline = run_normalise(&row.original_payee);
+            let pipeline = run_normalise(&row.original_payee, &PipelineCtx::new(&st.conn, &st.rule_cache));
             render_detail(&row, &txns, is_skipped, &pipeline)
         }
         _ => html! { div.empty-state { p { "Item not found." } } },
@@ -83,7 +83,7 @@ fn render_full_page(
     let detail = match active_row {
         Some(row) => {
             let is_skipped = state.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);
-            let pipeline = run_normalise(&row.original_payee);
+            let pipeline = run_normalise(&row.original_payee, &PipelineCtx::new(&state.conn, &state.rule_cache));
             render_detail(row, &active_txns, is_skipped, &pipeline)
         }
         None => html! { div.empty-state { p { "No proposals to show. Run `normalise` to populate the staging table." } } },

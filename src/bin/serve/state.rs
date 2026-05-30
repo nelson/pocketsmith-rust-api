@@ -109,6 +109,11 @@ impl TxnActionPillar {
 pub struct AppState {
     pub conn: rusqlite::Connection,
 
+    /// Process-lifetime compiled-rule cache for the normalisation
+    /// pipeline (editable-rules-v3 §7). Borrowed alongside `conn` to
+    /// build a `PipelineCtx` when rendering pipeline traces.
+    pub rule_cache: pocketsmith_sync::normalise::RuleCache,
+
     // --- Transfers tab ---
     pub transfers: TabState<(i64, i64), ActivityEntry>,
     pub status_filter: String,
@@ -142,6 +147,7 @@ impl AppState {
     pub fn new(conn: rusqlite::Connection) -> Self {
         Self {
             conn,
+            rule_cache: pocketsmith_sync::normalise::RuleCache::new(),
             transfers: TabState::default(),
             status_filter: "all".to_string(),
             confidence_filter: "all".to_string(),

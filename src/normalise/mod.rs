@@ -1,5 +1,6 @@
 pub(crate) mod banking_ops;
 pub mod apply;
+pub mod cache;
 pub(crate) mod employers;
 pub(crate) mod expand;
 #[allow(dead_code)]
@@ -227,9 +228,16 @@ pub fn features_to_json(f: &Features) -> String {
     serde_json::Value::Object(map).to_string()
 }
 
+pub use cache::{OwnedPipeline, PipelineCtx, RuleCache};
+
 /// Run the full normalisation pipeline on a raw payee string.
-/// Run the full normalisation pipeline on a raw payee string.
-pub fn normalise(original: &str) -> NormalisationResult {
+///
+/// `ctx` bundles the DB connection + compiled-rule cache (editable-rules
+/// v3 §8). In PR 2 the stages still read their in-code constants, so
+/// `ctx` is threaded but not yet consulted; each conversion PR (4–8)
+/// flips one stage to read from the DB via `ctx`.
+pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
+    let _ = ctx;
     let mut result = NormalisationResult::new(original);
     run_traced(&mut result, "prefix", prefix::apply);
     run_traced(&mut result, "suffix", suffix::apply);
@@ -426,14 +434,16 @@ mod tests {
 
     #[test]
     fn test_normalise_woolworths_full() {
-        let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026");
+        let p = OwnedPipeline::seeded_in_memory().unwrap();
+        let result = normalise("WOOLWORTHS 1624 STRATHF, Card xx9172 Value Date: 01/01/2026", &p.ctx());
         assert_eq!(result.class(), Some(&PayeeClass::Merchant));
         assert_eq!(result.features.entity_name.as_deref(), Some("Woolworths"));
     }
 
     #[test]
     fn test_normalise_direct_debit_comminsure() {
-        let result = normalise("Direct Debit 062246 CommInsure 3791272--147492387");
+        let p = OwnedPipeline::seeded_in_memory().unwrap();
+        let result = normalise("Direct Debit 062246 CommInsure 3791272--147492387", &p.ctx());
         assert_eq!(result.features.entity_name.as_deref(), Some("CommInsure"));
         assert_eq!(result.features.operation, Some(BankingOperation::DirectDebit));
         assert_eq!(result.features.account.as_deref(), Some("062246"));
@@ -442,7 +452,8 @@ mod tests {
 
     #[test]
     fn test_normalise_bpay() {
-        let result = normalise("BPAY PAYMENT");
+        let p = OwnedPipeline::seeded_in_memory().unwrap();
+        let result = normalise("BPAY PAYMENT", &p.ctx());
         assert_eq!(result.class(), Some(&PayeeClass::Other));
         assert_eq!(result.features.operation, Some(BankingOperation::BPay));
     }
