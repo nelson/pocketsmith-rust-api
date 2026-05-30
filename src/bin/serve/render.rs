@@ -9,8 +9,8 @@ use crate::css::CSS;
 use crate::js::JS;
 use crate::state::AppState;
 
-/// Top-of-page navigation between the four tabs. `active` is the slug
-/// (`"dashboard"`, `"transactions"`, `"transfers"`, or
+/// Top-of-page navigation between the five tabs. `active` is the slug
+/// (`"dashboard"`, `"transactions"`, `"pipeline"`, `"transfers"`, or
 /// `"normalise"`) of the tab being rendered; that tab gets a
 /// non-clickable label while the others are links.
 ///
@@ -20,11 +20,14 @@ use crate::state::AppState;
 ///
 /// The order of entries matters: Tab and Shift-Tab cycle through them
 /// left-to-right (see `js.rs`). The canonical order is
-/// Dashboard → Transactions → Transfers → Normalise.
+/// Dashboard → Transactions → Pipeline → Transfers → Normalise
+/// (editable-rules-v3 §4.1: Pipeline sits third, between Transactions
+/// and Transfers, since rule edits *cause* Transfers / Normalise data).
 pub fn render_tab_bar(active: &str) -> Markup {
     let tabs = [
         ("dashboard", "Dashboard", "/dashboard/"),
         ("transactions", "Transactions", "/transactions/"),
+        ("pipeline", "Pipeline", "/pipeline/"),
         ("transfers", "Transfers", "/transfers/"),
         ("normalise", "Normalise", "/normalise/"),
     ];
@@ -178,14 +181,13 @@ pub fn _appstate_marker(_: &AppState) {}
 mod tests {
     use super::*;
 
-    /// The tab bar must render four entries in this exact left-to-right
-    /// order: Dashboard, Transactions, Transfers, Normalise. Review is
-    /// intentionally omitted for now (planned, not implemented).
+    /// The tab bar must render five entries in this exact left-to-right
+    /// order: Dashboard, Transactions, Pipeline, Transfers, Normalise.
     /// Order matters because Tab/Shift-Tab cycles through them.
     #[test]
-    fn tab_bar_renders_four_tabs_in_canonical_order() {
+    fn tab_bar_renders_five_tabs_in_canonical_order() {
         let html = render_tab_bar("dashboard").into_string();
-        let positions: Vec<usize> = ["Dashboard", "Transactions", "Transfers", "Normalise"]
+        let positions: Vec<usize> = ["Dashboard", "Transactions", "Pipeline", "Transfers", "Normalise"]
             .iter()
             .map(|label| {
                 html.find(label)
@@ -216,6 +218,7 @@ mod tests {
         // The three others should be links to their canonical tab URLs.
         for href in [
             "href=\"/dashboard/\"",
+            "href=\"/pipeline/\"",
             "href=\"/transfers/\"",
             "href=\"/normalise/\"",
         ] {
@@ -236,7 +239,7 @@ mod tests {
     /// rendered HTML.
     #[test]
     fn tab_bar_active_slug_is_exclusive() {
-        for active in ["dashboard", "transactions", "transfers", "normalise"] {
+        for active in ["dashboard", "transactions", "pipeline", "transfers", "normalise"] {
             let html = render_tab_bar(active).into_string();
             let count = html.matches("class=\"tab active\"").count();
             assert_eq!(
@@ -259,7 +262,7 @@ mod page_tests {
     /// old tabs' grid-template-columns.
     #[test]
     fn render_page_tags_body_with_tab_slug_class() {
-        for slug in ["dashboard", "transactions", "transfers", "normalise"] {
+        for slug in ["dashboard", "transactions", "pipeline", "transfers", "normalise"] {
             let html = render_page(
                 slug,
                 "x",

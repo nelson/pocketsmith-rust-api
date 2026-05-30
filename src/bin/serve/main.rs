@@ -4,6 +4,7 @@ mod freshness;
 mod helpers;
 mod js;
 mod normalise;
+mod pipeline;
 mod render;
 mod state;
 mod tab;
@@ -154,6 +155,13 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
         (Method::Post, "/normalise/apply") => {
             normalise::handlers::apply(&state);
             normalise::views::render_page_shell(&state)
+        }
+
+        // --- Pipeline tab (rule editing; shell only for now)
+        (Method::Get, "/pipeline" | "/pipeline/") => pipeline::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/pipeline/stage/") => {
+            let slug = p.trim_start_matches("/pipeline/stage/").split('/').next().unwrap_or("");
+            pipeline::views::render_detail_fragment(&state, slug)
         }
 
         // --- Transfers tab

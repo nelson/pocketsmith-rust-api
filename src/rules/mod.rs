@@ -79,6 +79,12 @@ impl Stage {
         format!("rule_{}", self.name())
     }
 
+    /// Parse a stage from its `name` (used in `/pipeline/stage/<x>`
+    /// URLs). Returns `None` for an unknown slug.
+    pub fn from_name(s: &str) -> Option<Stage> {
+        Stage::all().into_iter().find(|st| st.name() == s)
+    }
+
     /// Content columns dumped to / loaded from the canonical SQL file.
     /// Excludes `id` (re-assigned by insertion order on reload, so
     /// declaration order is preserved). `created_at` / `updated_at` are
@@ -135,6 +141,11 @@ pub fn rules_dir() -> PathBuf {
 fn row_count(conn: &Connection, stage: Stage) -> Result<i64> {
     let sql = format!("SELECT COUNT(*) FROM {}", stage.table());
     Ok(conn.query_row(&sql, [], |r| r.get(0))?)
+}
+
+/// Number of rules currently stored for `stage`.
+pub fn count(conn: &Connection, stage: Stage) -> Result<i64> {
+    row_count(conn, stage)
 }
 
 /// Seed any empty rule table on startup (§6.1) from its

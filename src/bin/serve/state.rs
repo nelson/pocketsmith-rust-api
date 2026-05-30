@@ -141,6 +141,10 @@ pub struct AppState {
     /// `YYYY-MM`. `None` means "use the most recent month with data",
     /// which is what the shell falls back to on first render.
     pub dash_active_month: Option<String>,
+
+    // --- Pipeline tab ---
+    /// `name` of the currently-selected pipeline stage, if any.
+    pub pipeline_active: Option<String>,
 }
 
 impl AppState {
@@ -159,6 +163,7 @@ impl AppState {
             txn_activity: Vec::new(),
             txn_undone: 0,
             dash_active_month: None,
+            pipeline_active: None,
         }
     }
 
