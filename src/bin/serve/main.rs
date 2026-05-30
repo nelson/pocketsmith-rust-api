@@ -1,5 +1,6 @@
 mod css;
 mod dashboard;
+mod freshness;
 mod helpers;
 mod js;
 mod normalise;
@@ -33,6 +34,10 @@ fn main() -> Result<()> {
         .unwrap_or(3141);
 
     let conn = db::initialize(&db::path_from_env())?;
+    // Seed any empty rule table from src/rules/*.sql (or the in-code
+    // constants on the very first boot). Rules already present are left
+    // untouched. (editable-rules-v3 §6.1)
+    pocketsmith_sync::rules::load_into_db(&conn)?;
     let state = Arc::new(Mutex::new(AppState::new(conn)));
 
     let addr = format!("127.0.0.1:{port}");

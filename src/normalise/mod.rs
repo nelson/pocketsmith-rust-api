@@ -1,14 +1,14 @@
-mod banking_ops;
+pub(crate) mod banking_ops;
 pub mod apply;
-mod employers;
-mod expand;
+pub(crate) mod employers;
+pub(crate) mod expand;
 #[allow(dead_code)]
-mod locations;
-mod merchants;
-mod persons;
-mod prefix;
+pub(crate) mod locations;
+pub(crate) mod merchants;
+pub(crate) mod persons;
+pub(crate) mod prefix;
 pub mod scan;
-mod suffix;
+pub(crate) mod suffix;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BankingOperation {

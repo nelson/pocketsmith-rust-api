@@ -120,6 +120,21 @@ const BANKING_OPS: &[BankingOp] = &[
     },
 ];
 
+/// Owned seed rows for `rule_banking_ops` (one per operation/pattern
+/// pair), in declaration order.
+pub(crate) fn seed_rows() -> Vec<crate::rules::seed::BankingOpSeed> {
+    BANKING_OPS
+        .iter()
+        .flat_map(|op| {
+            op.patterns.iter().map(move |&pat| crate::rules::seed::BankingOpSeed {
+                operation: op.operation.display_name().to_string(),
+                pattern: pat.to_string(),
+                has_account: op.has_account,
+            })
+        })
+        .collect()
+}
+
 fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
     static COMPILED: OnceLock<Vec<CompiledBankingOp>> = OnceLock::new();
     COMPILED.get_or_init(|| {

@@ -223,6 +223,118 @@ CREATE TABLE IF NOT EXISTS payee_normalisations (
 );
 CREATE INDEX IF NOT EXISTS idx_payee_normalisations_status ON payee_normalisations(status);
 
+-- =====================================================================
+-- Editable normalisation rules (editable-rules-v3).
+--
+-- Each pipeline stage that today lives as an in-code `const` table gets
+-- a row-set here, editable from the Pipeline tab. The compiled pipeline
+-- behaviour is unchanged; only the source of its tables moves to SQLite.
+-- The canonical copy of each table is mirrored to `src/rules/<stage>.sql`
+-- (see `src/rules/`). Loaded at startup when a table is empty.
+--
+-- `note`, `created_at`, `updated_at` on every table. `sort_order` only
+-- on the loop / first-match stages where rule order is significant.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS _meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- entity-extraction (alphabetical, order doesn't matter at apply time) --
+CREATE TABLE IF NOT EXISTS rule_persons (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical   TEXT NOT NULL,
+    pattern     TEXT NOT NULL,              -- literal substring (case-insensitive)
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    UNIQUE (canonical, pattern)
+);
+
+CREATE TABLE IF NOT EXISTS rule_merchants (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical   TEXT NOT NULL,
+    pattern     TEXT NOT NULL,              -- regex source
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    UNIQUE (pattern)
+);
+
+CREATE TABLE IF NOT EXISTS rule_employers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical   TEXT NOT NULL,
+    pattern     TEXT NOT NULL,              -- regex source
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    UNIQUE (pattern)
+);
+
+-- loop stages (sort_order matters) --
+CREATE TABLE IF NOT EXISTS rule_prefixes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern     TEXT NOT NULL UNIQUE,       -- regex source
+    gateway     TEXT,
+    operation   TEXT,                       -- BankingOperation::display_name() or NULL
+    has_account INTEGER NOT NULL DEFAULT 0,
+    has_date    INTEGER NOT NULL DEFAULT 0,
+    note        TEXT,
+    sort_order  INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS rule_suffixes (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern           TEXT NOT NULL UNIQUE,
+    gateway           TEXT,
+    operation         TEXT,
+    institution       TEXT,
+    has_account       INTEGER NOT NULL DEFAULT 0,
+    has_date          INTEGER NOT NULL DEFAULT 0,
+    has_location      INTEGER NOT NULL DEFAULT 0,
+    has_currency_code INTEGER NOT NULL DEFAULT 0,
+    has_amount        INTEGER NOT NULL DEFAULT 0,
+    note              TEXT,
+    sort_order        INTEGER NOT NULL,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS rule_expansions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern     TEXT NOT NULL UNIQUE,       -- regex source
+    canonical   TEXT NOT NULL,
+    note        TEXT,
+    sort_order  INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- first-match-wins, grouped by op --
+CREATE TABLE IF NOT EXISTS rule_banking_ops (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    operation   TEXT NOT NULL,              -- BankingOperation::display_name()
+    pattern     TEXT NOT NULL,              -- regex source
+    has_account INTEGER NOT NULL DEFAULT 0,
+    note        TEXT,
+    sort_order  INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    UNIQUE (operation, pattern)
+);
+
+-- aux --
+CREATE TABLE IF NOT EXISTS rule_locations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    location    TEXT NOT NULL UNIQUE,
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
 CREATE TRIGGER IF NOT EXISTS payee_normalisations_updated_at
 AFTER UPDATE ON payee_normalisations
 FOR EACH ROW

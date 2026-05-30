@@ -143,6 +143,17 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "USA", canonical: "United States" },
 ];
 
+/// Owned seed rows for `rule_expansions`, in declaration order.
+pub(crate) fn seed_rows() -> Vec<crate::rules::seed::ExpansionSeed> {
+    EXPANSIONS
+        .iter()
+        .map(|e| crate::rules::seed::ExpansionSeed {
+            pattern: e.pattern.to_string(),
+            canonical: e.canonical.to_string(),
+        })
+        .collect()
+}
+
 fn compiled_expansions() -> &'static [CompiledExpansion] {
     static COMPILED: OnceLock<Vec<CompiledExpansion>> = OnceLock::new();
     COMPILED.get_or_init(|| {

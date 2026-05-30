@@ -46,6 +46,20 @@ pub fn apply(result: &mut NormalisationResult) {
     }
 }
 
+/// Owned seed rows for `rule_persons` (one per canonical/pattern pair),
+/// in declaration order.
+pub(crate) fn seed_rows() -> Vec<crate::rules::seed::PersonSeed> {
+    KNOWN_PERSONS
+        .iter()
+        .flat_map(|p| {
+            p.patterns.iter().map(move |&pat| crate::rules::seed::PersonSeed {
+                canonical: p.canonical.to_string(),
+                pattern: pat.to_string(),
+            })
+        })
+        .collect()
+}
+
 const KNOWN_PERSONS: &[Person] = &[
     Person { canonical: "A S-W Bywaters", patterns: &["A S-W BYWATERS"] },
     Person { canonical: "A Ventura Mendoza", patterns: &["A VENTURA MENDOZA"] },
