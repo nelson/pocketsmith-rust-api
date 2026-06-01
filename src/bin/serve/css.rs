@@ -968,7 +968,7 @@ body {
 .tab-transactions .cleaning-card .title { font-size: 12px; color: var(--fg); margin-bottom: 2px; line-height: 1.3; }
 .tab-transactions .cleaning-card .sub   { font-size: 11px; color: var(--fg-dim); line-height: 1.35; }
 .tab-transactions .cleaning-card .actions { margin: 0; padding-top: 6px; border-top: 1px solid var(--border); }
-.tab-transactions .cleaning-card .actions .btn { padding: 4px 10px; font-size: 11px; }
+.tab-transactions .cleaning-card .actions .btn { padding: 8px 10px; font-size: 13px; }
 .tab-transactions .note {
     background: var(--bg-highlight); border-left: 3px solid var(--accent);
     padding: 8px 12px; font-size: 11px; color: var(--fg-dim);
