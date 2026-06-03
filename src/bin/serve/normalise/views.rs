@@ -90,11 +90,11 @@ fn render_full_page(
     };
     let activity = render_activity(state);
 
-    let sync = crate::render::last_sync_info(&state.conn);
-    crate::render::render_page_with_sync(
+    let chips = crate::freshness::header_chips(&state.conn);
+    crate::render::render_page_with_chips(
         "normalise",
         "Payee Normalisations",
-        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        chips,
         queue,
         detail,
         activity,

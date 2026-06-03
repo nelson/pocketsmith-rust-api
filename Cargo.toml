@@ -40,6 +40,6 @@ name = "push"
 path = "src/bin/push.rs"
 
 [[bin]]
-name = "dump_rules"
-path = "src/bin/dump_rules.rs"
+name = "dump"
+path = "src/bin/dump.rs"
 

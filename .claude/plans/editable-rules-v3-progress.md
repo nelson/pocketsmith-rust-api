@@ -29,20 +29,42 @@ All tests green at each commit (`cargo test --features web`).
   trace per distinct payee, only for rows lacking a staging row (~tens of
   ms on a full 1000-row queue; benchmarked normalise at ~38µs/call).
 
-- **PR 1 — DONE (with one carve-out, see Decisions #1).**
+- **PR 1 — DONE.** (Revised per review — see "Review feedback" below.)
   - 8 `rule_*` tables + `_meta(key,value)` added to `schema.rs`.
-  - New `src/rules/` module: `Stage` enum, `load_into_db`, `dump_stage`,
-    `dump_all`, `schedule_dump`, `bootstrap_from_constants`,
-    `dump_stage_to_string`. Canonical store is `src/rules/*.sql`.
-  - `seed_rows()` accessors added to each `normalise::<stage>` module
-    (the bridge from the in-code constants to the DB tables). Stage
-    modules made `pub(crate)`.
-  - `src/bin/dump_rules.rs` binary — regenerates the 8 SQL files from the
-    constants. Committed the generated files.
+  - New `src/rules/` module: `Stage` enum (`name()` + derived `table()`),
+    `load_into_db`, `dump_stage`, `dump_all`, `schedule_dump`,
+    `dump_stage_to_string`. Canonical store is `src/rules/*.sql` — the
+    sole source of truth for the seed (decoupled from the in-code consts).
+  - `src/bin/dump.rs` binary (renamed from `dump_rules`) — dumps the
+    **live DB** to the 8 SQL files (export / recovery). Committed files
+    carry a fixed historical `created_at`/`updated_at`
+    (`2026-04-03T12:40:21Z`, the git-blame date of the original rules) so
+    rule age is stable across re-seeds; the columns round-trip on dump.
   - `load_into_db` wired into serve startup (seeds empty tables from the
-    SQL files, falls back to constants on first-ever boot).
-  - `freshness` module (header chip data + markup) implemented and tested
-    — see Decisions #1 for why it isn't wired into a header yet.
+    SQL files; errors clearly if a file is missing).
+  - `freshness` module wired into the header strip: `synced` + `pushed`
+    chips, each with a shape-distinct glyph (fresh leaf / fallen leaf /
+    bare tree / question-mark) so state reads without colour
+    (accessibility). The old bespoke `sync-chip` in `render.rs` was
+    removed in favour of it.
+  - REMOVED in review: `src/rules/seed.rs`, the 8 `seed_rows()`
+    accessors, and `bootstrap_from_constants`/`bootstrap_stage` — the
+    `*.sql` files replace the constants→DB bridge.
+
+## Review feedback — addressed on this branch
+
+- **Freshness chips wired in** (dashboard is merged): both `synced` and
+  `pushed` chips render in the header via `freshness::header_chips`.
+  Decision #1 is resolved — no longer waiting on a dashboard branch.
+- **Colour-blind accessibility**: chips encode state with a glyph, not
+  colour alone (leafy-green / fallen-leaf / leafless-tree / ?). NB the
+  leafless-tree glyph is Unicode 16 — it falls back to tofu on older
+  fonts; swap if it doesn't render.
+- **`dump` reads the live DB** (Decision #3 resolved): renamed binary,
+  no longer rebuilds from constants.
+- **Seed-row bridge removed**: the `*.sql` files are canonical; rows
+  carry a baked historical timestamp.
+- **`mod.rs` slimmed**: merged `table()`/`file_stem()` into one `name()`.
 
 ## Decisions needing your sign-off
 

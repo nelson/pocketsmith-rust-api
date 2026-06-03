@@ -1,18 +1,11 @@
 //! Freshness chips for the header strip (editable-rules-v3 §4.2).
 //!
-//! The header shows a `synced N ago` chip; this module generalises that
-//! logic so a sibling `pushed N ago` chip can sit beside it, driven by a
-//! different `_operations.reason` (`'push'` vs `'sync'`). Same fresh /
-//! stale / old buckets (≤ 24h / ≤ 7d / older).
+//! The header shows a `synced N ago` chip and a sibling `pushed N ago`
+//! chip, driven by different `_operations.reason` values (`'sync'` vs
+//! `'push'`). Same fresh / stale / old buckets (≤ 24h / ≤ 7d / older).
 //!
-//! NOTE (PR 1): the header strip itself lives on the (as-yet-unmerged)
-//! dashboard branch's `render.rs` (`render_header`). On `master` there is
-//! no header to host the chips, so these helpers are not yet wired into a
-//! page — they are the reusable, tested data+markup layer that the
-//! dashboard header will call once the two branches converge. See
-//! `.claude/plans/editable-rules-v3-progress.md`.
-
-#![allow(dead_code)] // wired in once the dashboard header lands on this base
+//! Each bucket carries a shape-distinct glyph as well as a colour, so
+//! the state is legible without relying on colour (accessibility).
 
 use maud::{html, Markup};
 use rusqlite::Connection;
@@ -31,13 +24,26 @@ pub enum Freshness {
 }
 
 impl Freshness {
-    /// CSS modifier class for the chip.
+    /// CSS modifier class for the chip (colour, for sighted-by-colour
+    /// users). Never the *only* signal — see [`glyph`](Self::glyph).
     pub fn class(&self) -> &'static str {
         match self {
             Freshness::Fresh => "freshness-fresh",
             Freshness::Stale => "freshness-stale",
             Freshness::Old => "freshness-old",
             Freshness::Never => "freshness-never",
+        }
+    }
+
+    /// Shape-distinct glyph so the bucket is legible without colour
+    /// (accessibility). A foliage lifecycle: fresh leaf → fallen leaf
+    /// → bare tree; `❔` for "no data yet".
+    pub fn glyph(&self) -> &'static str {
+        match self {
+            Freshness::Fresh => "\u{1F96C}", // 🥬 leafy green
+            Freshness::Stale => "\u{1F342}", // 🍂 fallen leaf
+            Freshness::Old => "\u{1FABE}",   // 🪾 leafless tree
+            Freshness::Never => "\u{2754}",  // ❔ white question mark
         }
     }
 }
@@ -94,7 +100,7 @@ pub fn freshness_chip(conn: &Connection, reason: &str, verb: &str, command: &str
             let tip = format!("last {verb} at {ts} \u{2014} re-run `{command}`");
             html! {
                 span.freshness-chip.(f.class()) title=(tip) {
-                    span.freshness-chip-dot {}
+                    span.freshness-chip-icon aria-hidden="true" { (f.glyph()) }
                     span.freshness-chip-label { (verb) " " (humanise_age(age)) }
                 }
             }
@@ -103,11 +109,22 @@ pub fn freshness_chip(conn: &Connection, reason: &str, verb: &str, command: &str
             let tip = format!("no {verb} recorded yet \u{2014} run `{command}`");
             html! {
                 span.freshness-chip.(Freshness::Never.class()) title=(tip) {
-                    span.freshness-chip-dot {}
+                    span.freshness-chip-icon aria-hidden="true" { (Freshness::Never.glyph()) }
                     span.freshness-chip-label { "never " (verb) }
                 }
             }
         }
+    }
+}
+
+/// The pair of freshness chips shown in the header-right: how long ago
+/// we last pulled from PocketSmith (`synced`) and last wrote back
+/// (`pushed`). Rendered together so callers thread the DB connection in
+/// one place.
+pub fn header_chips(conn: &Connection) -> Markup {
+    html! {
+        (freshness_chip(conn, "sync", "synced", "cargo run --bin sync"))
+        (freshness_chip(conn, "push", "pushed", "cargo run --bin push"))
     }
 }
 

@@ -75,11 +75,11 @@ pub fn render_full_page(state: &AppState, pairs: &[TransferPairRow], status_filt
     };
     let activity = render_activity(state);
 
-    let sync = crate::render::last_sync_info(&state.conn);
-    crate::render::render_page_with_sync(
+    let chips = crate::freshness::header_chips(&state.conn);
+    crate::render::render_page_with_chips(
         "transfers",
         "Transfer Pairs",
-        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        chips,
         queue,
         detail,
         activity,

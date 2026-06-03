@@ -105,21 +105,6 @@ const PREFIXES: &[Prefix] = &[
     Prefix { pattern: r"^ZLR\*", gateway: Some("Zeller"), ..DEFAULT },
 ];
 
-/// Owned seed rows for `rule_prefixes`, in declaration order (the
-/// loop's sort order). Used to bootstrap the editable rule table.
-pub(crate) fn seed_rows() -> Vec<crate::rules::seed::PrefixSeed> {
-    PREFIXES
-        .iter()
-        .map(|p| crate::rules::seed::PrefixSeed {
-            pattern: p.pattern.to_string(),
-            gateway: p.gateway.map(|s| s.to_string()),
-            operation: p.operation.map(|o| o.display_name().to_string()),
-            has_account: p.has_account,
-            has_date: p.has_date,
-        })
-        .collect()
-}
-
 fn compiled_prefixes() -> &'static [CompiledPrefix] {
     static COMPILED: OnceLock<Vec<CompiledPrefix>> = OnceLock::new();
     COMPILED.get_or_init(|| {

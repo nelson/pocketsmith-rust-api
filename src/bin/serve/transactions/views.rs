@@ -90,11 +90,11 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let queue = render_queue_with_header(&views, active_id, filter);
     let detail = render_active_detail(&st, &views, active_id);
     let activity = render_activity(&st);
-    let sync = crate::render::last_sync_info(&st.conn);
-    crate::render::render_page_with_sync(
+    let chips = crate::freshness::header_chips(&st.conn);
+    crate::render::render_page_with_chips(
         "transactions",
         "Transactions",
-        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        chips,
         queue,
         detail,
         activity,

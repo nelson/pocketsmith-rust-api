@@ -29,20 +29,6 @@ pub fn apply(result: &mut NormalisationResult) {
     }
 }
 
-/// Owned seed rows for `rule_employers` (one per canonical/pattern pair),
-/// in declaration order.
-pub(crate) fn seed_rows() -> Vec<crate::rules::seed::EmployerSeed> {
-    KNOWN_EMPLOYERS
-        .iter()
-        .flat_map(|e| {
-            e.patterns.iter().map(move |&pat| crate::rules::seed::EmployerSeed {
-                canonical: e.canonical.to_string(),
-                pattern: pat.to_string(),
-            })
-        })
-        .collect()
-}
-
 const KNOWN_EMPLOYERS: &[Employer] = &[
     Employer {
         canonical: "AFES",

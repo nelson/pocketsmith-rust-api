@@ -24,11 +24,6 @@ const KNOWN_LOCATIONS: &[&str] = &[
     "NORTHMEAD", "LYNEHAM", "CAMPSIE",
 ];
 
-/// Owned seed rows for `rule_locations`, in declaration order.
-pub(crate) fn seed_rows() -> Vec<String> {
-    KNOWN_LOCATIONS.iter().map(|s| s.to_string()).collect()
-}
-
 /// Extract a known location from a payee string by word-boundary scan.
 /// Returns the location in title case.
 pub fn extract_location(s: &str) -> Option<String> {
