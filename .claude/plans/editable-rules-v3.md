@@ -506,12 +506,16 @@ contents.
 ```rust
 pub fn load_into_db(conn: &Connection) -> Result<()>;
 pub fn dump_stage(conn: &Connection, stage: Stage) -> Result<()>;
-pub fn dump_all(conn: &Connection) -> Result<()>;          // for the bootstrap binary
-pub fn schedule_dump(stage: Stage);                        // spawns the bg thread
+pub fn dump_all(conn: &Connection) -> Result<()>;          // for the dump binary
+pub fn schedule_dump(stage: Stage, db_path: String);      // spawns the bg thread
 ```
 
-A tiny `bin/dump_rules.rs` wraps `dump_all` for the initial seed
-bootstrap (and as an escape hatch).
+A tiny `bin/dump.rs` wraps `dump_all` to export the **live DB** to the
+`src/rules/*.sql` files (manual export / recovery; serve also re-dumps
+in the background on every mutation). It does *not* rebuild from the
+in-code constants — the `*.sql` files are the canonical seed, and seed
+rows carry a baked historical `created_at`/`updated_at` so rule age is
+stable across re-seeds. *(Implemented in PR 1; see progress file.)*
 
 ### 6.3 Schema versioning
 
@@ -605,8 +609,8 @@ be overwhelmed."
 
 | # | PR title | Touches | Acceptance test |
 |---|----------|---------|-----------------|
-| 0 | `transactions: only flag "no normalisation" when trace is empty` | Transactions tab views | Verify the pillar text changes for merchant-only payees. |
-| 1 | `db+rules: schema for 8 rule tables + src/rules/*.sql seed loader + dump_all binary; serve header gains pushed-at chip` | new `src/rules/` module, schema migration, `dump_rules` binary, header chip | `cargo run --bin dump_rules` writes 8 SQL files; fresh DB seeds correctly; existing DB retains data. Header shows two freshness chips. |
+| 0 | `transactions: only flag "no normalisation" when trace is empty` | Transactions tab views | Verify the pillar text changes for merchant-only payees. **✅ MERGED** |
+| 1 | `db+rules: schema for 8 rule tables + src/rules/*.sql seed loader + dump binary; serve header gains pushed-at chip` | new `src/rules/` module, schema migration, `dump` binary, accessible freshness chips | `cargo run --bin dump` exports the live DB to 8 SQL files; fresh DB seeds correctly; existing DB retains data. Header shows two freshness chips (synced + pushed) with shape-distinct glyphs. **✅ MERGED** |
 | 2 | `normalise: PipelineCtx + RuleCache (no behaviour change)` | `normalise::cache`, `PipelineCtx`, every call site | All existing tests pass; pipeline still uses in-code constants. |
 | 3 | `serve: Pipeline tab shell (queue + empty detail + activity panel)` | new `serve/pipeline/` module, route table, nav | Tab visible in third nav slot; queue lists 8 stages with 2-line tag layout; arrow keys navigate. |
 | 4 | `pipeline(prefix+suffix): convert to DB; tab UI for these two stages incl. Edit/Eval modes + categorical impact` | `prefix.rs`, `suffix.rs`, `pipeline/views.rs` | Edit a prefix rule, click Evaluate, see impact buckets, save, see dirty banner, re-scan, banner clears. |
