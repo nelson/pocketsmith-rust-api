@@ -35,11 +35,11 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
         None => html! { div.empty-state { p { "No transactions yet \u{2014} run `cargo run --bin sync`." } } },
     };
     let activity = render_activity_placeholder(active.as_deref());
-    let sync = crate::render::last_sync_info(&st.conn);
-    crate::render::render_page_with_sync(
+    let chips = crate::freshness::header_chips(&st.conn);
+    crate::render::render_page_with_chips(
         "dashboard",
         "Dashboard",
-        sync.as_ref().map(|(s, a)| (s.as_str(), *a)),
+        chips,
         queue,
         detail,
         activity,

@@ -74,9 +74,9 @@ pub fn render_actions(action_base: &str, is_skipped: bool) -> Markup {
 /// All tabs use the same HTML element ids (`#queue`, `#detail`,
 /// `#activity`) so the JS keyboard handler and the HTMX swap targets
 /// in views.rs can be tab-agnostic.
-/// Convenience wrapper: same as [`render_page_with_sync`] but with no
-/// sync timestamp. Retained because the page-shell tests render the
-/// skeleton without setting up a DB row.
+/// Convenience wrapper: same as [`render_page_with_chips`] but with no
+/// freshness chips. Retained because the page-shell tests render the
+/// skeleton without setting up a DB connection.
 #[allow(dead_code)]
 pub fn render_page(
     tab_slug: &str,
@@ -85,16 +85,16 @@ pub fn render_page(
     detail: Markup,
     activity: Markup,
 ) -> Markup {
-    render_page_with_sync(tab_slug, title, None, queue, detail, activity)
+    render_page_with_chips(tab_slug, title, html! {}, queue, detail, activity)
 }
 
-/// Same as [`render_page`] but lets the caller supply a precomputed
-/// last-sync timestamp + age in seconds (avoids reaching back into
-/// the DB from inside view code). Pass `None` to omit the chip.
-pub fn render_page_with_sync(
+/// Same as [`render_page`] but lets the caller supply the precomputed
+/// header freshness chips (so the DB connection is threaded in the view
+/// layer, not reached into from here). Pass `html! {}` to omit them.
+pub fn render_page_with_chips(
     tab_slug: &str,
     title: &str,
-    last_sync: Option<(&str, i64)>,
+    chips: Markup,
     queue: Markup,
     detail: Markup,
     activity: Markup,
@@ -110,7 +110,7 @@ pub fn render_page_with_sync(
                 style { (PreEscaped(CSS)) }
             }
             body class=(format!("tab-{tab_slug}")) {
-                (render_header(tab_slug, last_sync))
+                (render_header(tab_slug, chips))
                 div.layout {
                     div.queue-panel #queue { (queue) }
                     div.detail-panel #detail { (detail) }
@@ -123,72 +123,19 @@ pub fn render_page_with_sync(
     }
 }
 
-/// Top-of-page header strip: tab bar on the left, last-sync chip and
-/// `?` keyboard-hints trigger on the right. The chip prompts the user
-/// to run `cargo run --bin sync` when the data is getting stale.
-fn render_header(tab_slug: &str, last_sync: Option<(&str, i64)>) -> Markup {
+/// Top-of-page header strip: tab bar on the left, the freshness chips
+/// (`synced` / `pushed`) and `?` keyboard-hints trigger on the right.
+/// `chips` is precomputed by the caller via
+/// [`crate::freshness::header_chips`].
+fn render_header(tab_slug: &str, chips: Markup) -> Markup {
     html! {
         div.header {
             (render_tab_bar(tab_slug))
             div.header-right {
-                @if let Some((ts, age)) = last_sync {
-                    span.sync-chip.(sync_chip_class(age)) title=(format!("last PocketSmith sync at {ts} \u{2014} re-sync with `cargo run --bin sync`")) {
-                        span.sync-chip-dot {}
-                        span.sync-chip-label { "synced " (humanise_sync_age(age)) }
-                    }
-                } @else {
-                    span.sync-chip.sync-chip-never title="no sync recorded yet \u{2014} run `cargo run --bin sync`" {
-                        span.sync-chip-dot {}
-                        span.sync-chip-label { "never synced" }
-                    }
-                }
+                (chips)
                 button.hints-trigger title="keyboard shortcuts (?)" onclick="document.getElementById('hints-overlay').classList.toggle('open')" { "?" }
             }
         }
-    }
-}
-
-/// Most-recent `sync` row from `_operations`: `(created_at, age_seconds)`.
-/// Computed in SQLite so we don't need a date-time crate just for this.
-/// Returns `None` on empty table or any DB error — the chip then
-/// renders "never synced".
-pub fn last_sync_info(conn: &rusqlite::Connection) -> Option<(String, i64)> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT created_at, CAST(strftime('%s','now') - strftime('%s', created_at) AS INTEGER) \
-               FROM _operations WHERE reason = 'sync' \
-               ORDER BY id DESC LIMIT 1",
-        )
-        .ok()?;
-    stmt.query_row([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).ok()
-}
-
-/// Bucket the age into a CSS class so the dot can colour itself:
-/// fresh (≤ 24h, green), stale (≤ 7d, yellow), old (> 7d, red).
-fn sync_chip_class(age_seconds: i64) -> &'static str {
-    if age_seconds <= 86_400 {
-        "sync-chip-fresh"
-    } else if age_seconds <= 7 * 86_400 {
-        "sync-chip-stale"
-    } else {
-        "sync-chip-old"
-    }
-}
-
-/// Compact "3h ago" / "2d ago" string. Negative ages (clock skew) fall
-/// back to "just now".
-fn humanise_sync_age(age_seconds: i64) -> String {
-    let s = age_seconds.max(0);
-    if s < 60 {
-        "just now".to_string()
-    } else if s < 3600 {
-        format!("{}m ago", s / 60)
-    } else if s < 86_400 {
-        format!("{}h ago", s / 3600)
-    } else if s < 86_400 * 30 {
-        format!("{}d ago", s / 86_400)
-    } else {
-        format!("{}mo ago", s / (86_400 * 30))
     }
 }
 

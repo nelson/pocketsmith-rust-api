@@ -28,7 +28,7 @@ pub const CSS: &str = r#"
 .header .tab-bar { margin: 0; }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-.sync-chip {
+.freshness-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -41,16 +41,22 @@ pub const CSS: &str = r#"
     font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
     cursor: help;
 }
-.sync-chip-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--fg-dim);
+/* Glyph carries the state without relying on colour (accessibility):
+   leafy green = fresh, fallen leaf = stale, bare tree = old, ? = never.
+   Colour tints the whole chip (border + background + label) as a
+   redundant secondary cue. */
+.freshness-chip-icon {
+    font-size: 12px;
+    line-height: 1;
 }
-.sync-chip-fresh .sync-chip-dot { background: var(--green); }
-.sync-chip-stale .sync-chip-dot { background: var(--yellow); }
-.sync-chip-old   .sync-chip-dot { background: var(--red); }
-.sync-chip-never .sync-chip-dot { background: var(--red); }
+.freshness-fresh { color: var(--green);  border-color: rgba(158, 206, 106, 0.5); background: rgba(158, 206, 106, 0.12); }
+.freshness-stale { color: var(--yellow); border-color: rgba(224, 175, 104, 0.5); background: rgba(224, 175, 104, 0.12); }
+.freshness-old   { color: var(--red);    border-color: rgba(247, 118, 142, 0.5); background: rgba(247, 118, 142, 0.12); }
+.freshness-never { color: var(--fg-dim); border-color: var(--border);            background: var(--bg-surface); }
+.freshness-fresh .freshness-chip-label { color: var(--green); }
+.freshness-stale .freshness-chip-label { color: var(--yellow); }
+.freshness-old   .freshness-chip-label { color: var(--red); }
+.freshness-never .freshness-chip-label { color: var(--fg-dim); }
 
 .hints-trigger {
     background: var(--bg-surface);

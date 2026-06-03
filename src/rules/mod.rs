@@ -4,27 +4,26 @@
 //! The canonical copy of each pipeline stage's rule table lives in
 //! SQLite, and is mirrored to `src/rules/<stage>.sql` so that:
 //!   * git diffs of rule edits are human-reviewable, and
-//!   * a blown-away database can be re-seeded with the *edited* rules
-//!     (not just the original in-code constants).
+//!   * a blown-away database can be re-seeded with the *edited* rules.
+//!
+//! The `src/rules/*.sql` files — not the in-code `const` dictionaries —
+//! are the source of truth for the seed. (The constants still drive the
+//! pipeline until each stage is converted in later PRs, but they no
+//! longer feed the rule tables.)
 //!
 //! Lifecycle (§6.1):
 //!   * On serve startup, [`load_into_db`] seeds any empty rule table
-//!     from its `src/rules/*.sql` file (falling back to the in-code
-//!     constants the very first time, before any file exists).
+//!     from its `src/rules/*.sql` file.
 //!   * On every committed rule mutation, [`schedule_dump`] re-dumps the
 //!     affected stage on a background thread.
-//!
-//! In PR 1 this module is pure infrastructure: nothing reads the rule
-//! tables for normalisation yet (the pipeline still uses its in-code
-//! `const` dictionaries). Stage conversions land in later PRs.
-
-pub mod seed;
+//!   * `cargo run --bin dump` dumps the *live* DB to the `*.sql` files
+//!     (bootstrap / recovery / manual export).
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
 /// Bump when an in-tree `src/rules/*.sql` file gains a new column, so a
@@ -59,22 +58,10 @@ impl Stage {
         ]
     }
 
-    /// SQLite table name backing this stage.
-    pub fn table(&self) -> &'static str {
-        match self {
-            Stage::Prefixes => "rule_prefixes",
-            Stage::Suffixes => "rule_suffixes",
-            Stage::Expansions => "rule_expansions",
-            Stage::Persons => "rule_persons",
-            Stage::Employers => "rule_employers",
-            Stage::Merchants => "rule_merchants",
-            Stage::BankingOps => "rule_banking_ops",
-            Stage::Locations => "rule_locations",
-        }
-    }
-
-    /// File stem for `src/rules/<stem>.sql`.
-    pub fn file_stem(&self) -> &'static str {
+    /// Short name: the `src/rules/<name>.sql` file stem and the suffix of
+    /// the `rule_<name>` table. The single source for both (see
+    /// [`table`](Self::table)).
+    pub fn name(&self) -> &'static str {
         match self {
             Stage::Prefixes => "prefixes",
             Stage::Suffixes => "suffixes",
@@ -87,26 +74,38 @@ impl Stage {
         }
     }
 
+    /// SQLite table name backing this stage: always `rule_<name>`.
+    pub fn table(&self) -> String {
+        format!("rule_{}", self.name())
+    }
+
     /// Content columns dumped to / loaded from the canonical SQL file.
-    /// Deliberately excludes `id`, `created_at`, `updated_at`: ids are
-    /// re-assigned by insertion order on reload (so declaration order
-    /// is preserved), and timestamps fall back to their column DEFAULT.
+    /// Excludes `id` (re-assigned by insertion order on reload, so
+    /// declaration order is preserved). `created_at` / `updated_at` are
+    /// included so a rule's age survives a re-seed — seed rows carry a
+    /// fixed historical timestamp; UI edits stamp the edit time.
     fn dump_columns(&self) -> &'static [&'static str] {
         match self {
             Stage::Prefixes => &[
                 "pattern", "gateway", "operation", "has_account", "has_date", "note",
-                "sort_order",
+                "sort_order", "created_at", "updated_at",
             ],
             Stage::Suffixes => &[
                 "pattern", "gateway", "operation", "institution", "has_account", "has_date",
                 "has_location", "has_currency_code", "has_amount", "note", "sort_order",
+                "created_at", "updated_at",
             ],
-            Stage::Expansions => &["pattern", "canonical", "note", "sort_order"],
-            Stage::Persons => &["canonical", "pattern", "note"],
-            Stage::Employers => &["canonical", "pattern", "note"],
-            Stage::Merchants => &["canonical", "pattern", "note"],
-            Stage::BankingOps => &["operation", "pattern", "has_account", "note", "sort_order"],
-            Stage::Locations => &["location", "note"],
+            Stage::Expansions => {
+                &["pattern", "canonical", "note", "sort_order", "created_at", "updated_at"]
+            }
+            Stage::Persons => &["canonical", "pattern", "note", "created_at", "updated_at"],
+            Stage::Employers => &["canonical", "pattern", "note", "created_at", "updated_at"],
+            Stage::Merchants => &["canonical", "pattern", "note", "created_at", "updated_at"],
+            Stage::BankingOps => &[
+                "operation", "pattern", "has_account", "note", "sort_order", "created_at",
+                "updated_at",
+            ],
+            Stage::Locations => &["location", "note", "created_at", "updated_at"],
         }
     }
 
@@ -138,28 +137,27 @@ fn row_count(conn: &Connection, stage: Stage) -> Result<i64> {
     Ok(conn.query_row(&sql, [], |r| r.get(0))?)
 }
 
-/// Seed any empty rule table on startup (§6.1). For each stage whose
-/// table is empty we load its `src/rules/<stage>.sql` file; if the file
-/// is missing (very first boot, before any dump) we fall back to the
-/// in-code constants via [`bootstrap_stage`].
-///
-/// Tables that already hold rows are left untouched, so an existing DB
-/// retains its (possibly UI-edited) data.
+/// Seed any empty rule table on startup (§6.1) from its
+/// `src/rules/<stage>.sql` file. Tables that already hold rows are left
+/// untouched, so an existing DB retains its (possibly UI-edited) data.
 pub fn load_into_db(conn: &Connection) -> Result<()> {
     let dir = rules_dir();
     for stage in Stage::all() {
         if row_count(conn, stage)? > 0 {
             continue;
         }
-        let file = dir.join(format!("{}.sql", stage.file_stem()));
-        if file.exists() {
-            let sql = std::fs::read_to_string(&file)
-                .with_context(|| format!("reading {}", file.display()))?;
-            conn.execute_batch(&sql)
-                .with_context(|| format!("loading {}", file.display()))?;
-        } else {
-            bootstrap_stage(conn, stage)?;
+        let file = dir.join(format!("{}.sql", stage.name()));
+        if !file.exists() {
+            bail!(
+                "missing canonical seed file {} \u{2014} run `cargo run --bin dump` \
+                 from a populated DB to regenerate it",
+                file.display()
+            );
         }
+        let sql = std::fs::read_to_string(&file)
+            .with_context(|| format!("reading {}", file.display()))?;
+        conn.execute_batch(&sql)
+            .with_context(|| format!("loading {}", file.display()))?;
     }
     set_schema_version(conn, RULES_SCHEMA_VERSION)?;
     Ok(())
@@ -197,10 +195,11 @@ fn render_value(v: &rusqlite::types::Value) -> String {
 pub fn dump_stage_to_string(conn: &Connection, stage: Stage) -> Result<String> {
     let cols = stage.dump_columns();
     let collist = cols.join(", ");
+    let table = stage.table();
     let sql = format!(
         "SELECT {} FROM {} ORDER BY {}",
         collist,
-        stage.table(),
+        table,
         stage.dump_order_by()
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -216,16 +215,16 @@ pub fn dump_stage_to_string(conn: &Connection, stage: Stage) -> Result<String> {
     let mut out = String::new();
     out.push_str(&format!(
         "-- Canonical seed for the `{}` pipeline stage.\n\
-         -- Generated by `cargo run --bin dump_rules` (editable-rules-v3 §6).\n\
+         -- Generated by `cargo run --bin dump` (editable-rules-v3 §6).\n\
          -- Edit via the Pipeline tab; this file is re-dumped on each change.\n",
-        stage.file_stem()
+        stage.name()
     ));
     for r in rows {
         let vals = r?;
         let rendered: Vec<String> = vals.iter().map(render_value).collect();
         out.push_str(&format!(
             "INSERT INTO {} ({}) VALUES ({});\n",
-            stage.table(),
+            table,
             collist,
             rendered.join(", ")
         ));
@@ -238,13 +237,13 @@ pub fn dump_stage(conn: &Connection, stage: Stage) -> Result<()> {
     let dir = rules_dir();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
     let body = dump_stage_to_string(conn, stage)?;
-    let path = dir.join(format!("{}.sql", stage.file_stem()));
+    let path = dir.join(format!("{}.sql", stage.name()));
     write_atomic(&path, body.as_bytes())
         .with_context(|| format!("writing {}", path.display()))?;
     Ok(())
 }
 
-/// Dump every stage. Used by the `dump_rules` bootstrap binary.
+/// Dump every stage. Used by the `dump` binary.
 pub fn dump_all(conn: &Connection) -> Result<()> {
     for stage in Stage::all() {
         dump_stage(conn, stage)?;
@@ -285,122 +284,40 @@ pub fn schedule_dump(stage: Stage, db_path: String) {
     });
 }
 
-// ---------------------------------------------------------------------
-// Bootstrap from the in-code constants (first-ever boot / fidelity oracle)
-// ---------------------------------------------------------------------
-
-/// Seed every rule table from the in-code constant dictionaries. Used
-/// to generate the first `src/rules/*.sql` files and as the load
-/// fallback before any file exists.
-pub fn bootstrap_from_constants(conn: &Connection) -> Result<()> {
-    for stage in Stage::all() {
-        bootstrap_stage(conn, stage)?;
-    }
-    Ok(())
-}
-
-/// Seed a single stage from its in-code constants. Idempotent only on an
-/// empty table (callers guard on emptiness).
-pub fn bootstrap_stage(conn: &Connection, stage: Stage) -> Result<()> {
-    use crate::normalise;
-    match stage {
-        Stage::Prefixes => {
-            for (i, r) in normalise::prefix::seed_rows().into_iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO rule_prefixes (pattern, gateway, operation, has_account, has_date, sort_order)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    rusqlite::params![r.pattern, r.gateway, r.operation, r.has_account as i64, r.has_date as i64, i as i64],
-                )?;
-            }
-        }
-        Stage::Suffixes => {
-            for (i, r) in normalise::suffix::seed_rows().into_iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO rule_suffixes (pattern, gateway, operation, institution, has_account, has_date, has_location, has_currency_code, has_amount, sort_order)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                    rusqlite::params![
-                        r.pattern, r.gateway, r.operation, r.institution,
-                        r.has_account as i64, r.has_date as i64, r.has_location as i64,
-                        r.has_currency_code as i64, r.has_amount as i64, i as i64
-                    ],
-                )?;
-            }
-        }
-        Stage::Expansions => {
-            for (i, r) in normalise::expand::seed_rows().into_iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO rule_expansions (pattern, canonical, sort_order) VALUES (?1, ?2, ?3)",
-                    rusqlite::params![r.pattern, r.canonical, i as i64],
-                )?;
-            }
-        }
-        Stage::Persons => {
-            for r in normalise::persons::seed_rows() {
-                conn.execute(
-                    "INSERT INTO rule_persons (canonical, pattern) VALUES (?1, ?2)",
-                    rusqlite::params![r.canonical, r.pattern],
-                )?;
-            }
-        }
-        Stage::Employers => {
-            for r in normalise::employers::seed_rows() {
-                conn.execute(
-                    "INSERT INTO rule_employers (canonical, pattern) VALUES (?1, ?2)",
-                    rusqlite::params![r.canonical, r.pattern],
-                )?;
-            }
-        }
-        Stage::Merchants => {
-            for r in normalise::merchants::seed_rows() {
-                conn.execute(
-                    "INSERT INTO rule_merchants (canonical, pattern) VALUES (?1, ?2)",
-                    rusqlite::params![r.canonical, r.pattern],
-                )?;
-            }
-        }
-        Stage::BankingOps => {
-            for (i, r) in normalise::banking_ops::seed_rows().into_iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO rule_banking_ops (operation, pattern, has_account, sort_order) VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![r.operation, r.pattern, r.has_account as i64, i as i64],
-                )?;
-            }
-        }
-        Stage::Locations => {
-            for loc in normalise::locations::seed_rows() {
-                conn.execute(
-                    "INSERT INTO rule_locations (location) VALUES (?1)",
-                    rusqlite::params![loc],
-                )?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::initialize_in_memory;
 
-    #[test]
-    fn bootstrap_populates_all_stages() {
+    /// Load the committed `src/rules/<stage>.sql` into a fresh DB.
+    fn load_committed(stage: Stage) -> Connection {
+        let manifest = env!("CARGO_MANIFEST_DIR");
+        let path = std::path::Path::new(manifest)
+            .join("src/rules")
+            .join(format!("{}.sql", stage.name()));
+        let sql = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
         let conn = initialize_in_memory().unwrap();
-        bootstrap_from_constants(&conn).unwrap();
+        conn.execute_batch(&sql).unwrap();
+        conn
+    }
+
+    #[test]
+    fn committed_files_populate_all_stages() {
         for stage in Stage::all() {
+            let conn = load_committed(stage);
             assert!(
                 row_count(&conn, stage).unwrap() > 0,
-                "stage {:?} should have rows after bootstrap",
+                "stage {:?} should have rows after loading its committed seed",
                 stage
             );
         }
     }
 
     #[test]
-    fn prefix_sort_order_matches_declaration_order() {
-        let conn = initialize_in_memory().unwrap();
-        bootstrap_stage(&conn, Stage::Prefixes).unwrap();
-        // First declared prefix is the date prefix.
+    fn prefix_sort_order_is_dense_and_date_first() {
+        let conn = load_committed(Stage::Prefixes);
+        // First-ordered prefix is the date prefix.
         let first: String = conn
             .query_row(
                 "SELECT pattern FROM rule_prefixes ORDER BY sort_order LIMIT 1",
@@ -422,11 +339,32 @@ mod tests {
     }
 
     #[test]
+    fn seed_rows_carry_historical_timestamp() {
+        // The committed seed bakes a fixed created_at so rule age is
+        // meaningful and stable across re-seeds (not "now" on every load).
+        let conn = load_committed(Stage::Persons);
+        let distinct_created: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT created_at) FROM rule_persons",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(distinct_created, 1, "all seed rows share one timestamp");
+        let ts: String = conn
+            .query_row("SELECT created_at FROM rule_persons LIMIT 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        // Historical, not the current year's "now"-ish default churn.
+        assert!(ts.starts_with("2026-04-03"), "unexpected seed timestamp: {ts}");
+    }
+
+    #[test]
     fn dump_round_trips_identically() {
-        // dump → load into a fresh DB → dump again ⇒ byte-identical.
-        let conn = initialize_in_memory().unwrap();
-        bootstrap_from_constants(&conn).unwrap();
+        // committed file → load → dump → reload → dump ⇒ byte-identical.
         for stage in Stage::all() {
+            let conn = load_committed(stage);
             let first = dump_stage_to_string(&conn, stage).unwrap();
 
             let conn2 = initialize_in_memory().unwrap();
@@ -438,57 +376,33 @@ mod tests {
     }
 
     #[test]
-    fn load_into_db_is_noop_when_tables_populated() {
-        let conn = initialize_in_memory().unwrap();
-        bootstrap_from_constants(&conn).unwrap();
-        let before: i64 = row_count(&conn, Stage::Merchants).unwrap();
-        // POCKETSMITH_RULES_DIR points nowhere meaningful here, but since
-        // tables are populated load_into_db must not touch them.
-        load_into_db(&conn).unwrap();
-        let after: i64 = row_count(&conn, Stage::Merchants).unwrap();
-        assert_eq!(before, after);
-    }
-
-    #[test]
-    fn committed_seed_files_match_constants() {
-        // The committed src/rules/*.sql files must load cleanly and
-        // reproduce exactly what the in-code constants bootstrap.
+    fn dump_reproduces_committed_files() {
+        // Loading a committed file and dumping it must reproduce that
+        // file byte-for-byte — guards the on-disk format against drift.
         let manifest = env!("CARGO_MANIFEST_DIR");
         for stage in Stage::all() {
             let path = std::path::Path::new(manifest)
                 .join("src/rules")
-                .join(format!("{}.sql", stage.file_stem()));
-            let sql = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
-
-            let from_file = initialize_in_memory().unwrap();
-            from_file.execute_batch(&sql).unwrap();
-
-            let from_const = initialize_in_memory().unwrap();
-            bootstrap_stage(&from_const, stage).unwrap();
-
+                .join(format!("{}.sql", stage.name()));
+            let committed = std::fs::read_to_string(&path).unwrap();
+            let conn = load_committed(stage);
+            let dumped = dump_stage_to_string(&conn, stage).unwrap();
             assert_eq!(
-                dump_stage_to_string(&from_file, stage).unwrap(),
-                dump_stage_to_string(&from_const, stage).unwrap(),
-                "committed seed for {:?} drifted from constants \u{2014} re-run `cargo run --bin dump_rules`",
+                committed, dumped,
+                "committed seed for {:?} drifted from dump format \u{2014} \
+                 re-run `cargo run --bin dump`",
                 stage
             );
         }
     }
 
     #[test]
-    fn load_into_db_falls_back_to_constants_when_no_files() {
-        // Point at an empty temp dir so no *.sql files exist; load must
-        // fall back to the in-code constants.
-        let tmp = std::env::temp_dir().join(format!("ps-rules-test-{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        std::env::set_var("POCKETSMITH_RULES_DIR", &tmp);
-
-        let conn = initialize_in_memory().unwrap();
+    fn load_into_db_is_noop_when_tables_populated() {
+        let conn = load_committed(Stage::Merchants);
+        let before: i64 = row_count(&conn, Stage::Merchants).unwrap();
+        // Tables are populated, so load_into_db must not touch them.
         load_into_db(&conn).unwrap();
-        assert!(row_count(&conn, Stage::Merchants).unwrap() > 0);
-
-        std::env::remove_var("POCKETSMITH_RULES_DIR");
-        let _ = std::fs::remove_dir_all(&tmp);
+        let after: i64 = row_count(&conn, Stage::Merchants).unwrap();
+        assert_eq!(before, after);
     }
 }
