@@ -44,6 +44,28 @@ pub fn initialize(path: &str) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Open the application database, create/upgrade the schema, **and seed
+/// any empty rule table** from `src/rules/*.sql`.
+///
+/// This is the single init path every binary (serve + all CLIs) must use
+/// so the web and CLI code paths can't diverge. It guarantees the
+/// editable rule tables are seeded before the normalisation pipeline
+/// reads them — without it, a CLI run on a DB that `serve` never touched
+/// would silently skip the DB-backed stages (and `dump` would overwrite
+/// the canonical `*.sql` files with empty tables). `load_into_db` is
+/// idempotent (it only fills empty tables), so this is cheap to call on
+/// every startup.
+pub fn open_app_db() -> Result<Connection> {
+    open_app_db_at(&path_from_env())
+}
+
+/// [`open_app_db`] against an explicit path (tests / isolated runs).
+pub fn open_app_db_at(path: &str) -> Result<Connection> {
+    let conn = initialize(path)?;
+    crate::rules::load_into_db(&conn)?;
+    Ok(conn)
+}
+
 pub fn initialize_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;

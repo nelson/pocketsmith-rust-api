@@ -38,7 +38,7 @@ fn run(opts: &PushOpts) -> Result<ExitCode> {
     let api_key = env::var("POCKETSMITH_API_KEY")
         .context("POCKETSMITH_API_KEY not set (see .env.example)")?;
     let client = PocketSmithClient::new(api_key);
-    let conn = db::initialize(&db::path_from_env())?;
+    let conn = db::open_app_db()?;
 
     let stats = push::push(&client, &conn, opts)?;
 
