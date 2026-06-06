@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
     let db_path = db::path_from_env();
-    let conn = db::initialize(&db_path)?;
+    let conn = db::open_app_db_at(&db_path)?;
     rules::dump_all(&conn)?;
 
     let dir = rules::rules_dir();

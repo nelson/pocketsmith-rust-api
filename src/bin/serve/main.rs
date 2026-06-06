@@ -34,11 +34,8 @@ fn main() -> Result<()> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3141);
 
-    let conn = db::initialize(&db::path_from_env())?;
-    // Seed any empty rule table from src/rules/*.sql (or the in-code
-    // constants on the very first boot). Rules already present are left
-    // untouched. (editable-rules-v3 §6.1)
-    pocketsmith_sync::rules::load_into_db(&conn)?;
+    // Single shared app-DB init (schema + rule seed) — see db::open_app_db.
+    let conn = db::open_app_db()?;
     let state = Arc::new(Mutex::new(AppState::new(conn)));
 
     let addr = format!("127.0.0.1:{port}");
