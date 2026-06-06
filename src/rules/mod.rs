@@ -326,18 +326,12 @@ mod tests {
     }
 
     #[test]
-    fn prefix_sort_order_is_dense_and_date_first() {
+    fn prefix_seed_sort_order_is_dense() {
+        // Structural invariant only: sort_order is a dense 0..N-1 sequence,
+        // so loop-stage ordering round-trips. Deliberately does NOT assert
+        // *which* rule is first — the rule content is editable data, not a
+        // fixed source of truth.
         let conn = load_committed(Stage::Prefixes);
-        // First-ordered prefix is the date prefix.
-        let first: String = conn
-            .query_row(
-                "SELECT pattern FROM rule_prefixes ORDER BY sort_order LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert!(first.contains("date"), "unexpected first prefix: {first}");
-        // sort_order is dense 0..N-1.
         let (min, max, cnt): (i64, i64, i64) = conn
             .query_row(
                 "SELECT MIN(sort_order), MAX(sort_order), COUNT(*) FROM rule_prefixes",

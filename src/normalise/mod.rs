@@ -399,69 +399,79 @@ mod tests {
         eprintln!("fidelity: checked {} payee\u{00d7}stage pairs", checked);
     }
 
-    /// Corner case: a brand-new database opened through the real app init
-    /// (`db::open_app_db_at`) — i.e. what a CLI hits before `serve` ever
-    /// runs. The DB-backed prefix/suffix stages must be seeded and behave
-    /// identically to the const oracle (incl. empty / no-match inputs).
-    /// Hermetic: needs no real `pocketsmith.db`.
+    /// Conversion test — **hermetic**. Defines its own prefix rule in the
+    /// DB (nothing to do with the production `src/rules/*.sql`) and proves
+    /// `apply_with_db` loads + compiles + applies + captures + strips from
+    /// exactly the DB rows. Tests the conversion *machinery* without
+    /// treating the current rules as an oracle or source of truth. This is
+    /// the template for the remaining per-stage conversions (PRs 5–8).
     #[test]
-    fn fresh_app_db_drives_prefix_and_suffix() {
-        let dir = std::env::temp_dir().join(format!("ps-freshpipe-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
-        let dbp = dir.join("fresh.db");
-        let conn = crate::db::open_app_db_at(dbp.to_str().unwrap()).unwrap();
+    fn prefix_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap(); // schema only
+        conn.execute(
+            "INSERT INTO rule_prefixes (pattern, has_account, has_date, sort_order) \
+             VALUES (?1, 1, 0, 0)",
+            [r"^ACCT (?P<account>\d+) "],
+        )
+        .unwrap();
         let cache = cache::RuleCache::new();
         let ctx = cache::PipelineCtx::new(&conn, &cache);
-        for payee in [
-            "Visa Debit Purchase Card 1234 COFFEE",
-            "Direct Debit 062246 CommInsure 3791272--147492387",
-            "",                     // corner: empty input
-            "PLAIN PAYEE NO RULES", // corner: nothing matches
-        ] {
-            for stage in ["prefix", "suffix"] {
-                let mut a = NormalisationResult::new(payee);
-                let mut b = NormalisationResult::new(payee);
-                match stage {
-                    "prefix" => {
-                        prefix::apply(&mut a);
-                        prefix::apply_with_db(&mut b, &ctx);
-                    }
-                    _ => {
-                        suffix::apply(&mut a);
-                        suffix::apply_with_db(&mut b, &ctx);
-                    }
-                }
-                assert_eq!(a.normalised, b.normalised, "{stage} normalised differs for {payee:?}");
-                assert_eq!(
-                    features_to_json(&a.features),
-                    features_to_json(&b.features),
-                    "{stage} features differ for {payee:?}"
-                );
-            }
-        }
-        // Non-vacuous guard: the Visa prefix genuinely extracts the account
-        // on the seeded DB, so the const==DB checks above aren't just
-        // comparing two empty (no-match) results.
-        let mut probe = NormalisationResult::new("Visa Debit Purchase Card 1234 COFFEE");
-        prefix::apply_with_db(&mut probe, &ctx);
-        assert_eq!(probe.features.account.as_deref(), Some("1234"));
-        let _ = std::fs::remove_dir_all(&dir);
+        let mut r = NormalisationResult::new("ACCT 4242 SOME SHOP");
+        prefix::apply_with_db(&mut r, &ctx);
+        assert_eq!(r.normalised, "SOME SHOP", "prefix must be stripped using the DB rule");
+        assert_eq!(r.features.account.as_deref(), Some("4242"), "named capture must be extracted");
+
+        // No rules => no-op (the corner case db::open_app_db prevents for
+        // CLIs: an unseeded DB must not panic or fabricate output).
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r2 = NormalisationResult::new("ACCT 4242 SOME SHOP");
+        prefix::apply_with_db(&mut r2, &ctx2);
+        assert_eq!(r2.normalised, "ACCT 4242 SOME SHOP", "no rules => input unchanged");
+        assert_eq!(r2.features.account, None, "no rules => no extraction");
     }
 
-    /// Guards the seeding contract the consolidation relies on: a DB with
-    /// bare schema but no rule seed leaves prefix/suffix with no rules, so
-    /// they must no-op (rather than panic or fabricate output). This is
-    /// exactly the corner case `db::open_app_db` prevents for the CLIs.
+    /// Conversion test — **hermetic** (suffix). Mirror of
+    /// [`prefix_stage_reads_its_rules_from_the_db`] for the suffix stage.
     #[test]
-    fn unseeded_db_makes_db_backed_stages_noop() {
-        let conn = crate::db::initialize_in_memory().unwrap(); // schema only, NOT seeded
+    fn suffix_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_suffixes (pattern, has_account, sort_order) VALUES (?1, 1, 0)",
+            [r"\s+CARD (?P<account>\d+)$"],
+        )
+        .unwrap();
         let cache = cache::RuleCache::new();
         let ctx = cache::PipelineCtx::new(&conn, &cache);
-        let payee = "Visa Debit Purchase Card 1234 COFFEE";
-        let mut r = NormalisationResult::new(payee);
-        prefix::apply_with_db(&mut r, &ctx);
-        assert_eq!(r.features.account, None, "no rules => no feature extraction");
-        assert_eq!(r.normalised, payee, "no rules => input unchanged");
+        let mut r = NormalisationResult::new("SOME SHOP CARD 9999");
+        suffix::apply_with_db(&mut r, &ctx);
+        assert_eq!(r.normalised, "SOME SHOP", "suffix must be stripped using the DB rule");
+        assert_eq!(r.features.account.as_deref(), Some("9999"));
+    }
+
+    /// Guards the init consolidation (not the seed *content*): every binary
+    /// must open the DB via `db::open_app_db`, which seeds the rule tables,
+    /// where bare `db::initialize` does not. This is the regression guard
+    /// for the fresh-DB corner case where a CLI would otherwise run the
+    /// pipeline against empty rule tables.
+    #[test]
+    fn open_app_db_seeds_rules_where_initialize_does_not() {
+        let bare = crate::db::initialize_in_memory().unwrap();
+        assert_eq!(
+            crate::rules::count(&bare, crate::rules::Stage::Prefixes).unwrap(),
+            0,
+            "bare initialize must not seed (schema only)"
+        );
+        let dir = std::env::temp_dir().join(format!("ps-openapp-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let dbp = dir.join("app.db");
+        let app = crate::db::open_app_db_at(dbp.to_str().unwrap()).unwrap();
+        assert!(
+            crate::rules::count(&app, crate::rules::Stage::Prefixes).unwrap() > 0,
+            "open_app_db must seed the rule tables on a fresh DB"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -153,3 +153,66 @@ is the template for converting the remaining six stages (PRs 5–8).
   will set `updated_at` explicitly or I'll add triggers then.
 - `POCKETSMITH_RULES_DIR` env var overrides the `src/rules` location (used
   by tests / isolated runs).
+
+## Testing strategy (rules are editable data, not an oracle)
+
+**Principle:** the rules in `src/rules/*.sql` (and the in-code `const`
+dictionaries) are **editable data with no special status** — not a source
+of truth, not an oracle. They will change, and a future "start over" must
+be free to seed from anything (or nothing). **No test or business-logic
+correctness may depend on their specific content.**
+
+### What currently elevates the rules (audit) — and the plan
+- **`fidelity` test + the `#[cfg(test)]` const dictionaries** (PREFIXES,
+  SUFFIXES, …) are **temporary conversion scaffolding**: they assert the
+  new DB path == the old const path. They only hold while the seed still
+  equals the constants. **Retire them once all stages are converted, and
+  necessarily before 4b editing lands** (an edited rule makes const ≠ DB,
+  which would fail the fidelity test). Tracked as a cleanup task.
+- **Pipeline example tests** (`test_normalise_woolworths_full`,
+  `…_comminsure`, `…_bpay`) assert specific outputs for specific payees,
+  i.e. they depend on the current merchant/banking/expand rule content.
+  Treat them as **"current-data smoke examples"**, not invariants; expect
+  to rewrite/relax them as those stages convert and rules become editable.
+- **Fixed:** removed the "date prefix is first" content assertion
+  (`prefix_seed_sort_order_is_dense` now checks only the dense 0..N-1
+  structural invariant); replaced the production-coupled fresh-DB test
+  with hermetic ones (below).
+- **Not coupled:** load/dump/round-trip/`open_app_db` tests check format,
+  wiring, and structure — never specific rule values. (Seed *content* is
+  intentionally not tested — it's a one-time migration.)
+
+### Per-stage conversion tests = hermetic, rules-in-test (the template)
+Each stage conversion (PRs 5–8) gets a hermetic test that **defines its
+own rules inside the test**, inserts them into an in-memory rule table,
+and asserts `apply_with_db` loads/compiles/applies/captures/strips
+correctly — independent of production content. Templates landed in PR 4:
+`prefix_stage_reads_its_rules_from_the_db` and
+`suffix_stage_reads_its_rules_from_the_db` (each also covers the unseeded
+no-op corner case). Copy the pattern per stage.
+
+### Future tests to implement (when their feature lands)
+- **Per-stage hermetic conversion test** for expand, persons, employers,
+  merchants, banking_ops (same rules-in-test template as prefix/suffix).
+- **4b editor (layered, not full-browser e2e):**
+  - *API→DB integration:* POST create/edit/delete/reorder → assert the
+    `rule_*` row changed, cache invalidated, and the background dump
+    rewrote `src/rules/<stage>.sql`.
+  - *View/render:* the rule list renders DB rows; the editor form renders
+    with the correct `hx-post` target + field names (in htmx, correct
+    attributes ⇒ correct request — no separate JS test needed).
+  - *Impact eval:* unit-test the impact computation as a near-pure fn over
+    fixture payees; view-test the bucket rendering.
+  - *One HTTP-layer round-trip* (e2e-minus-browser): create → list shows
+    it → evaluate shows impact → re-scan, driving the handlers directly.
+- **`cargo test --features fidelity`** (see below) as a belt-and-suspenders
+  full-corpus check — only while the const oracle still exists.
+
+### What `--features fidelity` is
+A cargo feature gating one heavy test (`prefix_suffix_db_matches_const_on_
+real_payees`) that opens the **real `pocketsmith.db`** and compares the
+const path vs the DB path across *every* real payee. It's gated because it
+needs that local DB (absent in CI/clean checkouts, where it would skip).
+It is **conversion scaffolding** with the same lifetime as the const
+oracle — delete it once the constants go. The hermetic per-stage tests are
+the permanent replacement.
