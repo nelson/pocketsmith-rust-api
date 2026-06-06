@@ -109,12 +109,6 @@ pub struct NormalisationResult {
     /// changed `normalised` or attached a feature. Populated only by
     /// [`normalise`] (raw stages don't write this).
     pub trace: Vec<TraceEntry>,
-    /// Scratch slot for the current stage to record the pattern it
-    /// matched. `run_traced` reads it after the stage runs, copies it
-    /// into the appended [`TraceEntry`], and clears it. Stages that
-    /// don't set it leave it `None`.
-    #[doc(hidden)]
-    pub last_matched_pattern: Option<&'static str>,
 }
 
 /// One entry in [`NormalisationResult::trace`]. Records what a single
@@ -135,12 +129,6 @@ pub struct TraceEntry {
     pub feature_values: Vec<(&'static str, String)>,
     /// Class set by this stage, if any.
     pub class_set: Option<PayeeClass>,
-    /// The pattern (regex source string) that the stage matched, if
-    /// it's meaningful. Populated by table-driven stages (merchants,
-    /// banking_ops, persons, employers) that try one of many patterns
-    /// until one wins. `None` for stages that don't have a single
-    /// matched-pattern concept (prefix/suffix/expand apply many rules).
-    pub matched_pattern: Option<&'static str>,
 }
 
 impl NormalisationResult {
@@ -151,7 +139,6 @@ impl NormalisationResult {
             class: None,
             features: Features::default(),
             trace: Vec::new(),
-            last_matched_pattern: None,
         }
     }
 
@@ -302,7 +289,6 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
             features_added: Vec::new(),
             feature_values: Vec::new(),
             class_set: None,
-            matched_pattern: None,
         });
     }
     result
@@ -318,7 +304,6 @@ fn run_traced(
     let before_str = result.normalised.clone();
     let before_keys = populated_feature_keys(&result.features);
     let before_class = result.class.clone();
-    result.last_matched_pattern = None;
     apply(result);
     // Entries the stage newly populated, each carrying its own display
     // string, so the added keys and their trace values come from one
@@ -336,7 +321,6 @@ fn run_traced(
     } else {
         None
     };
-    let matched_pattern = result.last_matched_pattern.take();
     if before_str != result.normalised || !features_added.is_empty() || class_set.is_some() {
         result.trace.push(TraceEntry {
             stage,
@@ -345,7 +329,6 @@ fn run_traced(
             features_added,
             feature_values,
             class_set,
-            matched_pattern,
         });
     }
 }
