@@ -330,6 +330,7 @@ CREATE TABLE IF NOT EXISTS rule_banking_ops (
 CREATE TABLE IF NOT EXISTS rule_locations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     location    TEXT NOT NULL UNIQUE,
+    kind        TEXT NOT NULL DEFAULT 'location' CHECK (kind IN ('location','region')),
     note        TEXT,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))

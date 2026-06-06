@@ -3,7 +3,6 @@ pub mod apply;
 pub mod cache;
 pub(crate) mod employers;
 pub(crate) mod expand;
-#[allow(dead_code)]
 pub(crate) mod locations;
 pub(crate) mod merchants;
 pub(crate) mod persons;
@@ -89,6 +88,7 @@ pub enum PayeeClass {
 pub struct Features {
     pub entity_name: Option<String>,
     pub location: Option<String>,
+    pub region: Option<String>,
     pub operation: Option<BankingOperation>,
     pub reason: Option<String>,
     pub institution: Option<String>,
@@ -173,9 +173,10 @@ impl NormalisationResult {
 
 /// Format a normalised result into the payee string that should be written
 /// to `transactions.payee`. Every classified payee is rendered from its
-/// canonical `entity_name`; merchants additionally append their location as
-/// `"{entity_name}, {location}"`. When no entity was identified we fall
-/// back to the normalised string.
+/// canonical `entity_name`; merchants additionally append their place as
+/// `"{entity_name}, {location} {region}"` (location and/or region, whichever
+/// are present). When no entity was identified we fall back to the
+/// normalised string.
 pub fn format_payee(result: &NormalisationResult) -> String {
     // Prefer the canonical entity name for any classified payee; fall back
     // to the normalised string when no entity was identified.
@@ -185,11 +186,21 @@ pub fn format_payee(result: &NormalisationResult) -> String {
         .clone()
         .unwrap_or_else(|| result.normalised.clone());
 
-    match (result.class(), &result.features.entity_name, &result.features.location) {
-        // Merchants carry their location: "{entity}, {location}".
-        (Some(PayeeClass::Merchant), Some(_), Some(loc)) => format!("{base}, {loc}"),
-        _ => base,
+    // Merchants append their place: location then region, space-joined.
+    if result.class() == Some(&PayeeClass::Merchant) && result.features.entity_name.is_some() {
+        let place = [
+            result.features.location.as_deref(),
+            result.features.region.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+        if !place.is_empty() {
+            return format!("{base}, {place}");
+        }
     }
+    base
 }
 
 /// Stable string tag for a [`PayeeClass`], used in DB columns and URL filters.
@@ -229,6 +240,7 @@ fn feature_entries(f: &Features) -> Vec<FeatureEntry> {
     vec![
         text("entity_name", &f.entity_name),
         text("location", &f.location),
+        text("region", &f.region),
         FeatureEntry {
             key: "operation",
             display: f.operation.as_ref().map(|o| o.display_name().to_string()),
@@ -271,6 +283,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
     run_traced(&mut result, "prefix", |r| prefix::apply_with_db(r, ctx));
     run_traced(&mut result, "suffix", |r| suffix::apply_with_db(r, ctx));
     run_traced(&mut result, "expand", |r| expand::apply_with_db(r, ctx));
+    run_traced(&mut result, "locations", |r| locations::apply_with_db(r, ctx));
     run_traced(&mut result, "persons", |r| persons::apply_with_db(r, ctx));
     run_traced(&mut result, "employers", |r| employers::apply_with_db(r, ctx));
     run_traced(&mut result, "merchants", |r| merchants::apply_with_db(r, ctx));
@@ -358,6 +371,50 @@ pub fn slug_for(original_payee: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Coverage report (`cargo test --features fidelity`): the new location
+    /// stage must extract a *suburb* into `features.location` for a large
+    /// share of real payees — where the old pipeline extracted the suburb in
+    /// **zero** cases (it only ever recorded the trailing state code, which
+    /// now lives in `features.region`). Skipped silently if the DB is absent.
+    #[cfg(feature = "fidelity")]
+    #[test]
+    fn location_extraction_coverage_on_real_payees() {
+        let Ok(conn) = rusqlite::Connection::open("pocketsmith.db") else {
+            eprintln!("pocketsmith.db absent — skipping coverage test");
+            return;
+        };
+        let payees: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT DISTINCT original_payee FROM transactions WHERE original_payee IS NOT NULL")
+                .unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().map(|r| r.unwrap()).collect()
+        };
+        let p = OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        let (mut with_location, mut with_region, mut state_code_in_location) = (0usize, 0usize, 0usize);
+        for payee in &payees {
+            let r = normalise(payee, &ctx);
+            if let Some(loc) = &r.features.location {
+                with_location += 1;
+                // location must be a suburb, never a bare state/country code.
+                if matches!(loc.to_uppercase().as_str(), "NSW" | "VIC" | "QLD" | "AU" | "NT" | "SA" | "WA" | "TAS" | "ACT") {
+                    state_code_in_location += 1;
+                }
+            }
+            if r.features.region.is_some() {
+                with_region += 1;
+            }
+        }
+        eprintln!(
+            "location coverage: {with_location} payees have a suburb location; {with_region} have a region; {state_code_in_location} location values are bare state codes"
+        );
+        // The whole point of the stage: suburbs are now captured at scale.
+        assert!(with_location > 4000, "expected >4000 suburb locations, got {with_location}");
+        // Regions still populated (by suffix), and never leak into location.
+        assert!(with_region > 2000, "expected >2000 region values, got {with_region}");
+        assert_eq!(state_code_in_location, 0, "location must hold suburbs, not state codes");
+    }
 
     /// Heavy fidelity gate (`cargo test --features fidelity`): for every
     /// distinct `original_payee` in the real `pocketsmith.db`, the
@@ -629,6 +686,41 @@ mod tests {
         assert_eq!(r2.class(), None, "no rules => unclassified");
     }
 
+    /// Conversion test — **hermetic** (locations). The location stage scans
+    /// the *whole* normalised string (not just the tail) and records the
+    /// suburb in `features.location`, additively. Defines its own
+    /// `rule_locations` rows, independent of production content.
+    #[test]
+    fn locations_stage_reads_its_rules_from_the_db() {
+        let conn = crate::db::initialize_in_memory().unwrap(); // schema only
+        for loc in ["STRATHFIELD", "NORTH STRATHFIELD", "ULTIMO", "SYDNEY"] {
+            conn.execute("INSERT INTO rule_locations (location) VALUES (?1)", [loc])
+                .unwrap();
+        }
+        let cache = cache::RuleCache::new();
+        let ctx = cache::PipelineCtx::new(&conn, &cache);
+
+        // Mid-string suburb the suffix stage structurally can't reach.
+        let mut r = NormalisationResult::new("GREENWAY MEAT In STRATHFIELD Date 05 Jul");
+        locations::apply_with_db(&mut r, &ctx);
+        assert_eq!(r.features.location.as_deref(), Some("Strathfield"));
+        // Additive: the normalised string is untouched.
+        assert_eq!(r.normalised, "GREENWAY MEAT In STRATHFIELD Date 05 Jul");
+
+        // Longest match wins (NORTH STRATHFIELD over STRATHFIELD).
+        let mut r2 = NormalisationResult::new("SHOP NORTH STRATHFIELD");
+        locations::apply_with_db(&mut r2, &ctx);
+        assert_eq!(r2.features.location.as_deref(), Some("North Strathfield"));
+
+        // No rules => no-op (unseeded DB must not panic or fabricate).
+        let bare = crate::db::initialize_in_memory().unwrap();
+        let cache2 = cache::RuleCache::new();
+        let ctx2 = cache::PipelineCtx::new(&bare, &cache2);
+        let mut r3 = NormalisationResult::new("GREENWAY MEAT In STRATHFIELD");
+        locations::apply_with_db(&mut r3, &ctx2);
+        assert_eq!(r3.features.location, None, "no rules => no extraction");
+    }
+
     /// Guards the init consolidation (not the seed *content*): every binary
     /// must open the DB via `db::open_app_db`, which seeds the rule tables,
     /// where bare `db::initialize` does not. This is the regression guard
@@ -791,6 +883,29 @@ mod tests {
         result.features.entity_name = Some("Woolworths".into());
         result.features.location = Some("Strathfield".into());
         assert_eq!(format_payee(&result), "Woolworths, Strathfield");
+    }
+
+    #[test]
+    fn test_format_payee_merchant_location_and_region() {
+        let mut result = NormalisationResult::new("WOOLWORTHS STRATHFIELD NSW");
+        result.normalised = "WOOLWORTHS".into();
+        result.set_class(PayeeClass::Merchant);
+        result.features.entity_name = Some("Woolworths".into());
+        result.features.location = Some("Strathfield".into());
+        result.features.region = Some("NSW 2140".into());
+        // "{entity}, {location} {region}"
+        assert_eq!(format_payee(&result), "Woolworths, Strathfield NSW 2140");
+    }
+
+    #[test]
+    fn test_format_payee_merchant_region_only() {
+        let mut result = NormalisationResult::new("MERCHANT NSW");
+        result.normalised = "MERCHANT".into();
+        result.set_class(PayeeClass::Merchant);
+        result.features.entity_name = Some("Some Merchant".into());
+        result.features.region = Some("NSW".into());
+        // No suburb, region only: "{entity}, {region}"
+        assert_eq!(format_payee(&result), "Some Merchant, NSW");
     }
 
     #[test]

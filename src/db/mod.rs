@@ -35,11 +35,7 @@ pub fn initialize(path: &str) -> Result<Connection> {
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
-    drop_legacy_artifacts(&conn)?;
-    migrate_add_pushed_at(&conn)?;
-    migrate_add_explicit_writes(&conn)?;
-    migrate_rename_pocketsmith_reason(&conn)?;
-    seed_field_masks(&conn)?;
+    migrate_and_seed(&conn)?;
 
     Ok(conn)
 }
@@ -70,12 +66,52 @@ pub fn initialize_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA)?;
-    drop_legacy_artifacts(&conn)?;
-    migrate_add_pushed_at(&conn)?;
-    migrate_add_explicit_writes(&conn)?;
-    migrate_rename_pocketsmith_reason(&conn)?;
-    seed_field_masks(&conn)?;
+    migrate_and_seed(&conn)?;
     Ok(conn)
+}
+
+/// Bring a freshly-`SCHEMA`'d connection up to date: drop legacy artifacts,
+/// run every idempotent migration, then seed the `field_masks` lookup.
+/// Shared by [`initialize`] and [`initialize_in_memory`] so the on-disk and
+/// in-memory paths can't drift.
+fn migrate_and_seed(conn: &Connection) -> Result<()> {
+    drop_legacy_artifacts(conn)?;
+    migrate_add_pushed_at(conn)?;
+    migrate_add_explicit_writes(conn)?;
+    migrate_rename_pocketsmith_reason(conn)?;
+    migrate_add_location_kind(conn)?;
+    seed_field_masks(conn)?;
+    Ok(())
+}
+
+/// Whether `table` already has a column named `column`. Used by the
+/// idempotent `ALTER TABLE ADD COLUMN` migrations below to skip the add
+/// on DBs that already have the column (fresh DBs get it via `SCHEMA`).
+fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info('{table}')"))?;
+    let names = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for name in names {
+        if name? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Idempotent migration: add `kind TEXT NOT NULL DEFAULT 'location'` to
+/// `rule_locations` if absent. Fresh DBs get it via SCHEMA; DBs created
+/// before the location/region split lack it, so `locations::load_compiled`
+/// (which selects `kind`) would otherwise error and silently skip the
+/// stage. `ALTER TABLE ADD COLUMN` requires a constant default, so existing
+/// rows become `kind='location'` — correct, since the pre-split seed was
+/// all suburbs.
+fn migrate_add_location_kind(conn: &Connection) -> Result<()> {
+    if !column_exists(conn, "rule_locations", "kind")? {
+        conn.execute_batch(
+            "ALTER TABLE rule_locations ADD COLUMN kind TEXT NOT NULL DEFAULT 'location';",
+        )?;
+    }
+    Ok(())
 }
 
 /// Idempotent migration: add `pushed_at TEXT` to `_transaction_changes` if it
@@ -84,19 +120,7 @@ pub fn initialize_in_memory() -> Result<Connection> {
 /// get the column added in place — no data movement required because the
 /// default is NULL.
 fn migrate_add_pushed_at(conn: &Connection) -> Result<()> {
-    let has_column: bool = {
-        let mut stmt = conn.prepare("PRAGMA table_info('_transaction_changes')")?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-        let mut found = false;
-        for r in rows {
-            if r? == "pushed_at" {
-                found = true;
-                break;
-            }
-        }
-        found
-    };
-    if !has_column {
+    if !column_exists(conn, "_transaction_changes", "pushed_at")? {
         conn.execute_batch(
             "ALTER TABLE _transaction_changes ADD COLUMN pushed_at TEXT;",
         )?;
@@ -109,19 +133,7 @@ fn migrate_add_pushed_at(conn: &Connection) -> Result<()> {
 /// `with_operation` invocation that tries to read it would otherwise fail.
 /// See `with_operation` / `record_operation_writes` for the semantics.
 fn migrate_add_explicit_writes(conn: &Connection) -> Result<()> {
-    let has_column: bool = {
-        let mut stmt = conn.prepare("PRAGMA table_info('_current_operation')")?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-        let mut found = false;
-        for r in rows {
-            if r? == "explicit_writes" {
-                found = true;
-                break;
-            }
-        }
-        found
-    };
-    if !has_column {
+    if !column_exists(conn, "_current_operation", "explicit_writes")? {
         conn.execute_batch(
             "ALTER TABLE _current_operation ADD COLUMN explicit_writes INTEGER;",
         )?;
@@ -500,6 +512,30 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1, "second op should count its own change row, not inherit");
+    }
+
+    #[test]
+    fn test_migrate_add_location_kind() {
+        let conn = test_db();
+        // Simulate a pre-split DB: drop the column the SCHEMA added.
+        conn.execute_batch("ALTER TABLE rule_locations DROP COLUMN kind;").unwrap();
+        conn.execute(
+            "INSERT INTO rule_locations (location) VALUES ('STRATHFIELD')",
+            [],
+        )
+        .unwrap();
+        super::migrate_add_location_kind(&conn).unwrap();
+        // Column now exists and the legacy row defaulted to 'location'.
+        let kind: String = conn
+            .query_row(
+                "SELECT kind FROM rule_locations WHERE location = 'STRATHFIELD'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(kind, "location");
+        // Idempotent: re-run is a no-op.
+        super::migrate_add_location_kind(&conn).unwrap();
     }
 
     #[test]

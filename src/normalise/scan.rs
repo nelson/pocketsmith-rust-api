@@ -165,7 +165,7 @@ mod tests {
         let rows = pn::list_all(&conn).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].original_payee, "WOOLWORTHS 1624 STRATHF");
-        assert_eq!(rows[0].proposed_payee, "Woolworths");
+        assert_eq!(rows[0].proposed_payee, "Woolworths, Strathfield");
         assert_eq!(rows[0].status, Status::Pending);
         assert_eq!(rows[0].class.as_deref(), Some("merchant"));
         assert_eq!(rows[0].txn_count, 1);
@@ -218,7 +218,7 @@ mod tests {
         let row = pn::get_by_original(&conn, "WOOLWORTHS 1624 STRATHF").unwrap().unwrap();
         // Status reset to pending, proposal replaced.
         assert_eq!(row.status, Status::Pending);
-        assert_eq!(row.proposed_payee, "Woolworths");
+        assert_eq!(row.proposed_payee, "Woolworths, Strathfield");
     }
 
     // --- Multi-row group: txn_count reflects the full group, single staging row ---
@@ -245,7 +245,7 @@ mod tests {
             &conn,
             1,
             "WOOLWORTHS 1624 STRATHF",
-            "Woolworths",
+            "Woolworths, Strathfield",
         );
         let stats = scan(&conn).unwrap();
         assert_eq!(stats.skipped_no_change, 1);
