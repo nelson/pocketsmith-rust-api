@@ -22,6 +22,7 @@ use super::expand::CompiledExpansion;
 use super::persons::CompiledPerson;
 use super::employers::CompiledEmployer;
 use super::merchants::CompiledMerchant;
+use super::banking_ops::CompiledBankingOp;
 use crate::rules::Stage;
 
 /// Process-lifetime cache of compiled rules, keyed by stage.
@@ -39,6 +40,7 @@ pub struct RuleCache {
     employers: RwLock<Option<Arc<Vec<CompiledEmployer>>>>,
     merchants: RwLock<Option<Arc<Vec<CompiledMerchant>>>>,
     locations: RwLock<Option<Arc<super::locations::LocationRules>>>,
+    banking_ops: RwLock<Option<Arc<Vec<CompiledBankingOp>>>>,
 }
 
 impl RuleCache {
@@ -117,6 +119,16 @@ impl RuleCache {
         Ok(arc)
     }
 
+    /// Compiled banking-op rules (see [`prefixes`](Self::prefixes)).
+    pub(crate) fn banking_ops(&self, conn: &Connection) -> Result<Arc<Vec<CompiledBankingOp>>> {
+        if let Some(arc) = self.banking_ops.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::banking_ops::load_compiled(conn)?);
+        *self.banking_ops.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
     /// Drop the cached compilation for one stage so the next read
     /// recompiles it from the (just-edited) DB rows. No-op for stages
     /// not yet converted to read from the DB.
@@ -129,7 +141,7 @@ impl RuleCache {
             Stage::Employers => *self.employers.write().unwrap() = None,
             Stage::Merchants => *self.merchants.write().unwrap() = None,
             Stage::Locations => *self.locations.write().unwrap() = None,
-            Stage::BankingOps => {}
+            Stage::BankingOps => *self.banking_ops.write().unwrap() = None,
         }
     }
 }

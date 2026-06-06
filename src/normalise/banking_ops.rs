@@ -1,25 +1,29 @@
+#[cfg(test)]
 use std::sync::OnceLock;
 
 use regex::Regex;
 
 use super::{BankingOperation, NormalisationResult, PayeeClass};
 
+#[cfg(test)]
 struct BankingOp {
     operation: BankingOperation,
     patterns: &'static [&'static str],
     has_account: bool,
 }
 
-struct CompiledBankingOp {
+pub(crate) struct CompiledBankingOp {
     regex: Regex,
     operation: BankingOperation,
     has_account: bool,
-    pattern: &'static str,
 }
 
-pub fn apply(result: &mut NormalisationResult) {
+/// First-match-wins banking-op detection: set operation (+ optional
+/// account capture), then class=Other if still unclassified. Shared by
+/// [`apply_with_db`] and the const test oracle [`apply`].
+fn run_match(result: &mut NormalisationResult, compiled: &[CompiledBankingOp]) {
     if result.features.operation.is_none() {
-        for cop in compiled_banking_ops() {
+        for cop in compiled {
             if let Some(caps) = cop.regex.captures(&result.normalised) {
                 result.features.operation = Some(cop.operation);
                 if cop.has_account {
@@ -27,7 +31,6 @@ pub fn apply(result: &mut NormalisationResult) {
                         result.features.account = Some(account.as_str().to_string());
                     }
                 }
-                result.last_matched_pattern = Some(cop.pattern);
                 break;
             }
         }
@@ -37,6 +40,47 @@ pub fn apply(result: &mut NormalisationResult) {
     }
 }
 
+/// DB-backed banking-op detection.
+pub fn apply_with_db(result: &mut NormalisationResult, ctx: &super::PipelineCtx) {
+    match ctx.cache.banking_ops(ctx.conn) {
+        Ok(compiled) => run_match(result, &compiled),
+        Err(e) => eprintln!("banking_ops: rule load failed, stage skipped: {e:#}"),
+    }
+}
+
+/// Load + compile banking-op rules in apply order (sort_order, id).
+/// Each row's `operation` is a stored display name mapped back to the
+/// enum; an unrecognised name is an error (corrupt rule table).
+pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<CompiledBankingOp>> {
+    let mut stmt = conn.prepare(
+        "SELECT operation, pattern, has_account FROM rule_banking_ops ORDER BY sort_order, id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)? != 0,
+        ))
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        let (operation, pattern, has_account) = r?;
+        let operation = BankingOperation::from_display_name(&operation)
+            .ok_or_else(|| anyhow::anyhow!("unknown banking operation {operation:?}"))?;
+        let regex = Regex::new(&pattern)
+            .map_err(|e| anyhow::anyhow!("invalid banking op pattern {pattern:?}: {e}"))?;
+        out.push(CompiledBankingOp { regex, operation, has_account });
+    }
+    Ok(out)
+}
+
+/// Const-backed banking-op pass: fidelity oracle.
+#[cfg(test)]
+pub(crate) fn apply(result: &mut NormalisationResult) {
+    run_match(result, compiled_banking_ops());
+}
+
+#[cfg(test)]
 const BANKING_OPS: &[BankingOp] = &[
     BankingOp {
         operation: BankingOperation::BPay,
@@ -120,6 +164,7 @@ const BANKING_OPS: &[BankingOp] = &[
     },
 ];
 
+#[cfg(test)]
 fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
     static COMPILED: OnceLock<Vec<CompiledBankingOp>> = OnceLock::new();
     COMPILED.get_or_init(|| {
@@ -130,7 +175,6 @@ fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
                     regex: Regex::new(pat).expect("invalid banking op pattern"),
                     operation: op.operation,
                     has_account: op.has_account,
-                    pattern: pat,
                 })
             })
             .collect()
@@ -140,6 +184,27 @@ fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DB-backed banking-op path must reproduce the const oracle.
+    #[test]
+    fn db_apply_matches_const_oracle() {
+        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
+        let ctx = p.ctx();
+        for inp in [
+            "INTEREST CHARGE", "BPAY PAYMENT", "INTERNAL TRANSFER",
+            "TRANSFER TO OTHER BANK", "TRANSFER TO XX1234", "Contribution Tax",
+            "Unpaid Payment Fee", "Account Fee", "PayID Payment Received, Thank you",
+            "WDL ATM", "CASH DEPOSIT", "SOMETHING UNMATCHED",
+        ] {
+            let mut a = NormalisationResult::new(inp);
+            apply(&mut a);
+            let mut b = NormalisationResult::new(inp);
+            apply_with_db(&mut b, &ctx);
+            assert_eq!(a.features.operation, b.features.operation, "op differs for {inp:?}");
+            assert_eq!(a.features.account, b.features.account, "account differs for {inp:?}");
+            assert_eq!(a.class(), b.class(), "class differs for {inp:?}");
+        }
+    }
 
     #[test]
     fn test_interest_charge() {

@@ -287,7 +287,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
     run_traced(&mut result, "persons", |r| persons::apply_with_db(r, ctx));
     run_traced(&mut result, "employers", |r| employers::apply_with_db(r, ctx));
     run_traced(&mut result, "merchants", |r| merchants::apply_with_db(r, ctx));
-    run_traced(&mut result, "banking_ops", banking_ops::apply);
+    run_traced(&mut result, "banking_ops", |r| banking_ops::apply_with_db(r, ctx));
     // If normalised string is empty after stripping, use banking op name or "Cash"
     if result.normalised.trim().is_empty() {
         let before = result.normalised.clone();
@@ -437,7 +437,7 @@ mod tests {
         let ctx = p.ctx();
         let mut checked = 0usize;
         for payee in &payees {
-            for stage in ["prefix", "suffix", "expand", "persons", "employers", "merchants"] {
+            for stage in ["prefix", "suffix", "expand", "persons", "employers", "merchants", "banking_ops"] {
                 let mut a = NormalisationResult::new(payee);
                 let mut b = NormalisationResult::new(payee);
                 match stage {
@@ -461,9 +461,13 @@ mod tests {
                         employers::apply(&mut a);
                         employers::apply_with_db(&mut b, &ctx);
                     }
-                    _ => {
+                    "merchants" => {
                         merchants::apply(&mut a);
                         merchants::apply_with_db(&mut b, &ctx);
+                    }
+                    _ => {
+                        banking_ops::apply(&mut a);
+                        banking_ops::apply_with_db(&mut b, &ctx);
                     }
                 }
                 assert_eq!(a.normalised, b.normalised, "{stage} normalised differs for {payee:?}");
