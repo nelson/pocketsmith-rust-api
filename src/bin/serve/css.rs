@@ -590,29 +590,6 @@ body {
 .norm-trace-class { color: var(--magenta); }
 .norm-trace-feat { color: var(--cyan); }
 .norm-trace-feat-val { color: var(--fg); font-weight: 600; }
-.norm-trace-pattern {
-    margin-top: 4px;
-    font-size: 11px;
-    color: var(--fg-dim);
-}
-.norm-trace-pattern-label {
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 10px;
-    color: var(--fg-dark);
-    margin-right: 2px;
-}
-.norm-trace-pattern-src {
-    background: var(--bg-highlight);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 0 5px;
-    color: var(--magenta);
-    font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
-    font-size: 11px;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-}
 
 /* Actions */
 .actions {

@@ -771,13 +771,6 @@ fn render_trace_entry(entry: &TraceEntry) -> Markup {
                         }
                     }
                 }
-                @if let Some(pat) = entry.matched_pattern {
-                    div.norm-trace-pattern {
-                        span.norm-trace-pattern-label { "matched" }
-                        " "
-                        code.norm-trace-pattern-src { (pat) }
-                    }
-                }
             }
         }
     }
