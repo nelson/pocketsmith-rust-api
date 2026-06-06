@@ -183,6 +183,9 @@ const EXPANSIONS: &[Expansion] = &[
     Expansion { pattern: "SGP", canonical: "Singapore" },
     Expansion { pattern: "GBR", canonical: "United Kingdom" },
     Expansion { pattern: "USA", canonical: "United States" },
+    Expansion { pattern: "DENPASA", canonical: "DENPASAR" },
+    Expansion { pattern: "TORONT", canonical: "TORONTO" },
+    Expansion { pattern: "DALHO", canonical: "DALHOUSIE" },
 ];
 
 #[cfg(test)]

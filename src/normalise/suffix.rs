@@ -78,7 +78,7 @@ fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledSuffix]) {
                             "NS" => "NSW",
                             other => other,
                         };
-                        result.features.location = Some(location.to_string());
+                        result.features.region = Some(location.to_string());
                     }
                 }
                 if pat.has_currency_code {
@@ -304,7 +304,7 @@ mod tests {
         let mut r = NormalisationResult::new("SOME MERCHANT NS AUS");
         apply(&mut r);
         assert_eq!(r.normalised, "SOME MERCHANT");
-        assert_eq!(r.features.location.as_deref(), Some("NSW"));
+        assert_eq!(r.features.region.as_deref(), Some("NSW"));
     }
 
     #[test]
@@ -312,7 +312,7 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT NSW 2140");
         apply(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.location.as_deref(), Some("NSW 2140"));
+        assert_eq!(r.features.region.as_deref(), Some("NSW 2140"));
     }
 
     #[test]
@@ -320,7 +320,7 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT AU AUS");
         apply(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.location.as_deref(), Some("AU"));
+        assert_eq!(r.features.region.as_deref(), Some("AU"));
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
         let mut r = NormalisationResult::new("MERCHANT VIC");
         apply(&mut r);
         assert_eq!(r.normalised, "MERCHANT");
-        assert_eq!(r.features.location.as_deref(), Some("VIC"));
+        assert_eq!(r.features.region.as_deref(), Some("VIC"));
     }
 
     #[test]

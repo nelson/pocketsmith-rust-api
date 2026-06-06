@@ -103,3 +103,6 @@ INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, u
 INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('SGP', 'Singapore', NULL, 99, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');
 INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('GBR', 'United Kingdom', NULL, 100, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');
 INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('USA', 'United States', NULL, 101, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');
+INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('DENPASA', 'DENPASAR', NULL, 102, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');
+INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('TORONT', 'TORONTO', NULL, 103, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');
+INSERT INTO rule_expansions (pattern, canonical, note, sort_order, created_at, updated_at) VALUES ('DALHO', 'DALHOUSIE', NULL, 104, '2026-04-03T12:40:21Z', '2026-04-03T12:40:21Z');

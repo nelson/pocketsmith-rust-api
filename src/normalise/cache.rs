@@ -38,6 +38,7 @@ pub struct RuleCache {
     persons: RwLock<Option<Arc<Vec<CompiledPerson>>>>,
     employers: RwLock<Option<Arc<Vec<CompiledEmployer>>>>,
     merchants: RwLock<Option<Arc<Vec<CompiledMerchant>>>>,
+    locations: RwLock<Option<Arc<super::locations::LocationRules>>>,
 }
 
 impl RuleCache {
@@ -106,6 +107,16 @@ impl RuleCache {
         Ok(arc)
     }
 
+    /// Known places (suburbs + regions), see [`prefixes`](Self::prefixes).
+    pub(crate) fn locations(&self, conn: &Connection) -> Result<Arc<super::locations::LocationRules>> {
+        if let Some(arc) = self.locations.read().unwrap().as_ref() {
+            return Ok(arc.clone());
+        }
+        let arc = Arc::new(super::locations::load_compiled(conn)?);
+        *self.locations.write().unwrap() = Some(arc.clone());
+        Ok(arc)
+    }
+
     /// Drop the cached compilation for one stage so the next read
     /// recompiles it from the (just-edited) DB rows. No-op for stages
     /// not yet converted to read from the DB.
@@ -117,7 +128,8 @@ impl RuleCache {
             Stage::Persons => *self.persons.write().unwrap() = None,
             Stage::Employers => *self.employers.write().unwrap() = None,
             Stage::Merchants => *self.merchants.write().unwrap() = None,
-            Stage::BankingOps | Stage::Locations => {}
+            Stage::Locations => *self.locations.write().unwrap() = None,
+            Stage::BankingOps => {}
         }
     }
 }

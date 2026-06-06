@@ -111,7 +111,7 @@ impl Stage {
                 "operation", "pattern", "has_account", "note", "sort_order", "created_at",
                 "updated_at",
             ],
-            Stage::Locations => &["location", "note", "created_at", "updated_at"],
+            Stage::Locations => &["location", "kind", "note", "created_at", "updated_at"],
         }
     }
 
