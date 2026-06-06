@@ -172,17 +172,23 @@ impl NormalisationResult {
 }
 
 /// Format a normalised result into the payee string that should be written
-/// to `transactions.payee`. Merchant rows combine entity_name + location
-/// when both are present; otherwise we fall back to the normalised string.
-/// Non-merchant classes always use the normalised string verbatim.
+/// to `transactions.payee`. Every classified payee is rendered from its
+/// canonical `entity_name`; merchants additionally append their location as
+/// `"{entity_name}, {location}"`. When no entity was identified we fall
+/// back to the normalised string.
 pub fn format_payee(result: &NormalisationResult) -> String {
-    match result.class() {
-        Some(PayeeClass::Merchant) => match (&result.features.entity_name, &result.features.location) {
-            (Some(name), Some(loc)) => format!("{} {}", name, loc),
-            (Some(name), None) => name.clone(),
-            _ => result.normalised.clone(),
-        },
-        _ => result.normalised.clone(),
+    // Prefer the canonical entity name for any classified payee; fall back
+    // to the normalised string when no entity was identified.
+    let base = result
+        .features
+        .entity_name
+        .clone()
+        .unwrap_or_else(|| result.normalised.clone());
+
+    match (result.class(), &result.features.entity_name, &result.features.location) {
+        // Merchants carry their location: "{entity}, {location}".
+        (Some(PayeeClass::Merchant), Some(_), Some(loc)) => format!("{base}, {loc}"),
+        _ => base,
     }
 }
 
@@ -784,7 +790,7 @@ mod tests {
         result.set_class(PayeeClass::Merchant);
         result.features.entity_name = Some("Woolworths".into());
         result.features.location = Some("Strathfield".into());
-        assert_eq!(format_payee(&result), "Woolworths Strathfield");
+        assert_eq!(format_payee(&result), "Woolworths, Strathfield");
     }
 
     #[test]
@@ -806,10 +812,23 @@ mod tests {
 
     #[test]
     fn test_format_payee_person() {
-        let mut result = NormalisationResult::new("JOHN SMITH");
-        result.normalised = "John Smith".into();
+        let mut result = NormalisationResult::new("MR JOHN SMITH");
+        result.normalised = "MR JOHN SMITH".into();
         result.set_class(PayeeClass::Person);
+        result.features.entity_name = Some("John Smith".into());
+        // Persons render from the canonical entity name, not the
+        // normalised string, and never append a location.
+        result.features.location = Some("Strathfield".into());
         assert_eq!(format_payee(&result), "John Smith");
+    }
+
+    #[test]
+    fn test_format_payee_employer() {
+        let mut result = NormalisationResult::new("SALARY FROM ACME");
+        result.normalised = "SALARY FROM ACME".into();
+        result.set_class(PayeeClass::Employer);
+        result.features.entity_name = Some("Acme Corp".into());
+        assert_eq!(format_payee(&result), "Acme Corp");
     }
 
     #[test]
