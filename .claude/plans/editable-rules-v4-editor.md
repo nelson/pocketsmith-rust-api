@@ -2,9 +2,9 @@
 
 > Branch base: `master` (PRs 0–8 of v3 merged — every stage is DB-backed
 > and fidelity-proven; the Pipeline tab is a working **read-only** rule
-> browser). Supersedes the "what's left" section of
-> [`editable-rules-v3-progress.md`](./editable-rules-v3-progress.md).
-> Status: **plan only — code starts after sign-off.**
+> browser). Continues the editable-rules work now that v3's DB conversion
+> has landed.
+> Status: **in progress — PR 1 complete (see Progress below).**
 >
 > Mockups (unchanged from v3):
 > - [`pipeline-A-merchants.html`](../../mockups/pipeline-A-merchants.html) — edit mode + activity-log add/edit/delete vocabulary
@@ -414,16 +414,18 @@ stays `1`.
 
 ## 7. PR sequence at a glance
 
-| # | Title | Gate |
-|---|-------|------|
-| 1 | `normalise+serve: uniform two-line pipeline trace (matched pattern + span)` | trace renders `~=` + green hit on matcher stages; diff on modifying stages; fidelity still green |
-| 2 | `normalise: retire const oracle + fidelity scaffolding; rule_* updated_at triggers` | net-negative LOC; hermetic per-stage tests still cover; triggers stamp updated_at |
-| 3 | `pipeline(prefix+suffix): editor framework — Edit/Evaluate, impact buckets, mutations, activity log, dirty banner, rule_impact cache` | full create→evaluate→save→dirty→rescan flow tested |
-| 4 | `pipeline(expand): editor` | add/edit/delete end-to-end |
-| 5 | `pipeline(persons+employers+merchants): editor` | add a merchant rule end-to-end |
-| 6 | `pipeline(locations): editor` | add/remove a suburb, see effect |
-| 7 | `pipeline(banking_ops): editor` | same |
-| 8 | `transactions: "+ Add rule for this payee" + guess_stage heuristic` | click trace-empty txn → prefilled new-rule card |
+Status key: ✅ done · ⏳ next · (blank) not started.
+
+| # | Status | Title | Gate |
+|---|--------|-------|------|
+| 1 | ✅ | `normalise+serve: uniform two-line pipeline trace (matched pattern + span)` | trace renders `~=` + green hit on matcher stages; diff on modifying stages; fidelity still green |
+| 2 | ⏳ | `normalise: retire const oracle + fidelity scaffolding; rule_* updated_at triggers` | net-negative LOC; hermetic per-stage tests still cover; triggers stamp updated_at |
+| 3 |   | `pipeline(prefix+suffix): editor framework — Edit/Evaluate, impact buckets, mutations, activity log, dirty banner, rule_impact cache` | full create→evaluate→save→dirty→rescan flow tested |
+| 4 |   | `pipeline(expand): editor` | add/edit/delete end-to-end |
+| 5 |   | `pipeline(persons+employers+merchants): editor` | add a merchant rule end-to-end |
+| 6 |   | `pipeline(locations): editor` | add/remove a suburb, see effect |
+| 7 |   | `pipeline(banking_ops): editor` | same |
+| 8 |   | `transactions: "+ Add rule for this payee" + guess_stage heuristic` | click trace-empty txn → prefilled new-rule card |
 
 Every PR: fidelity-style gate (all prior tests pass) + red-green commit
 sequence (failing test → pass → refactor) for any PR ≥ 200 LOC.
@@ -448,3 +450,33 @@ sequence (failing test → pass → refactor) for any PR ≥ 200 LOC.
    vs. the saved rule. First-match stages keep all four buckets.
 
 No open questions remain. Sign-off → start at PR 1.
+
+## 9. Progress log
+
+### PR 1 — uniform two-line pipeline trace — ✅ done (branch `feat/pipeline-trace-two-line`)
+
+Landed the data-model + capture + shared renderer for the two-line trace:
+
+- `TraceEntry` gained `match_info: Option<MatchInfo { pattern, haystack,
+  span }>`, captured via a transient `NormalisationResult.pending_match`
+  slot that `run_traced` drains per stage (never leaks across stages).
+- Matcher stages (persons / employers / merchants / banking_ops /
+  locations) record the firing rule's **authored** pattern + the match
+  byte-span. `record_match(pattern, span)` reads the haystack from
+  `self.normalised` (the review removed a redundant haystack arg).
+- Extracted the duplicated trace renderer from `transactions/views.rs`
+  and `normalise/views.rs` into a shared `src/bin/serve/trace.rs`. Line 1
+  is the `before → after` diff for modifying stages, else
+  `{pattern} ~= {string}` with the matched substring in a green
+  `.norm-trace-hay-hit` span; line 2 (features/class) unchanged.
+- **Tests (8):** 4 in `normalise/mod.rs` (match-info capture, modifying
+  stage has none, multi-byte byte-span correctness, authored-vs-wrapped
+  pattern) + 4 in `trace.rs` (diff vs match render, green hit, span-less
+  fallback, empty placeholder).
+- **Verification:** `cargo test --features web` — 302 lib + 154 serve, 0
+  failures; `cargo test --features fidelity --lib` — 304, 0 failures (the
+  const oracle is still intact here; its retirement is PR 2). Code review
+  passed with no changes requested.
+
+**Next: PR 2** — retire the const oracle + `--features fidelity`
+scaffolding and add `rule_*` `updated_at` triggers.
