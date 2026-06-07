@@ -109,6 +109,30 @@ pub struct NormalisationResult {
     /// changed `normalised` or attached a feature. Populated only by
     /// [`normalise`] (raw stages don't write this).
     pub trace: Vec<TraceEntry>,
+    /// Transient: a matcher stage sets this when one of its rules fires,
+    /// so [`run_traced`] can attach it to the stage's [`TraceEntry`] as
+    /// [`TraceEntry::match_info`]. Always drained (`take`) per stage, so
+    /// it never leaks across stages. Not part of the persisted result.
+    pending_match: Option<MatchInfo>,
+}
+
+/// What a first-match-wins / matcher stage matched, for the pipeline
+/// trace's `{pattern} ~= {string}` line. Captured by the stage at the
+/// moment a rule wins and carried on the stage's [`TraceEntry`].
+#[derive(Debug, Clone)]
+pub struct MatchInfo {
+    /// The rule pattern that fired, as authored (regex source or the raw
+    /// literal) — *not* any internally-wrapped form, so the trace shows
+    /// the rule the user would edit.
+    pub pattern: String,
+    /// The string the pattern was tested against (equals the stage's
+    /// `before`; captured explicitly so the renderer is self-contained).
+    pub haystack: String,
+    /// Byte range of the matched substring within `haystack`, for the
+    /// green highlight. The overall regex/literal match is always one
+    /// contiguous run, so a single span suffices. `None` when the match
+    /// position isn't meaningful to highlight.
+    pub span: Option<(usize, usize)>,
 }
 
 /// One entry in [`NormalisationResult::trace`]. Records what a single
@@ -129,6 +153,12 @@ pub struct TraceEntry {
     pub feature_values: Vec<(&'static str, String)>,
     /// Class set by this stage, if any.
     pub class_set: Option<PayeeClass>,
+    /// Present when a matcher stage fired without (necessarily) changing
+    /// the string — drives the `{pattern} ~= {string}` line-1 rendering
+    /// for first-match-wins / additive stages (persons, employers,
+    /// merchants, locations, banking_ops). `None` for pure string
+    /// transforms (prefix/suffix/expand), whose line 1 is the diff.
+    pub match_info: Option<MatchInfo>,
 }
 
 impl NormalisationResult {
@@ -139,7 +169,22 @@ impl NormalisationResult {
             class: None,
             features: Features::default(),
             trace: Vec::new(),
+            pending_match: None,
         }
+    }
+
+    /// Record that a matcher-stage rule fired (for the pipeline trace's
+    /// `{pattern} ~= {string}` line). Consumed by [`run_traced`] after
+    /// the stage runs. The haystack is the current `normalised` string
+    /// (what matcher stages test against); `span` is the byte range of the
+    /// matched substring within it, or `None` when not meaningful to
+    /// highlight.
+    pub(crate) fn record_match(&mut self, pattern: impl Into<String>, span: Option<(usize, usize)>) {
+        self.pending_match = Some(MatchInfo {
+            pattern: pattern.into(),
+            haystack: self.normalised.clone(),
+            span,
+        });
     }
 
     pub fn original(&self) -> &str {
@@ -289,6 +334,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
             features_added: Vec::new(),
             feature_values: Vec::new(),
             class_set: None,
+            match_info: None,
         });
     }
     result
@@ -305,6 +351,9 @@ fn run_traced(
     let before_keys = populated_feature_keys(&result.features);
     let before_class = result.class.clone();
     apply(result);
+    // A matcher stage may have recorded which rule fired; drain it so it
+    // attaches to *this* stage's entry only (never leaks to the next).
+    let match_info = result.pending_match.take();
     // Entries the stage newly populated, each carrying its own display
     // string, so the added keys and their trace values come from one
     // pass over the canonical field list.
@@ -321,7 +370,11 @@ fn run_traced(
     } else {
         None
     };
-    if before_str != result.normalised || !features_added.is_empty() || class_set.is_some() {
+    if before_str != result.normalised
+        || !features_added.is_empty()
+        || class_set.is_some()
+        || match_info.is_some()
+    {
         result.trace.push(TraceEntry {
             stage,
             before: before_str,
@@ -329,6 +382,7 @@ fn run_traced(
             features_added,
             feature_values,
             class_set,
+            match_info,
         });
     }
 }
@@ -354,6 +408,93 @@ pub fn slug_for(original_payee: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A matcher stage (merchants) that classifies without changing the
+    /// string must record a `MatchInfo` on its trace entry: the authored
+    /// pattern + the matched span, with `before == after`.
+    #[test]
+    fn trace_records_match_info_for_matcher_stage() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_merchants (canonical, pattern) VALUES ('Zebra Cafe', '(?i)ZEBRA CAFE')",
+            [],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+        let r = normalise("PURCHASE ZEBRA CAFE SYDNEY", &ctx);
+        let m = r
+            .trace
+            .iter()
+            .find(|t| t.stage == "merchants")
+            .expect("a merchants trace entry");
+        assert_eq!(m.before, m.after, "merchant stage does not change the string");
+        let mi = m.match_info.as_ref().expect("merchant entry carries match_info");
+        assert_eq!(mi.pattern, "(?i)ZEBRA CAFE", "shows the authored regex source");
+        let (s, e) = mi.span.expect("a match span");
+        assert_eq!(mi.haystack[s..e].to_uppercase(), "ZEBRA CAFE");
+    }
+
+    /// A pure string-transform stage (prefix) leaves `match_info` None;
+    /// its line 1 is the before-after diff.
+    #[test]
+    fn trace_modifying_stage_has_no_match_info() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_prefixes (pattern, has_account, has_date, sort_order) VALUES (?1, 0, 0, 0)",
+            [r"^PURCHASE\s+"],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+        let r = normalise("PURCHASE SOMETHING", &ctx);
+        let p = r
+            .trace
+            .iter()
+            .find(|t| t.stage == "prefix")
+            .expect("a prefix trace entry");
+        assert_ne!(p.before, p.after, "prefix changed the string");
+        assert!(p.match_info.is_none(), "modifying stage leaves match_info None");
+    }
+
+    /// The match span is a byte range; a multi-byte char before the match
+    /// must not corrupt it (the slice must land on char boundaries).
+    #[test]
+    fn trace_match_span_is_byte_correct_with_multibyte() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_merchants (canonical, pattern) VALUES ('Cafe', '(?i)CAFE')",
+            [],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+        // U+00E9 is two bytes; the ASCII-case-insensitive match must land
+        // on the trailing standalone "CAFE", not inside "Caf\u{e9}".
+        let r = normalise("Caf\u{e9} CAFE", &ctx);
+        let m = r.trace.iter().find(|t| t.stage == "merchants").unwrap();
+        let mi = m.match_info.as_ref().unwrap();
+        let (s, e) = mi.span.unwrap();
+        assert_eq!(&mi.haystack[s..e], "CAFE");
+    }
+
+    /// The trace shows the *authored* person pattern, not the internally
+    /// wrapped regex the stage compiles for matching.
+    #[test]
+    fn trace_match_info_uses_authored_person_pattern() {
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Jane Doe', 'JANE DOE')",
+            [],
+        )
+        .unwrap();
+        let cache = RuleCache::new();
+        let ctx = PipelineCtx::new(&conn, &cache);
+        let r = normalise("payment jane doe", &ctx);
+        let m = r.trace.iter().find(|t| t.stage == "persons").unwrap();
+        let mi = m.match_info.as_ref().unwrap();
+        assert_eq!(mi.pattern, "JANE DOE", "raw stored pattern, not the wrapped regex");
+    }
 
     /// Coverage report (`cargo test --features fidelity`): the new location
     /// stage must extract a *suburb* into `features.location` for a large

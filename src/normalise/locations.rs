@@ -22,11 +22,12 @@ use super::{NormalisationResult, PipelineCtx};
 pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
     match ctx.cache.locations(ctx.conn) {
         Ok(rules) => {
-            if let Some(loc) = best_match(&result.normalised, &rules.locations) {
+            if let Some((loc, pattern, span)) = best_match(&result.normalised, &rules.locations) {
+                result.record_match(pattern, span);
                 result.features.location = Some(loc);
             }
             if result.features.region.is_none() {
-                if let Some(reg) = best_match(&result.normalised, &rules.regions) {
+                if let Some((reg, _, _)) = best_match(&result.normalised, &rules.regions) {
                     result.features.region = Some(reg);
                 }
             }
@@ -86,8 +87,11 @@ fn rightmost_word_boundary(hay: &str, needle: &str) -> Option<usize> {
 /// Choose the best known location in `s`: the **longest** match, and among
 /// equal-length matches the **rightmost** one (the locality nearest the
 /// trailing region code is the true one, e.g. `ULTIMO` over `SYDNEY` in
-/// "CAFE 10 SYDNEY ULTIMO"). Returned in title case.
-fn best_match(s: &str, locs: &[String]) -> Option<String> {
+/// "CAFE 10 SYDNEY ULTIMO"). Returns `(title-cased name, matched pattern,
+/// span)`, where `span` is the byte range of the match in the *original*
+/// `s` — `None` when uppercasing changed the byte length (so offsets from
+/// the upper-cased search can't be trusted to land on `s`'s boundaries).
+fn best_match(s: &str, locs: &[String]) -> Option<(String, String, Option<(usize, usize)>)> {
     let upper = s.to_uppercase();
     let mut best: Option<(usize, usize, &str)> = None; // (len, pos, loc)
     for loc in locs {
@@ -98,7 +102,12 @@ fn best_match(s: &str, locs: &[String]) -> Option<String> {
             }
         }
     }
-    best.map(|(_, _, loc)| to_title_case(loc))
+    best.map(|(len, pos, loc)| {
+        // Offsets come from the upper-cased haystack; they only map onto
+        // `s` byte-for-byte when uppercasing preserved its length.
+        let span = (upper.len() == s.len()).then_some((pos, pos + len));
+        (to_title_case(loc), loc.to_string(), span)
+    })
 }
 
 fn to_title_case(s: &str) -> String {

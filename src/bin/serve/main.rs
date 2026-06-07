@@ -8,6 +8,7 @@ mod pipeline;
 mod render;
 mod state;
 mod tab;
+mod trace;
 mod transactions;
 mod transfers;
 

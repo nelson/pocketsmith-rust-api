@@ -16,6 +16,7 @@ pub(crate) struct CompiledBankingOp {
     regex: Regex,
     operation: BankingOperation,
     has_account: bool,
+    pattern: String,
 }
 
 /// First-match-wins banking-op detection: set operation (+ optional
@@ -25,11 +26,16 @@ fn run_match(result: &mut NormalisationResult, compiled: &[CompiledBankingOp]) {
     if result.features.operation.is_none() {
         for cop in compiled {
             if let Some(caps) = cop.regex.captures(&result.normalised) {
+                let span = caps.get(0).map(|m| (m.start(), m.end()));
+                let account = if cop.has_account {
+                    caps.name("account").map(|a| a.as_str().to_string())
+                } else {
+                    None
+                };
+                result.record_match(cop.pattern.clone(), span);
                 result.features.operation = Some(cop.operation);
-                if cop.has_account {
-                    if let Some(account) = caps.name("account") {
-                        result.features.account = Some(account.as_str().to_string());
-                    }
+                if let Some(account) = account {
+                    result.features.account = Some(account);
                 }
                 break;
             }
@@ -69,7 +75,7 @@ pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<C
             .ok_or_else(|| anyhow::anyhow!("unknown banking operation {operation:?}"))?;
         let regex = Regex::new(&pattern)
             .map_err(|e| anyhow::anyhow!("invalid banking op pattern {pattern:?}: {e}"))?;
-        out.push(CompiledBankingOp { regex, operation, has_account });
+        out.push(CompiledBankingOp { regex, operation, has_account, pattern });
     }
     Ok(out)
 }
@@ -175,6 +181,7 @@ fn compiled_banking_ops() -> &'static [CompiledBankingOp] {
                     regex: Regex::new(pat).expect("invalid banking op pattern"),
                     operation: op.operation,
                     has_account: op.has_account,
+                    pattern: pat.to_string(),
                 })
             })
             .collect()
