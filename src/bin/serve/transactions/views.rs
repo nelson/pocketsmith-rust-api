@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx, TraceEntry};
+use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx};
 
 use crate::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::state::{AppState, Decision};
@@ -701,77 +701,12 @@ fn render_detail(
 
         (render_cards_row(pair, norm, cat, row.id))
 
-        @if let Some(p) = pipeline { (render_pipeline_trace(p)) }
+        @if let Some(p) = pipeline { (crate::trace::render_pipeline_trace(p)) }
 
         @if !siblings.is_empty() { (render_siblings(row.original_payee.as_deref(), siblings)) }
 
         div.note {
             "Y / N / S act on whichever pillar is currently up for review (norm-pending or pair-pending). Press the buttons or the corresponding key."
-        }
-    }
-}
-
-/// Render the per-stage transformation trace for the active row.
-/// Mirrors the Normalise tab's pipeline-trace section but reuses the
-/// same data (NormalisationResult). One row per pipeline stage that
-/// mutated the normalised string or attached a feature.
-fn render_pipeline_trace(p: &NormalisationResult) -> Markup {
-    if p.trace.is_empty() {
-        return html! {
-            div.norm-trace {
-                h3 { "Pipeline trace" }
-                div.norm-trace-empty { "(no rules matched \u{2014} normalised string equals the original)" }
-            }
-        };
-    }
-    html! {
-        div.norm-trace {
-            h3 { "Pipeline trace" }
-            div.norm-trace-list {
-                @for entry in &p.trace {
-                    (render_trace_entry(entry))
-                }
-            }
-        }
-    }
-}
-
-fn render_trace_entry(entry: &TraceEntry) -> Markup {
-    let changed_string = entry.before != entry.after;
-    let values: std::collections::HashMap<&str, &str> = entry
-        .feature_values
-        .iter()
-        .map(|(k, v)| (*k, v.as_str()))
-        .collect();
-    html! {
-        div.norm-trace-row {
-            span.norm-trace-stage { (entry.stage) }
-            div.norm-trace-body {
-                @if changed_string {
-                    div.norm-trace-diff {
-                        span.norm-trace-before { (entry.before) }
-                        span.norm-trace-arrow { " \u{2192} " }
-                        span.norm-trace-after { (entry.after) }
-                    }
-                }
-                @if !entry.features_added.is_empty() || entry.class_set.is_some() {
-                    div.norm-trace-extracted {
-                        @if let Some(c) = &entry.class_set {
-                            span.norm-trace-class { "class = " (format!("{:?}", c).to_lowercase()) }
-                        }
-                        @for feat in &entry.features_added {
-                            @if let Some(v) = values.get(feat) {
-                                span.norm-trace-feat {
-                                    "+" (feat) " "
-                                    span.norm-trace-feat-val { "(" (v) ")" }
-                                }
-                            } @else {
-                                span.norm-trace-feat { "+" (feat) }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }

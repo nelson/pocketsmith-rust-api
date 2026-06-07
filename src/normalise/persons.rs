@@ -16,6 +16,8 @@ struct Person {
 pub(crate) struct CompiledPerson {
     regex: Regex,
     canonical: String,
+    /// The authored pattern (raw literal), surfaced in the pipeline trace.
+    pattern: String,
 }
 
 #[cfg(test)]
@@ -28,6 +30,7 @@ fn compiled_persons() -> &'static [CompiledPerson] {
                 p.patterns.iter().map(move |&pat| CompiledPerson {
                     regex: compile_person(pat),
                     canonical: p.canonical.to_string(),
+                    pattern: pat.to_string(),
                 })
             })
             .collect()
@@ -45,7 +48,8 @@ fn compile_person(pattern: &str) -> Regex {
 /// First-match-wins over the compiled set: set entity_name + class.
 fn run_match(result: &mut NormalisationResult, compiled: &[CompiledPerson]) {
     for cp in compiled {
-        if cp.regex.is_match(&result.normalised) {
+        if let Some(m) = cp.regex.find(&result.normalised) {
+            result.record_match(cp.pattern.clone(), Some((m.start(), m.end())));
             result.features.entity_name = Some(cp.canonical.clone());
             result.set_class(PayeeClass::Person);
             return;
@@ -77,6 +81,7 @@ pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledPerson>> {
         out.push(CompiledPerson {
             regex: compile_person(&pattern),
             canonical,
+            pattern,
         });
     }
     Ok(out)

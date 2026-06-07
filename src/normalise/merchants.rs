@@ -14,6 +14,7 @@ struct Merchant {
 pub(crate) struct CompiledMerchant {
     regex: Regex,
     canonical: String,
+    pattern: String,
 }
 
 /// First-match-wins over the compiled set, only if unclassified.
@@ -22,7 +23,8 @@ fn run_match(result: &mut NormalisationResult, compiled: &[CompiledMerchant]) {
         return;
     }
     for cm in compiled {
-        if cm.regex.is_match(&result.normalised) {
+        if let Some(m) = cm.regex.find(&result.normalised) {
+            result.record_match(cm.pattern.clone(), Some((m.start(), m.end())));
             result.features.entity_name = Some(cm.canonical.clone());
             result.set_class(PayeeClass::Merchant);
             return;
@@ -51,7 +53,7 @@ pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<C
         let (canonical, pattern) = r?;
         let regex = Regex::new(&pattern)
             .map_err(|e| anyhow::anyhow!("invalid merchant pattern {pattern:?}: {e}"))?;
-        out.push(CompiledMerchant { regex, canonical });
+        out.push(CompiledMerchant { regex, canonical, pattern });
     }
     Ok(out)
 }
@@ -248,6 +250,7 @@ fn compiled_merchants() -> &'static [CompiledMerchant] {
             .map(|m| CompiledMerchant {
                 regex: Regex::new(m.pattern).expect("invalid merchant pattern"),
                 canonical: m.canonical.to_string(),
+                pattern: m.pattern.to_string(),
             })
             .collect()
     })

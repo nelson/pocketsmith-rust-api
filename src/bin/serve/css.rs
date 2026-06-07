@@ -614,6 +614,11 @@ body {
 .norm-trace-before { color: var(--red); text-decoration: line-through; }
 .norm-trace-arrow { color: var(--fg-dim); }
 .norm-trace-after { color: var(--green); font-weight: 600; }
+.norm-trace-match { overflow-wrap: anywhere; word-break: break-word; }
+.norm-trace-pattern { color: var(--red); }
+.norm-trace-tilde { color: var(--fg-dim); }
+.norm-trace-hay { color: var(--fg); }
+.norm-trace-hay-hit { color: var(--green); font-weight: 600; }
 .norm-trace-extracted { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; }
 .norm-trace-class { color: var(--magenta); }
 .norm-trace-feat { color: var(--cyan); }

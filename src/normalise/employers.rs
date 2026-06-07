@@ -14,6 +14,7 @@ struct Employer {
 pub(crate) struct CompiledEmployer {
     regex: Regex,
     canonical: String,
+    pattern: String,
 }
 
 /// First-match-wins over the compiled set, but only if nothing has
@@ -23,7 +24,8 @@ fn run_match(result: &mut NormalisationResult, compiled: &[CompiledEmployer]) {
         return;
     }
     for ce in compiled {
-        if ce.regex.is_match(&result.normalised) {
+        if let Some(m) = ce.regex.find(&result.normalised) {
+            result.record_match(ce.pattern.clone(), Some((m.start(), m.end())));
             result.features.entity_name = Some(ce.canonical.clone());
             result.set_class(PayeeClass::Employer);
             return;
@@ -51,7 +53,7 @@ pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<C
         let (canonical, pattern) = r?;
         let regex = Regex::new(&pattern)
             .map_err(|e| anyhow::anyhow!("invalid employer pattern {pattern:?}: {e}"))?;
-        out.push(CompiledEmployer { regex, canonical });
+        out.push(CompiledEmployer { regex, canonical, pattern });
     }
     Ok(out)
 }
@@ -100,6 +102,7 @@ fn compiled_employers() -> &'static [CompiledEmployer] {
                 e.patterns.iter().map(move |&pat| CompiledEmployer {
                     regex: Regex::new(pat).expect("invalid employer pattern"),
                     canonical: e.canonical.to_string(),
+                    pattern: pat.to_string(),
                 })
             })
             .collect()
