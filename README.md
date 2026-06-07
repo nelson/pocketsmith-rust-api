@@ -58,7 +58,7 @@ cargo run --bin serve --features web
 
 Then open <http://127.0.0.1:3141>. Override the port with `SERVE_PORT=4000 cargo run --bin serve --features web`.
 
-The server hosts five tabs in the canonical left-to-right order **Dashboard · Transactions · Review · Transfers · Normalise**. Two tabs are implemented today (Transfers, Normalise, plus the new Transactions); Dashboard and Review have plans in `.claude/plans/dashboard-tab-mvp.md` and `.claude/plans/review-tab-mvp.md` and are not yet built.
+The server hosts the tabs **Dashboard · Transactions · Pipeline · Transfers · Normalise**. Dashboard, Transactions, Pipeline, Transfers and Normalise are implemented today; the Review tab has a plan in `.claude/plans/review-tab-mvp.md` and is not yet built.
 
 Every tab uses the same three-pane shell: a filterable queue on the left, a detail panel for the selected row, and an activity log + counters at the bottom. `Tab` / `Shift+Tab` cycles tabs; `↑` / `↓` walks the queue; `Y` / `N` / `S` confirm / reject / skip; `U` undoes the most recent decision. Search is `/`. Clicking the status emoji on a confirmed or rejected row also undoes.
 
