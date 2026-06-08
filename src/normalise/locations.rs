@@ -22,12 +22,21 @@ use super::{NormalisationResult, PipelineCtx};
 pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
     match ctx.cache.locations(ctx.conn) {
         Ok(rules) => {
+            // Record the match for the trace's `{pattern} ~= {string}`
+            // line, preferring the location match; fall back to the region
+            // match so a region-only hit still produces a match line
+            // (consistent with the other matcher stages).
+            let mut recorded = false;
             if let Some((loc, pattern, span)) = best_match(&result.normalised, &rules.locations) {
                 result.record_match(pattern, span);
                 result.features.location = Some(loc);
+                recorded = true;
             }
             if result.features.region.is_none() {
-                if let Some((reg, _, _)) = best_match(&result.normalised, &rules.regions) {
+                if let Some((reg, pattern, span)) = best_match(&result.normalised, &rules.regions) {
+                    if !recorded {
+                        result.record_match(pattern, span);
+                    }
                     result.features.region = Some(reg);
                 }
             }
@@ -89,8 +98,11 @@ fn rightmost_word_boundary(hay: &str, needle: &str) -> Option<usize> {
 /// trailing region code is the true one, e.g. `ULTIMO` over `SYDNEY` in
 /// "CAFE 10 SYDNEY ULTIMO"). Returns `(title-cased name, matched pattern,
 /// span)`, where `span` is the byte range of the match in the *original*
-/// `s` — `None` when uppercasing changed the byte length (so offsets from
-/// the upper-cased search can't be trusted to land on `s`'s boundaries).
+/// `s`. The position comes from the upper-cased haystack, so it maps onto
+/// `s` byte-for-byte only when `s` is ASCII (ASCII upper-casing is length-
+/// and boundary-preserving); for any non-ASCII input (e.g. `ß` → `SS`
+/// shifts boundaries) we return `None` for the span so the trace renders
+/// the haystack un-highlighted rather than mis-sliced.
 fn best_match(s: &str, locs: &[String]) -> Option<(String, String, Option<(usize, usize)>)> {
     let upper = s.to_uppercase();
     let mut best: Option<(usize, usize, &str)> = None; // (len, pos, loc)
@@ -103,9 +115,9 @@ fn best_match(s: &str, locs: &[String]) -> Option<(String, String, Option<(usize
         }
     }
     best.map(|(len, pos, loc)| {
-        // Offsets come from the upper-cased haystack; they only map onto
-        // `s` byte-for-byte when uppercasing preserved its length.
-        let span = (upper.len() == s.len()).then_some((pos, pos + len));
+        // `pos`/`len` index the upper-cased haystack; they map onto `s`
+        // byte-for-byte only when `s` is ASCII. Drop the span otherwise.
+        let span = s.is_ascii().then_some((pos, pos + len));
         (to_title_case(loc), loc.to_string(), span)
     })
 }
@@ -198,6 +210,47 @@ mod tests {
         apply_with_db(&mut r, &c);
         assert_eq!(r.features.region.as_deref(), Some("Singapore"));
         assert_eq!(r.features.location, None, "region kind must not set location");
+    }
+
+    #[test]
+    fn region_only_match_still_records_match_info() {
+        // A region-only hit (no location match) must record match_info so
+        // the trace shows the `{pattern} ~= {string}` line, like every
+        // other matcher stage — not just the bare region feature.
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute(
+            "INSERT INTO rule_locations (location, kind) VALUES ('SINGAPORE', 'region')",
+            [],
+        )
+        .unwrap();
+        let cache = cache::RuleCache::new();
+        let c = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("MERCHANT Singapore");
+        apply_with_db(&mut r, &c);
+        assert_eq!(r.features.location, None, "no location matched");
+        let mi = r
+            .pending_match
+            .as_ref()
+            .expect("region-only match must record match_info for the trace line");
+        assert_eq!(mi.pattern, "SINGAPORE");
+    }
+
+    #[test]
+    fn non_ascii_haystack_drops_span_to_avoid_misaligned_highlight() {
+        // Upper-cased offsets only map onto a non-ASCII string unreliably
+        // (e.g. ß → SS), so the span must be dropped — the match is still
+        // recorded, just without a highlight range.
+        let conn = crate::db::initialize_in_memory().unwrap();
+        conn.execute("INSERT INTO rule_locations (location) VALUES ('SYDNEY')", [])
+            .unwrap();
+        let cache = cache::RuleCache::new();
+        let c = cache::PipelineCtx::new(&conn, &cache);
+        let mut r = NormalisationResult::new("Caf\u{e9} SYDNEY"); // non-ASCII 'é'
+        apply_with_db(&mut r, &c);
+        assert_eq!(r.features.location.as_deref(), Some("Sydney"));
+        let mi = r.pending_match.as_ref().expect("match recorded");
+        assert_eq!(mi.pattern, "SYDNEY");
+        assert!(mi.span.is_none(), "non-ASCII haystack drops the span (graceful no-highlight)");
     }
 
     #[test]
