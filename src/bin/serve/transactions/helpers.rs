@@ -505,7 +505,7 @@ mod filter_tests {
     use super::*;
     use pocketsmith_sync::db::{initialize_in_memory, transfer_pairs, with_operation};
     use pocketsmith_sync::review::Status;
-    use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
+    use pocketsmith_sync::test_support::{seed_account, seed_pn};
     use pocketsmith_sync::transfers::{Confidence, TransferPair};
 
     fn insert_txn(

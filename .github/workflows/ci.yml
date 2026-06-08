@@ -29,6 +29,9 @@ jobs:
       # Builds every target: the lib, all five default bins, and the
       # web-gated `serve` bin + all test harnesses. `web` is the only
       # non-default feature; it is the only one that adds compiled code.
+      # Warnings fail the build: the `[lints.rust] warnings = "deny"` table
+      # in Cargo.toml turns any warning in this package's code into an
+      # error (dependencies are unaffected), so this step gates on them.
       - name: Build (all targets, web feature)
         run: cargo build --all-targets --features web --locked
 
