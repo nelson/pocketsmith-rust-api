@@ -1,15 +1,6 @@
-#[cfg(test)]
-use std::sync::OnceLock;
-
 use regex::Regex;
 
 use super::{NormalisationResult, PayeeClass};
-
-#[cfg(test)]
-struct Employer {
-    canonical: &'static str,
-    patterns: &'static [&'static str],
-}
 
 pub(crate) struct CompiledEmployer {
     regex: Regex,
@@ -58,102 +49,42 @@ pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<C
     Ok(out)
 }
 
-/// Const-backed employer match: fidelity oracle.
-#[cfg(test)]
-pub(crate) fn apply(result: &mut NormalisationResult) {
-    run_match(result, compiled_employers());
-}
-#[cfg(test)]
-const KNOWN_EMPLOYERS: &[Employer] = &[
-    Employer {
-        canonical: "AFES",
-        patterns: &[
-            r"(?i)(?:Salary from|From) AFES",
-        ],
-    },
-    Employer {
-        canonical: "Apple",
-        patterns: &[
-            r"(?i)(?:PAY/SALARY FROM|Salary from|TRANSFER FROM|From) APPLE (?:COMPUTERS|PTY LTD|COMPUTER AUSTRALIA)",
-            r"(?i)Employer Contribution From Apple",
-        ],
-    },
-    Employer {
-        canonical: "Freelancer",
-        patterns: &[
-            r"(?i)(?:Salary.*Freelancer|Employer Contribution From Freelancer)",
-        ],
-    },
-    Employer {
-        canonical: "Ghost Locomotion",
-        patterns: &[
-            r"(?i)(?:Salary.*GHOST LOCOMOTION|Employer Contribution From Ghost Locomotion|Ghost Locomotion.*(?:Receipt|Salary))",
-        ],
-    },
-];
-
-#[cfg(test)]
-fn compiled_employers() -> &'static [CompiledEmployer] {
-    static COMPILED: OnceLock<Vec<CompiledEmployer>> = OnceLock::new();
-    COMPILED.get_or_init(|| {
-        KNOWN_EMPLOYERS
-            .iter()
-            .flat_map(|e| {
-                e.patterns.iter().map(move |&pat| CompiledEmployer {
-                    regex: Regex::new(pat).expect("invalid employer pattern"),
-                    canonical: e.canonical.to_string(),
-                    pattern: pat.to_string(),
-                })
-            })
-            .collect()
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::normalise::OwnedPipeline;
 
-    /// DB-backed employer match must reproduce the const oracle.
-    #[test]
-    fn db_apply_matches_const_oracle() {
-        let p = crate::normalise::OwnedPipeline::seeded_in_memory().unwrap();
-        let ctx = p.ctx();
-        for inp in [
-            "PAY/SALARY FROM APPLE COMPUTERS SALARY",
-            "Salary from AFES - TAM S AFES",
-            "APPLE STORE R523 R523 BROADWAY",
-            "Employer Contribution From Apple",
-            "Salary Freelancer",
-        ] {
-            let mut a = NormalisationResult::new(inp);
-            apply(&mut a);
-            let mut b = NormalisationResult::new(inp);
-            apply_with_db(&mut b, &ctx);
-            assert_eq!(a.features.entity_name, b.features.entity_name, "entity differs for {inp:?}");
-            assert_eq!(a.class(), b.class(), "class differs for {inp:?}");
+    /// Run the DB-backed employer stage against the seeded in-memory
+    /// pipeline (rules from `src/rules/employers.sql`).
+    fn run(input: &str) -> NormalisationResult {
+        thread_local! {
+            static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();
         }
+        PIPELINE.with(|p| {
+            let ctx = p.ctx();
+            let mut r = NormalisationResult::new(input);
+            apply_with_db(&mut r, &ctx);
+            r
+        })
     }
 
     #[test]
     fn test_employer_apple_salary() {
-        let mut r = NormalisationResult::new("PAY/SALARY FROM APPLE COMPUTERS SALARY");
-        apply(&mut r);
+        let r = run("PAY/SALARY FROM APPLE COMPUTERS SALARY");
         assert_eq!(r.features.entity_name.as_deref(), Some("Apple"));
         assert_eq!(r.class(), Some(&PayeeClass::Employer));
     }
 
     #[test]
     fn test_employer_afes_salary() {
-        let mut r = NormalisationResult::new("Salary from AFES - TAM S AFES");
-        apply(&mut r);
+        let r = run("Salary from AFES - TAM S AFES");
         assert_eq!(r.features.entity_name.as_deref(), Some("AFES"));
         assert_eq!(r.class(), Some(&PayeeClass::Employer));
     }
 
     #[test]
     fn test_not_employer_apple_store() {
-        let mut r = NormalisationResult::new("APPLE STORE R523 R523 BROADWAY");
-        apply(&mut r);
+        let r = run("APPLE STORE R523 R523 BROADWAY");
         assert!(r.features.entity_name.is_none());
         assert!(r.class().is_none());
     }

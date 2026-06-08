@@ -356,6 +356,83 @@ BEGIN
     WHERE txn_id_a = NEW.txn_id_a AND txn_id_b = NEW.txn_id_b;
 END;
 
+-- Stamp `updated_at` on any edit to an editable rule table, mirroring the
+-- `payee_normalisations` trigger above. Keyed on the `id` PK. Idempotent
+-- (`CREATE TRIGGER IF NOT EXISTS`); a trigger-only addition needs no
+-- re-seed, so RULES_SCHEMA_VERSION stays at 1.
+CREATE TRIGGER IF NOT EXISTS rule_persons_updated_at
+AFTER UPDATE ON rule_persons
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_persons
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_merchants_updated_at
+AFTER UPDATE ON rule_merchants
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_merchants
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_employers_updated_at
+AFTER UPDATE ON rule_employers
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_employers
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_prefixes_updated_at
+AFTER UPDATE ON rule_prefixes
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_prefixes
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_suffixes_updated_at
+AFTER UPDATE ON rule_suffixes
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_suffixes
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_expansions_updated_at
+AFTER UPDATE ON rule_expansions
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_expansions
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_banking_ops_updated_at
+AFTER UPDATE ON rule_banking_ops
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_banking_ops
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS rule_locations_updated_at
+AFTER UPDATE ON rule_locations
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+    UPDATE rule_locations
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS _transaction_changes_insert
 AFTER INSERT ON transactions
 WHEN NOT EXISTS (SELECT 1 FROM _transaction_changes WHERE transaction_id = NEW.id)
@@ -437,3 +514,66 @@ BEGIN
     SELECT RAISE(ABORT, 'transactions: sync-owned column may only be modified under reason sync or test');
 END;
 ";
+
+#[cfg(test)]
+mod tests {
+    use crate::db;
+
+    /// The `rule_*_updated_at` triggers stamp `updated_at` on edit but not
+    /// on insert. Verified on `rule_merchants` (all eight share one
+    /// generated trigger shape).
+    #[test]
+    fn rule_updated_at_bumps_on_update_not_insert() {
+        let conn = db::initialize_in_memory().unwrap();
+
+        // INSERT: both timestamps default to the same `now` (SQLite fixes
+        // the value of `'now'` within a single statement).
+        conn.execute(
+            "INSERT INTO rule_merchants (canonical, pattern) VALUES ('Foo', '(?i)FOO')",
+            [],
+        )
+        .unwrap();
+        let (created, updated): (String, String) = conn
+            .query_row(
+                "SELECT created_at, updated_at FROM rule_merchants WHERE canonical = 'Foo'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(created, updated, "INSERT leaves created_at == updated_at");
+
+        // Seed a distinctly old `updated_at`. Because NEW.updated_at differs
+        // from OLD here, the trigger's `WHEN NEW.updated_at = OLD.updated_at`
+        // guard is false and it does not fire — the explicit value sticks.
+        const OLD: &str = "2000-01-01T00:00:00.000Z";
+        conn.execute(
+            "UPDATE rule_merchants SET updated_at = ?1 WHERE canonical = 'Foo'",
+            [OLD],
+        )
+        .unwrap();
+        let seeded: String = conn
+            .query_row(
+                "SELECT updated_at FROM rule_merchants WHERE canonical = 'Foo'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(seeded, OLD, "explicit updated_at write is not clobbered");
+
+        // A content edit (NEW.updated_at == OLD.updated_at) fires the trigger.
+        conn.execute(
+            "UPDATE rule_merchants SET canonical = 'Bar' WHERE canonical = 'Foo'",
+            [],
+        )
+        .unwrap();
+        let bumped: String = conn
+            .query_row(
+                "SELECT updated_at FROM rule_merchants WHERE canonical = 'Bar'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_ne!(bumped, OLD, "UPDATE bumps updated_at to now()");
+        assert!(bumped >= created, "bumped timestamp is not older than created_at");
+    }
+}
