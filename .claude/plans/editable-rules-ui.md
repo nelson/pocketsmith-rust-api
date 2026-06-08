@@ -1,4 +1,4 @@
-# Plan: Editable rules v4 — the editor surface + uniform pipeline trace
+# Plan: Editable rules UI — the editor surface + uniform pipeline trace
 
 > Branch base: `master` (PRs 0–8 of v3 merged — every stage is DB-backed
 > and fidelity-proven; the Pipeline tab is a working **read-only** rule
@@ -237,9 +237,13 @@ Save is self-contained (matches the mockup's read-only evaluate form).
 - `src/bin/serve/pipeline/editor.rs` — the parameterised editor card
   (edit + evaluate + new), shared by all stages. Stage-specific bits
   (which fields, which flags) come from a small `StageSchema` descriptor.
-- `src/bin/serve/pipeline/impact.rs` — the categorical-impact computation
-  (`compute_buckets`) as a near-pure function over fixture payees, plus the
-  bucket rendering.
+- `src/rules/impact.rs` (**library**, not the serve binary) — the
+  categorical-impact computation (`compute_buckets`) as a pure function
+  over `(stage, candidate_rule, saved_rules, payees)`. Lives in the
+  library so both the serve Evaluate handler **and** the rule-editing CLI
+  (§10) share one implementation; only the rendering differs (HTML
+  buckets in serve, text/JSON in the CLI). The serve side keeps just the
+  bucket *rendering* in `src/bin/serve/pipeline/impact.rs`.
 - `src/bin/serve/pipeline/mutations.rs` — create/edit/delete/reorder
   handlers. Each wraps `db::with_operation("rule-edit", …)`, then
   `cache.invalidate(stage)`, then `rules::schedule_dump(stage, db_path)`,
@@ -426,6 +430,7 @@ Status key: ✅ done · ⏳ next · (blank) not started.
 | 6 |   | `pipeline(locations): editor` | add/remove a suburb, see effect |
 | 7 |   | `pipeline(banking_ops): editor` | same |
 | 8 |   | `transactions: "+ Add rule for this payee" + guess_stage heuristic` | click trace-empty txn → prefilled new-rule card |
+| 9 |   | `rules CLI: scriptable evaluate + apply (non-interactive)` | `--evaluate` prints impact buckets without writing; `--apply` commits the mutation + dumps `.sql`; both exit-coded for scripts/tests |
 
 Every PR: fidelity-style gate (all prior tests pass) + red-green commit
 sequence (failing test → pass → refactor) for any PR ≥ 200 LOC.
@@ -480,3 +485,56 @@ Landed the data-model + capture + shared renderer for the two-line trace:
 
 **Next: PR 2** — retire the const oracle + `--features fidelity`
 scaffolding and add `rule_*` `updated_at` triggers.
+
+## 10. Rule-editing CLI — scriptable evaluate + apply (PR 9)
+
+The Pipeline tab is the interactive editor; this PR adds a headless,
+scriptable path to the **same two stages** (evaluate, then confirm) for
+use in scripts, fixtures, and tests. No HTTP, no new API endpoint — it
+calls the library primitives directly.
+
+### 10.1 Why it's cheap (reuse map)
+Everything the CLI needs is already library-level once PR 3 lands:
+- **Evaluate** → `rules::impact::compute_buckets` (relocated to the
+  library per §3.2). Pure fn → print instead of render.
+- **Confirm** → `rules::{insert_rule,update_rule,delete_rule,reorder}`
+  wrapped in `db::with_operation("rule-edit", …)`, then a **synchronous**
+  `rules::dump_stage` (the process exits, so no `schedule_dump`
+  background thread and no `RuleCache::invalidate` are needed).
+- Pipeline execution at the rule's true position reuses
+  `normalise()` + `PipelineCtx`/`RuleCache` exactly as serve does.
+
+### 10.2 Surface (a subcommand on the existing `normalise` binary)
+Two flags realise the two stages; default is evaluate-only (dry-run):
+```
+normalise rule --stage merchants --pattern '(?i)FOO' --canonical 'Foo' [--note …] [--flags …]
+    --evaluate        # default: compute + print impact buckets, write nothing
+    --apply           # commit the create/edit; implies a fresh evaluate first
+    --json            # machine-readable impact + result (for tests/scripts)
+normalise rule --stage merchants --id 42 --delete [--apply]
+normalise rule --stage prefixes --id 7 --move-before 3 [--apply]
+```
+- Without `--apply`, the command is a pure dry-run (the evaluate stage):
+  prints the four impact buckets (counts + up-to-6 samples), exits 0;
+  invalid regex exits non-zero with `syntax error: …` (matches §3.4).
+- With `--apply`, it re-runs evaluate, performs the mutation under
+  `with_operation`, re-dumps `src/rules/<stage>.sql`, and prints the
+  activity-log line (`+ added` / `~ edited` / `− deleted`, §3.6).
+- Re-scan stays explicit: the existing `normalise` (scan) command
+  refreshes `payee_normalisations` + `rule_impact`; the CLI just notes
+  "N payees would re-stage — run `normalise` to re-scan" (the §3.8 dirty
+  signal, headless form).
+
+### 10.3 Testing value
+- Gives §3.10's create→evaluate→save→dirty→rescan flow an **HTTP-free**
+  end-to-end harness: assert bucket output, then the `rule_*` row, the
+  re-dumped `.sql`, and the dirty derivation — driving the same library
+  calls the handlers do.
+- `--json` output makes golden-file tests of impact trivial and stable.
+- The evaluate/apply split is the dry-run/commit safety rail in CLI form.
+
+### 10.4 Cost
+~150–200 LOC: arg parsing + dispatch + text/JSON bucket renderer + the
+thin mutation wrapper. All correctness-bearing logic is reused from the
+library; this PR adds presentation + wiring only. Prereq: PR 3 (CRUD +
+`compute_buckets` in the library).
