@@ -186,7 +186,7 @@ mod compact_tests {
     }
 
     #[test]
-    fn compact_avoids_1000k_artefact_by_jumping_to_M() {
+    fn compact_avoids_1000k_artefact_by_jumping_to_m() {
         // $999,500.00 -> $1.00M (would otherwise round to "$1000.0k")
         assert_eq!(format_dollars_compact(99_950_000), "$1.00M");
         // $999,999.99 -> $1.00M
@@ -194,7 +194,7 @@ mod compact_tests {
     }
 
     #[test]
-    fn compact_1m_plus_uses_M_with_two_decimals() {
+    fn compact_1m_plus_uses_m_with_two_decimals() {
         // $1,000,000.00 -> $1.00M
         assert_eq!(format_dollars_compact(100_000_000), "$1.00M");
         // $1,234,567.89 -> $1.23M
@@ -204,7 +204,7 @@ mod compact_tests {
     }
 
     #[test]
-    fn compact_1b_plus_uses_B() {
+    fn compact_1b_plus_uses_b() {
         // $1,000,000,000.00 -> $1.00B
         assert_eq!(format_dollars_compact(100_000_000_000), "$1.00B");
     }
