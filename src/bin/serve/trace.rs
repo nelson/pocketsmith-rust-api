@@ -1,4 +1,4 @@
-//! Shared pipeline-trace renderer (editable-rules-v4 PR 1).
+//! Shared pipeline-trace renderer (editable rules UI — PR 1).
 //!
 //! Both the Transactions detail panel and the Normalise tab render the
 //! same `NormalisationResult::trace`, so the markup lives here once.
