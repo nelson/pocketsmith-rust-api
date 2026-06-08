@@ -28,8 +28,7 @@ jobs:
 
       # Builds every target: the lib, all five default bins, and the
       # web-gated `serve` bin + all test harnesses. `web` is the only
-      # feature that adds compiled code (`fidelity` only gates heavy
-      # real-DB tests that need a local pocketsmith.db, absent in CI).
+      # non-default feature; it is the only one that adds compiled code.
       - name: Build (all targets, web feature)
         run: cargo build --all-targets --features web --locked
 

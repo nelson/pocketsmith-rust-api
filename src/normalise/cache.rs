@@ -179,8 +179,8 @@ impl OwnedPipeline {
     }
 
     /// In-memory DB seeded from the canonical `src/rules/*.sql` files —
-    /// for tests and fidelity checks (§8). Seeding the eight small rule
-    /// tables is ~1ms.
+    /// the basis for the hermetic per-stage tests. Seeding the eight small
+    /// rule tables is ~1ms.
     pub fn seeded_in_memory() -> anyhow::Result<Self> {
         let conn = crate::db::initialize_in_memory()?;
         crate::rules::load_into_db(&conn)?;
