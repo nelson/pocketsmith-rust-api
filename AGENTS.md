@@ -22,8 +22,7 @@ git push -u "https://nelson:${GH_TOKEN}@github.com/nelson/pocketsmith-rust-api.g
 ```
 
 Notes:
-- Use the **github.com** token (`gh auth token -h github.com`), not the
-  default `gh` account, which is Apple-internal GHE (`github.pie.apple.com`).
+- Use the **github.com** token (`gh auth token -h github.com`).
 - Username must be `nelson`; `x-access-token` is rejected ("Invalid
   username or token").
 - For force pushes, prefer a lease and tag the old remote tip first:
