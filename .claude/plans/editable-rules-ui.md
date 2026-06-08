@@ -210,12 +210,14 @@ trigger addition does not require a re-seed, so the version stays at 1.
 
 ---
 
-## 3. The editor framework — prefix + suffix (PR 3, = v3 PR 4b)
+## 3. The editor GUI framework — prefix + suffix (branch `editor-gui-framework`)
 
-This is the keystone PR: it builds the reusable editor machinery that
-every later stage parameterises over. Prefix+suffix are chosen first
-because they exercise the hardest shape (loop stage, capture-flag matrix,
-drag-reorder).
+This is the keystone GUI PR: it builds the reusable Pipeline-tab editor
+machinery (which the per-stage branches then parameterise over) and ships
+the first stage editor (prefix + suffix). It **consumes the rule-editing
+library core** — typed CRUD + `compute_buckets` — already introduced by the
+`rule-cli` branch; this PR adds the web layer (editor card, mutation
+*handlers*, dirty banner, `rule_impact` cache) on top.
 
 ### 3.1 Routes (all under `/pipeline/`, tiny_http, HTMX fragments)
 | Method | Path | Returns |
@@ -237,19 +239,18 @@ Save is self-contained (matches the mockup's read-only evaluate form).
 - `src/bin/serve/pipeline/editor.rs` — the parameterised editor card
   (edit + evaluate + new), shared by all stages. Stage-specific bits
   (which fields, which flags) come from a small `StageSchema` descriptor.
-- `src/rules/impact.rs` (**library**, not the serve binary) — the
-  categorical-impact computation (`compute_buckets`) as a pure function
-  over `(stage, candidate_rule, saved_rules, payees)`. Lives in the
-  library so both the serve Evaluate handler **and** the rule-editing CLI
-  (§10) share one implementation; only the rendering differs (HTML
-  buckets in serve, text/JSON in the CLI). The serve side keeps just the
-  bucket *rendering* in `src/bin/serve/pipeline/impact.rs`.
+- `src/rules/impact.rs` (**library**, introduced by the `rule-cli`
+  branch) — `compute_buckets`, a pure function over
+  `(stage, candidate_rule, saved_rules, payees)`, reused as-is here; this
+  PR adds only the HTML bucket *rendering* in
+  `src/bin/serve/pipeline/impact.rs` (the CLI renders text/JSON instead).
 - `src/bin/serve/pipeline/mutations.rs` — create/edit/delete/reorder
   handlers. Each wraps `db::with_operation("rule-edit", …)`, then
   `cache.invalidate(stage)`, then `rules::schedule_dump(stage, db_path)`,
   then pushes a rule-change activity entry (§3.6).
-- `src/rules/mod.rs` — add typed CRUD: `insert_rule`, `update_rule`,
-  `delete_rule`, `reorder` (per-stage column-aware; small and mechanical).
+- `src/rules/mod.rs` typed CRUD (`insert_rule`, `update_rule`,
+  `delete_rule`, `reorder`) is also introduced by `rule-cli`; the
+  handlers above just call it.
 
 ### 3.3 `StageSchema` descriptor (one source of truth per stage)
 Drives the editor form, the rule-list columns, and the CRUD column set, so
@@ -420,17 +421,34 @@ stays `1`.
 
 Status key: ✅ done · ⏳ next · (blank) not started.
 
-| # | Status | Title | Gate |
-|---|--------|-------|------|
-| 1 | ✅ | `normalise+serve: uniform two-line pipeline trace (matched pattern + span)` | trace renders `~=` + green hit on matcher stages; diff on modifying stages; fidelity still green |
-| 2 | ⏳ | `normalise: retire const oracle + fidelity scaffolding; rule_* updated_at triggers` | net-negative LOC; hermetic per-stage tests still cover; triggers stamp updated_at |
-| 3 |   | `pipeline(prefix+suffix): editor framework — Edit/Evaluate, impact buckets, mutations, activity log, dirty banner, rule_impact cache` | full create→evaluate→save→dirty→rescan flow tested |
-| 4 |   | `pipeline(expand): editor` | add/edit/delete end-to-end |
-| 5 |   | `pipeline(persons+employers+merchants): editor` | add a merchant rule end-to-end |
-| 6 |   | `pipeline(locations): editor` | add/remove a suburb, see effect |
-| 7 |   | `pipeline(banking_ops): editor` | same |
-| 8 |   | `transactions: "+ Add rule for this payee" + guess_stage heuristic` | click trace-empty txn → prefilled new-rule card |
-| 9 |   | `rules CLI: scriptable evaluate + apply (non-interactive)` | `--evaluate` prints impact buckets without writing; `--apply` commits the mutation + dumps `.sql`; both exit-coded for scripts/tests |
+**PRs are identified by branch name, not number** — the *Order* column is
+the current plan and can be resequenced freely as long as each row's
+*Depends on* is still satisfied. The order below already applies the
+requested swap: the headless CLIs (`pipeline-trace-cli`, `rule-cli`) come
+**before** the GUI, so the rule-editing **library core** (typed CRUD in
+`rules::mod.rs` + `compute_buckets` in `rules::impact.rs`) is introduced
+by `rule-cli` and merely *consumed* by `editor-gui-framework`.
+
+| Order | Branch | Status | Scope | Depends on |
+|------:|--------|--------|-------|------------|
+| 1 | `feat/pipeline-trace-two-line` | ✅ | uniform two-line pipeline trace (matched pattern + span) | — |
+| 2 | `remove-const-oracle` | ⏳ | retire const oracle + `--features fidelity` scaffolding; `rule_*` `updated_at` triggers | 1 |
+| 3 | `pipeline-trace-cli` | | headless CLI: print the per-stage pipeline trace for a payee / txn (text + `--json`) | 1 (trace data); slot after 2 |
+| 4 | `rule-cli` | | scriptable rule editing: introduces the **library core** (CRUD + `compute_buckets`) + `--evaluate`/`--apply`/`--json` | 2 (edits must post-date oracle removal) |
+| 5 | `editor-gui-framework` | | Pipeline-tab editor: Edit/Evaluate card, impact buckets, mutation handlers, activity log, dirty banner, `rule_impact` cache — *consumes* the rule-cli library core | 4 |
+| 6 | `expand-editor` | | `pipeline(expand)` editor | 5 |
+| 7 | `entity-editor` | | `pipeline(persons+employers+merchants)` editor | 5 |
+| 8 | `location-editor` | | `pipeline(locations)` editor | 5 |
+| 9 | `ops-editor` | | `pipeline(banking_ops)` editor | 5 |
+| 10 | `transaction-add-rule` | | `transactions: "+ Add rule for this payee"` + `guess_stage` heuristic | 5 |
+
+Acceptance gates per branch:
+- `remove-const-oracle` — net-negative LOC; hermetic per-stage tests still cover; triggers stamp `updated_at`.
+- `pipeline-trace-cli` — `normalise trace "<payee>"` prints the two-line trace; `--json` is stable; exit-coded (see §11).
+- `rule-cli` — `--evaluate` prints impact buckets and writes nothing; `--apply` commits + dumps `.sql`; invalid regex exits non-zero (see §10).
+- `editor-gui-framework` — full create→evaluate→save→dirty→rescan flow tested.
+- `expand-editor` / `entity-editor` / `location-editor` / `ops-editor` — add/edit/delete a rule end-to-end for that stage.
+- `transaction-add-rule` — click a trace-empty txn → land in Pipeline new-rule state, stage pre-chosen, pattern prefilled.
 
 Every PR: fidelity-style gate (all prior tests pass) + red-green commit
 sequence (failing test → pass → refactor) for any PR ≥ 200 LOC.
@@ -486,23 +504,25 @@ Landed the data-model + capture + shared renderer for the two-line trace:
 **Next: PR 2** — retire the const oracle + `--features fidelity`
 scaffolding and add `rule_*` `updated_at` triggers.
 
-## 10. Rule-editing CLI — scriptable evaluate + apply (PR 9)
+## 10. Rule-editing CLI — scriptable evaluate + apply (branch `rule-cli`)
 
-The Pipeline tab is the interactive editor; this PR adds a headless,
-scriptable path to the **same two stages** (evaluate, then confirm) for
-use in scripts, fixtures, and tests. No HTTP, no new API endpoint — it
-calls the library primitives directly.
+The headless, scriptable path to rule editing (evaluate, then confirm),
+for scripts, fixtures, and tests. No HTTP. Because it lands **before** the
+GUI, this PR **introduces the rule-editing library core** that the GUI
+later consumes. Prereq: `remove-const-oracle` (#2) — once rules diverge
+from the in-code consts, the fidelity oracle must already be gone.
 
-### 10.1 Why it's cheap (reuse map)
-Everything the CLI needs is already library-level once PR 3 lands:
-- **Evaluate** → `rules::impact::compute_buckets` (relocated to the
-  library per §3.2). Pure fn → print instead of render.
+### 10.1 What it introduces (the library core)
+This PR adds the correctness-bearing primitives to the **library**, so
+the GUI (and tests) reuse them:
+- **Evaluate** → `rules::impact::compute_buckets` (new), a pure fn over
+  `(stage, candidate_rule, saved_rules, payees)`. CLI prints; GUI renders.
 - **Confirm** → `rules::{insert_rule,update_rule,delete_rule,reorder}`
-  wrapped in `db::with_operation("rule-edit", …)`, then a **synchronous**
-  `rules::dump_stage` (the process exits, so no `schedule_dump`
-  background thread and no `RuleCache::invalidate` are needed).
+  (new) wrapped in `db::with_operation("rule-edit", …)`, then a
+  **synchronous** `rules::dump_stage` (the process exits, so no
+  `schedule_dump` background thread and no `RuleCache::invalidate`).
 - Pipeline execution at the rule's true position reuses
-  `normalise()` + `PipelineCtx`/`RuleCache` exactly as serve does.
+  `normalise()` + `PipelineCtx`/`RuleCache` exactly as serve will.
 
 ### 10.2 Surface (a subcommand on the existing `normalise` binary)
 Two flags realise the two stages; default is evaluate-only (dry-run):
@@ -534,7 +554,48 @@ normalise rule --stage prefixes --id 7 --move-before 3 [--apply]
 - The evaluate/apply split is the dry-run/commit safety rail in CLI form.
 
 ### 10.4 Cost
-~150–200 LOC: arg parsing + dispatch + text/JSON bucket renderer + the
-thin mutation wrapper. All correctness-bearing logic is reused from the
-library; this PR adds presentation + wiring only. Prereq: PR 3 (CRUD +
-`compute_buckets` in the library).
+~150–200 LOC of presentation + wiring on top of the library core it
+introduces (arg parsing + dispatch + text/JSON bucket renderer + the thin
+mutation wrapper). The GUI framework (`editor-gui-framework`) then reuses
+the same CRUD + `compute_buckets` for its handlers and Evaluate card.
+
+## 11. Pipeline-trace CLI — headless trace inspector (branch `pipeline-trace-cli`)
+
+A scriptable companion to PR 1: print the per-stage normalisation trace
+for a payee (or a stored transaction) on the command line, so the
+pipeline can be debugged without the web UI. Slots right after
+`remove-const-oracle` (#2); its only real dependency is the trace data
+(`TraceEntry` / `MatchInfo`) shipped in PR 1.
+
+### 11.1 Reuse
+No new pipeline logic: it calls `normalise(payee, &ctx)` and walks the
+returned `result.trace`. The two-line shape is exactly what the web
+renderer (`serve/trace.rs`) shows — this is the text/JSON projection of
+the same `TraceEntry { before, after, match_info, features_added,
+feature_values, class_set }`.
+
+### 11.2 Surface (a subcommand on the existing `normalise` binary)
+```
+normalise trace "<raw payee string>"     # ad-hoc string
+normalise trace --txn <id>               # look up original_payee from the DB
+    --json                               # machine-readable trace (array of stage entries)
+```
+Text output mirrors the UI's two lines per stage:
+- line 1: `before → after` for modifying stages, else `{pattern} ~= {string}`
+  with the matched span marked (e.g. `[…]` around the hit, since there's no
+  colour in a pipe);
+- line 2: `+feature (value)` / `class = …`.
+The final `proposed_payee` (via `format_payee`) is printed at the end.
+
+### 11.3 Testing value
+- Golden text/JSON of the trace for a few fixed payees — a fast,
+  HTTP-free regression on pipeline *behaviour* and on the trace data
+  itself (complements PR 1's render tests, which assert markup).
+- `--json` gives scripts a stable contract for “what did the pipeline do
+  to this string”.
+
+### 11.4 Cost
+~80–120 LOC: arg parsing + a text renderer (share the
+matched-span-splitting helper conceptually with `serve/trace.rs`, but the
+CLI has its own tiny text formatter) + the optional `--txn` DB lookup. No
+library changes beyond what PR 1 already landed.
