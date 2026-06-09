@@ -1,8 +1,23 @@
 //! The shared commit seam (rule-cli §3.6): the single "save a rule"
 //! entry point. Takes **exactly one** [`Mutation`], performs it inside
 //! one `with_operation`, invalidates the cache (if supplied), and writes
-//! the dump per [`DumpPolicy`]. There is no batching — one commit is one
-//! atomic change producing one `_operations` row and one activity line.
+//! the canonical `.sql` mirror per [`DumpPolicy`]. There is no batching —
+//! one commit is one atomic change producing one `_operations` row and
+//! one activity line.
+//!
+//! `commit` vs `dump` (review naming question): they are related but
+//! different scopes.
+//!   * **commit** persists *one rule change* to the DB (the authority).
+//!   * **dump** writes the human-reviewable `rules/<stage>.sql` *mirror*
+//!     of the DB — the same operation the `dump` binary performs for all
+//!     eight stages. Committing a change re-dumps only the one stage it
+//!     touched, so the mirror tracks the DB.
+//!
+//! At-rest consistency: the CLI commits with [`DumpPolicy::Sync`], which
+//! re-dumps the stage *before the process exits*, so once `rule … --apply`
+//! returns the `.sql` already matches the DB. The DB is always the
+//! authority; the `.sql` is only read to re-seed an empty table on a cold
+//! start, never to overwrite live rows.
 
 use anyhow::Result;
 use rusqlite::Connection;
@@ -12,17 +27,23 @@ use super::model::{Mutation, Rule};
 use super::{activity::RuleChange, dirty};
 use crate::normalise::RuleCache;
 
-/// When (and where) the canonical `rules/<stage>.sql` dump is written.
-/// The only policy difference between the CLI and serve (rule-cli §1.2);
-/// it feeds nothing while a process runs, so it can't change pipeline
-/// behaviour.
+/// *When* (and where) the canonical `rules/<stage>.sql` mirror is written
+/// after a commit — purely the dump's timing, never *what* is written, so
+/// it cannot change pipeline behaviour (rule-cli §1.2). Both variants
+/// re-dump identical content; they differ only in scheduling.
 #[derive(Debug, Clone)]
 pub enum DumpPolicy {
     /// CLI: dump inline into the given directory before the process
-    /// exits. The dir is injected (not read from a global) so callers and
-    /// tests stay parallel-safe; production passes `rules::rules_dir()`.
+    /// exits, so the mirror matches the DB at rest. The dir is injected
+    /// (not read from a global) so callers and tests stay parallel-safe;
+    /// production passes `rules::rules_dir()`.
     Sync(std::path::PathBuf),
-    /// serve: re-dump the stage on a detached background thread.
+    /// Long-running host (the future serve integration): re-dump the
+    /// stage on a detached background thread so an HTTP response isn't
+    /// blocked on disk I/O. **Not yet wired to serve** (serve is still
+    /// read-only); currently exercised only by the parity test. When
+    /// serve adopts this, it should also dump on shutdown to preserve
+    /// at-rest consistency under an abrupt kill.
     Background { db_path: String },
 }
 
