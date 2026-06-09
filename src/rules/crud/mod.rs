@@ -1,4 +1,5 @@
-//! Typed CRUD over the `rule_*` tables (rule-cli §3.3).
+//! Typed CRUD over the `rule_*` tables (rule-cli §3.3), split one verb
+//! per file (`create`/`read`/`update`/`delete`/`reorder`).
 //!
 //! These are **pure storage ops**: each performs exactly one row
 //! mutation and does *not* open an operation or dump. The single-change
@@ -6,20 +7,33 @@
 //! lives in [`commit`](super::commit). They are split out only for
 //! testability — callers always go through `commit`, which admits
 //! exactly one [`Mutation`].
+//!
+//! This `mod.rs` holds the shared SQL-shape plumbing (column lists, row
+//! mapping, UNIQUE-conflict messaging) used by more than one verb;
+//! single-verb helpers live next to their verb. (Child modules may use
+//! these private helpers — descendants see their ancestors' items.)
 
-use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 
-use super::model::{LocationKind, MoveTarget, Rule, RuleData, RuleError};
+use super::model::{RuleData, RuleError};
 use super::Stage;
+
+mod create;
+mod delete;
+mod read;
+mod reorder;
+mod update;
+
+pub use create::insert_rule;
+pub use delete::delete_rule;
+pub use read::{get, list, load_for_compile};
+pub use reorder::move_rule;
+pub use update::update_rule;
 
 /// Stages with a `sort_order` column (NOT NULL): the three loop stages
 /// plus banking_ops. New rows append at `MAX(sort_order)+1`.
 fn has_sort_order(stage: Stage) -> bool {
-    matches!(
-        stage,
-        Stage::Prefixes | Stage::Suffixes | Stage::Expansions | Stage::BankingOps
-    )
+    matches!(stage, Stage::Prefixes | Stage::Suffixes | Stage::Expansions | Stage::BankingOps)
 }
 
 /// Stages whose order is user-controllable via `move` (rule-cli §3.3):
@@ -29,7 +43,7 @@ pub fn is_movable(stage: Stage) -> bool {
     matches!(stage, Stage::Prefixes | Stage::Suffixes | Stage::Expansions)
 }
 
-/// Data columns for a stage, in the order [`map_row`] reads them.
+/// Data columns for a stage, in the order [`read::map_row`] reads them.
 fn data_columns(stage: Stage) -> &'static [&'static str] {
     match stage {
         Stage::Prefixes => &["pattern", "gateway", "operation", "has_account", "has_date", "note"],
@@ -42,123 +56,6 @@ fn data_columns(stage: Stage) -> &'static [&'static str] {
         Stage::BankingOps => &["operation", "pattern", "has_account", "note"],
         Stage::Locations => &["location", "kind", "note"],
     }
-}
-
-/// `ORDER BY` for reads: ordered stages by (sort_order, id); the rest by
-/// the auto-sort that matches the pipeline (id = declaration order).
-fn order_by(stage: Stage) -> &'static str {
-    if has_sort_order(stage) {
-        "sort_order, id"
-    } else {
-        "id"
-    }
-}
-
-/// Build the `SELECT id, <sort_order|NULL>, <data cols> FROM table` head.
-fn select_sql(stage: Stage) -> String {
-    let sort_expr = if has_sort_order(stage) { "sort_order" } else { "NULL" };
-    format!(
-        "SELECT id, {sort_expr}, {} FROM {}",
-        data_columns(stage).join(", "),
-        stage.table()
-    )
-}
-
-/// Read one row (id, sort_order, then data cols at offset 2) into a [`Rule`].
-fn map_row(stage: Stage, row: &rusqlite::Row<'_>) -> rusqlite::Result<Rule> {
-    let id: i64 = row.get(0)?;
-    let sort_order: Option<i64> = row.get(1)?;
-    // Data columns start at index 2.
-    let s = |i: usize| -> rusqlite::Result<Option<String>> { row.get(i) };
-    let req = |i: usize| -> rusqlite::Result<String> { row.get(i) };
-    let b = |i: usize| -> rusqlite::Result<bool> { Ok(row.get::<_, i64>(i)? != 0) };
-    let data = match stage {
-        Stage::Prefixes => RuleData::Prefix {
-            pattern: req(2)?,
-            gateway: s(3)?,
-            operation: s(4)?,
-            has_account: b(5)?,
-            has_date: b(6)?,
-            note: s(7)?,
-        },
-        Stage::Suffixes => RuleData::Suffix {
-            pattern: req(2)?,
-            gateway: s(3)?,
-            operation: s(4)?,
-            institution: s(5)?,
-            has_account: b(6)?,
-            has_date: b(7)?,
-            has_location: b(8)?,
-            has_currency_code: b(9)?,
-            has_amount: b(10)?,
-            note: s(11)?,
-        },
-        Stage::Expansions => RuleData::Expansion {
-            pattern: req(2)?,
-            canonical: req(3)?,
-            note: s(4)?,
-        },
-        Stage::Persons => RuleData::Person {
-            canonical: req(2)?,
-            pattern: req(3)?,
-            note: s(4)?,
-        },
-        Stage::Employers => RuleData::Employer {
-            canonical: req(2)?,
-            pattern: req(3)?,
-            note: s(4)?,
-        },
-        Stage::Merchants => RuleData::Merchant {
-            canonical: req(2)?,
-            pattern: req(3)?,
-            note: s(4)?,
-        },
-        Stage::BankingOps => RuleData::BankingOp {
-            operation: req(2)?,
-            pattern: req(3)?,
-            has_account: b(4)?,
-            note: s(5)?,
-        },
-        Stage::Locations => RuleData::Location {
-            location: req(2)?,
-            // CHECK constraint guarantees a valid kind; default to Location.
-            kind: LocationKind::from_str(&req(3)?).unwrap_or(LocationKind::Location),
-            note: s(4)?,
-        },
-    };
-    Ok(Rule { id, sort_order, data })
-}
-
-/// List a stage's rules in apply order.
-pub fn list(conn: &Connection, stage: Stage) -> Result<Vec<Rule>> {
-    let sql = format!("{} ORDER BY {}", select_sql(stage), order_by(stage));
-    let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map([], |row| map_row(stage, row))?;
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
-    Ok(out)
-}
-
-/// Fetch one rule by id, or `None` if it isn't in that stage.
-pub fn get(conn: &Connection, stage: Stage, id: i64) -> Result<Option<Rule>> {
-    let sql = format!("{} WHERE id = ?1", select_sql(stage));
-    let mut stmt = conn.prepare(&sql)?;
-    Ok(stmt.query_row([id], |row| map_row(stage, row)).optional()?)
-}
-
-/// Load a stage's rules in apply order as bare [`RuleData`] for the
-/// pipeline compilers — the single typed read that replaces the
-/// per-stage hand-written `SELECT`s (rule-cli §3.1).
-pub fn load_for_compile(conn: &Connection, stage: Stage) -> Result<Vec<RuleData>> {
-    Ok(list(conn, stage)?.into_iter().map(|r| r.data).collect())
-}
-
-/// Next append position for an ordered stage.
-fn next_sort_order(conn: &Connection, stage: Stage) -> Result<i64> {
-    let sql = format!("SELECT COALESCE(MAX(sort_order) + 1, 0) FROM {}", stage.table());
-    Ok(conn.query_row(&sql, [], |r| r.get(0))?)
 }
 
 /// Bound parameter values for a rule's data columns, in `data_columns`
@@ -203,114 +100,9 @@ fn data_params(data: &RuleData) -> Vec<rusqlite::types::Value> {
     }
 }
 
-/// Insert a new rule, returning its assigned id. New ordered-stage rows
-/// append at `MAX(sort_order)+1`. A `UNIQUE` violation maps to
-/// [`RuleError::Duplicate`].
-pub fn insert_rule(conn: &Connection, data: &RuleData) -> Result<i64> {
-    let stage = data.stage();
-    let cols = data_columns(stage);
-    let mut vals = data_params(data);
-    let mut collist: Vec<&str> = cols.to_vec();
-    if has_sort_order(stage) {
-        collist.push("sort_order");
-        vals.push(rusqlite::types::Value::Integer(next_sort_order(conn, stage)?));
-    }
-    let placeholders: Vec<String> = (1..=vals.len()).map(|i| format!("?{i}")).collect();
-    let sql = format!(
-        "INSERT INTO {} ({}) VALUES ({})",
-        stage.table(),
-        collist.join(", "),
-        placeholders.join(", ")
-    );
-    match conn.execute(&sql, rusqlite::params_from_iter(vals.iter())) {
-        Ok(_) => Ok(conn.last_insert_rowid()),
-        Err(e) => Err(map_unique(conn, data, e)),
-    }
-}
-
-/// Update an existing rule's data columns by id (sort_order untouched).
-pub fn update_rule(conn: &Connection, id: i64, data: &RuleData) -> Result<()> {
-    let stage = data.stage();
-    let cols = data_columns(stage);
-    let assignments: Vec<String> =
-        cols.iter().enumerate().map(|(i, c)| format!("{c} = ?{}", i + 1)).collect();
-    let mut vals = data_params(data);
-    let id_idx = vals.len() + 1;
-    vals.push(rusqlite::types::Value::Integer(id));
-    let sql = format!(
-        "UPDATE {} SET {} WHERE id = ?{id_idx}",
-        stage.table(),
-        assignments.join(", ")
-    );
-    match conn.execute(&sql, rusqlite::params_from_iter(vals.iter())) {
-        Ok(0) => Err(RuleError::NotFound { stage, id }.into()),
-        Ok(_) => Ok(()),
-        Err(e) => Err(map_unique(conn, data, e)),
-    }
-}
-
-/// Delete a rule by id. Ordered stages are renumbered dense afterwards.
-pub fn delete_rule(conn: &Connection, stage: Stage, id: i64) -> Result<()> {
-    let sql = format!("DELETE FROM {} WHERE id = ?1", stage.table());
-    let n = conn.execute(&sql, [id])?;
-    if n == 0 {
-        return Err(RuleError::NotFound { stage, id }.into());
-    }
-    if has_sort_order(stage) {
-        renumber_dense(conn, stage)?;
-    }
-    Ok(())
-}
-
-/// Reposition one loop-stage rule relative to a neighbour, then
-/// renumber `sort_order` dense (rule-cli §3.3).
-pub fn move_rule(conn: &Connection, stage: Stage, id: i64, target: MoveTarget) -> Result<()> {
-    if !is_movable(stage) {
-        return Err(RuleError::NotOrdered(stage).into());
-    }
-    let anchor = target.anchor();
-    if id == anchor {
-        return Err(RuleError::CrossStage.into());
-    }
-    // Current order of ids.
-    let sql = format!("SELECT id FROM {} ORDER BY sort_order, id", stage.table());
-    let mut stmt = conn.prepare(&sql)?;
-    let mut ids: Vec<i64> = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
-    if !ids.contains(&id) {
-        return Err(RuleError::NotFound { stage, id }.into());
-    }
-    if !ids.contains(&anchor) {
-        return Err(RuleError::NotFound { stage, id: anchor }.into());
-    }
-    ids.retain(|&x| x != id);
-    let pos = ids.iter().position(|&x| x == anchor).expect("anchor present");
-    let insert_at = match target {
-        MoveTarget::Before(_) => pos,
-        MoveTarget::After(_) => pos + 1,
-    };
-    ids.insert(insert_at, id);
-    // Reassign sort_order = index.
-    let upd = format!("UPDATE {} SET sort_order = ?1 WHERE id = ?2", stage.table());
-    for (i, rid) in ids.iter().enumerate() {
-        conn.execute(&upd, params![i as i64, rid])?;
-    }
-    Ok(())
-}
-
-/// Rewrite `sort_order` to a dense `0..N-1` run preserving current order.
-fn renumber_dense(conn: &Connection, stage: Stage) -> Result<()> {
-    let sql = format!("SELECT id FROM {} ORDER BY sort_order, id", stage.table());
-    let mut stmt = conn.prepare(&sql)?;
-    let ids: Vec<i64> = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
-    let upd = format!("UPDATE {} SET sort_order = ?1 WHERE id = ?2", stage.table());
-    for (i, id) in ids.iter().enumerate() {
-        conn.execute(&upd, params![i as i64, id])?;
-    }
-    Ok(())
-}
-
 /// Map a rusqlite UNIQUE-constraint error to a friendly
-/// [`RuleError::Duplicate`]; pass other errors through as anyhow.
+/// [`RuleError::Duplicate`]; pass other errors through as anyhow. Shared
+/// by `create` and `update`.
 fn map_unique(conn: &Connection, data: &RuleData, e: rusqlite::Error) -> anyhow::Error {
     if let rusqlite::Error::SqliteFailure(f, _) = &e {
         if f.code == rusqlite::ErrorCode::ConstraintViolation {
@@ -344,8 +136,7 @@ fn duplicate_message(conn: &Connection, data: &RuleData) -> String {
             ("location = ?1".into(), format!("location {location:?}"))
         }
     };
-    let id = find_conflict_id(conn, stage, &clause, data);
-    match id {
+    match find_conflict_id(conn, stage, &clause, data) {
         Some(id) => format!("a {name} rule with {descr} already exists (#{id})"),
         None => format!("a {name} rule with {descr} already exists"),
     }
