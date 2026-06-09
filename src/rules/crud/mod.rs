@@ -13,7 +13,7 @@
 //! single-verb helpers live next to their verb. (Child modules may use
 //! these private helpers — descendants see their ancestors' items.)
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params_from_iter, Connection, OptionalExtension};
 
 use super::model::{RuleData, RuleError};
 use super::Stage;
@@ -115,49 +115,40 @@ fn map_unique(conn: &Connection, data: &RuleData, e: rusqlite::Error) -> anyhow:
 /// Build "a {stage} rule with {field} {value:?} already exists (#id)".
 fn duplicate_message(conn: &Connection, data: &RuleData) -> String {
     let stage = data.stage();
-    let name = stage.name();
-    let (clause, descr): (String, String) = match data {
-        RuleData::Prefix { pattern, .. }
-        | RuleData::Suffix { pattern, .. }
-        | RuleData::Expansion { pattern, .. }
-        | RuleData::Merchant { pattern, .. }
-        | RuleData::Employer { pattern, .. } => {
-            ("pattern = ?1".into(), format!("pattern {pattern:?}"))
-        }
-        RuleData::Person { canonical, pattern, .. } => (
-            "canonical = ?1 AND pattern = ?2".into(),
-            format!("canonical {canonical:?} + pattern {pattern:?}"),
-        ),
-        RuleData::BankingOp { operation, pattern, .. } => (
-            "operation = ?1 AND pattern = ?2".into(),
-            format!("operation {operation:?} + pattern {pattern:?}"),
-        ),
-        RuleData::Location { location, .. } => {
-            ("location = ?1".into(), format!("location {location:?}"))
-        }
-    };
-    match find_conflict_id(conn, stage, &clause, data) {
-        Some(id) => format!("a {name} rule with {descr} already exists (#{id})"),
-        None => format!("a {name} rule with {descr} already exists"),
+    let key = conflict_key(data);
+    let descr = key.iter().map(|(c, v)| format!("{c} {v:?}")).collect::<Vec<_>>().join(" + ");
+    match find_conflict_id(conn, stage, &key) {
+        Some(id) => format!("a {} rule with {descr} already exists (#{id})", stage.name()),
+        None => format!("a {} rule with {descr} already exists", stage.name()),
     }
 }
 
-fn find_conflict_id(conn: &Connection, stage: Stage, clause: &str, data: &RuleData) -> Option<i64> {
-    let sql = format!("SELECT id FROM {} WHERE {clause}", stage.table());
-    let res = match data {
+/// The columns + values of the UNIQUE key a duplicate collides on, so the
+/// conflict message and the id lookup are derived from one definition.
+fn conflict_key(data: &RuleData) -> Vec<(&'static str, &str)> {
+    match data {
         RuleData::Person { canonical, pattern, .. } => {
-            conn.query_row(&sql, params![canonical, pattern], |r| r.get(0))
+            vec![("canonical", canonical), ("pattern", pattern)]
         }
         RuleData::BankingOp { operation, pattern, .. } => {
-            conn.query_row(&sql, params![operation, pattern], |r| r.get(0))
+            vec![("operation", operation), ("pattern", pattern)]
         }
-        RuleData::Location { location, .. } => conn.query_row(&sql, params![location], |r| r.get(0)),
-        other => {
-            let pattern = other.pattern().unwrap_or("");
-            conn.query_row(&sql, params![pattern], |r| r.get(0))
-        }
-    };
-    res.optional().ok().flatten()
+        RuleData::Location { location, .. } => vec![("location", location)],
+        // Prefix / Suffix / Expansion / Merchant / Employer are UNIQUE on pattern.
+        other => vec![("pattern", other.pattern().unwrap_or(""))],
+    }
+}
+
+fn find_conflict_id(conn: &Connection, stage: Stage, key: &[(&str, &str)]) -> Option<i64> {
+    let clause = key
+        .iter()
+        .enumerate()
+        .map(|(i, (col, _))| format!("{col} = ?{}", i + 1))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let sql = format!("SELECT id FROM {} WHERE {clause}", stage.table());
+    let values = key.iter().map(|(_, v)| *v);
+    conn.query_row(&sql, params_from_iter(values), |r| r.get(0)).optional().ok().flatten()
 }
 
 #[cfg(test)]
