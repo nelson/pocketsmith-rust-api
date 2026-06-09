@@ -198,10 +198,8 @@ impl Mutation {
     /// The [`Stage`] this mutation operates on.
     pub fn stage(&self) -> Stage {
         match self {
-            Mutation::Add(data) => data.stage(),
-            Mutation::Edit { data, .. } => data.stage(),
-            Mutation::Delete { stage, .. } => *stage,
-            Mutation::Move { stage, .. } => *stage,
+            Mutation::Add(data) | Mutation::Edit { data, .. } => data.stage(),
+            Mutation::Delete { stage, .. } | Mutation::Move { stage, .. } => *stage,
         }
     }
 }

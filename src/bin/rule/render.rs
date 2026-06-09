@@ -129,12 +129,35 @@ pub(crate) fn test(flags: &Flags, result: &TestResult, input: &str) -> Result<()
 
 // --- evaluate --------------------------------------------------------------
 
-/// Single-width glyphs (render cleanly inside the aligned table) — colour
-/// carries the meaning, the glyph is a quick visual anchor (rule-cli §14.3).
-const GLYPH_GAIN: &str = "+"; // gained a match / now affected (green)
-const GLYPH_MOVED: &str = "±"; // reassigned to another rule (blue)
-const GLYPH_FALL: &str = "-"; // now unmatched / no longer affected (red)
-const GLYPH_UNCHANGED: &str = "·"; // unchanged (dim)
+/// A bucket outcome: its single-width glyph (a quick visual anchor; the
+/// colour carries the meaning) and how it colours text (rule-cli §14.3).
+#[derive(Clone, Copy)]
+enum Outcome {
+    Gain,      // newly matched / newly affected
+    Moved,     // reassigned to another rule
+    Fall,      // now unmatched / no longer affected
+    Unchanged, // not affected by the edit
+}
+
+impl Outcome {
+    fn glyph(self) -> &'static str {
+        match self {
+            Outcome::Gain => "+",
+            Outcome::Moved => "±",
+            Outcome::Fall => "-",
+            Outcome::Unchanged => "·",
+        }
+    }
+
+    fn paint(self, style: &Style, s: &str) -> String {
+        match self {
+            Outcome::Gain => style.green(s),
+            Outcome::Moved => style.wrap("34", s), // blue
+            Outcome::Fall => style.red(s),
+            Outcome::Unchanged => style.dim(s),
+        }
+    }
+}
 
 pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets: &Buckets) {
     if flags.json {
@@ -161,12 +184,16 @@ pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets
         ("value", Align::Right),
     ];
     let mut rows: Vec<Vec<Cell>> = Vec::new();
-    // (glyph, colour tag g/b/r, bucket) for the detail table below.
-    let mut sections: Vec<(&str, &str, &BucketCount)> = Vec::new();
+    // (outcome, bucket) for the detail table below.
+    let mut sections: Vec<(Outcome, &BucketCount)> = Vec::new();
 
-    let mut push = |glyph: &str, label: &str, coloured_label: String, b: &BucketCount| {
+    let mut push = |outcome: Outcome, label: &str, b: &BucketCount| {
+        let glyph = outcome.glyph();
         rows.push(vec![
-            Cell::coloured(format!("{glyph} {label}"), format!("{glyph} {coloured_label}")),
+            Cell::coloured(
+                format!("{glyph} {label}"),
+                format!("{glyph} {}", outcome.paint(&style, label)),
+            ),
             Cell::text(commas(b.payees)),
             Cell::text(commas(b.txns)),
             Cell::text(money(b.total_cents)),
@@ -175,25 +202,20 @@ pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets
 
     match buckets {
         Buckets::FirstMatch { newly_matched, stolen, new_fallthrough, unchanged_payees } => {
-            push(GLYPH_GAIN, "newly matched", style.green("newly matched"), newly_matched);
-            push(GLYPH_MOVED, "moved from other", style.wrap("34", "moved from other"), stolen);
-            push(GLYPH_FALL, "new fallthrough", style.red("new fallthrough"), new_fallthrough);
+            push(Outcome::Gain, "newly matched", newly_matched);
+            push(Outcome::Moved, "moved from other", stolen);
+            push(Outcome::Fall, "new fallthrough", new_fallthrough);
             unchanged_row(&style, &mut rows, *unchanged_payees);
-            sections.push((GLYPH_GAIN, "g", newly_matched));
-            sections.push((GLYPH_MOVED, "b", stolen));
-            sections.push((GLYPH_FALL, "r", new_fallthrough));
+            sections.push((Outcome::Gain, newly_matched));
+            sections.push((Outcome::Moved, stolen));
+            sections.push((Outcome::Fall, new_fallthrough));
         }
         Buckets::Loop { newly_affected, no_longer_affected, unchanged_payees } => {
-            push(GLYPH_GAIN, "newly affected", style.green("newly affected"), newly_affected);
-            push(
-                GLYPH_FALL,
-                "no longer affected",
-                style.red("no longer affected"),
-                no_longer_affected,
-            );
+            push(Outcome::Gain, "newly affected", newly_affected);
+            push(Outcome::Fall, "no longer affected", no_longer_affected);
             unchanged_row(&style, &mut rows, *unchanged_payees);
-            sections.push((GLYPH_GAIN, "g", newly_affected));
-            sections.push((GLYPH_FALL, "r", no_longer_affected));
+            sections.push((Outcome::Gain, newly_affected));
+            sections.push((Outcome::Fall, no_longer_affected));
         }
     }
     print!("{}", render_table(&style, &cols, &rows));
@@ -211,7 +233,8 @@ pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets
     let limit = if flags.all { usize::MAX } else { SAMPLE_LIMIT };
     let mut detail: Vec<Vec<Cell>> = Vec::new();
     let mut hidden = 0usize;
-    for (glyph, tag, b) in &sections {
+    for (outcome, b) in &sections {
+        let glyph = outcome.glyph();
         let take = b.samples.len().min(limit);
         hidden += b.samples.len() - take;
         for s in b.samples.iter().take(take) {
@@ -219,7 +242,7 @@ pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets
             detail.push(vec![
                 Cell::coloured(
                     format!("{glyph} {payee}"),
-                    format!("{} {payee}", paint(&style, tag, glyph)),
+                    format!("{} {payee}", outcome.paint(&style, glyph)),
                 ),
                 Cell::text(commas(s.txn_count)),
                 Cell::text(money(s.total_cents)),
@@ -246,24 +269,13 @@ pub(crate) fn evaluate(flags: &Flags, stage: Stage, mutation: &Mutation, buckets
 }
 
 fn unchanged_row(style: &Style, rows: &mut Vec<Vec<Cell>>, payees: i64) {
+    let label = format!("{} unchanged", Outcome::Unchanged.glyph());
     rows.push(vec![
-        Cell::coloured(
-            format!("{GLYPH_UNCHANGED} unchanged"),
-            style.dim(&format!("{GLYPH_UNCHANGED} unchanged")),
-        ),
+        Cell::coloured(label.clone(), Outcome::Unchanged.paint(style, &label)),
         Cell::text(commas(payees)),
         Cell::coloured("—", style.dim("—")),
         Cell::coloured("—", style.dim("—")),
     ]);
-}
-
-/// Colour `s` by an outcome tag: g=green, b=blue, r=red.
-fn paint(style: &Style, tag: &str, s: &str) -> String {
-    match tag {
-        "g" => style.green(s),
-        "b" => style.wrap("34", s),
-        _ => style.red(s),
-    }
 }
 
 /// A cell for the old/new columns: the value (sanitised), or a dim em-dash.

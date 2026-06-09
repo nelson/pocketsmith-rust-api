@@ -139,7 +139,7 @@ pub fn validate_draft(data: &RuleData) -> Result<(), RuleError> {
             non_empty("operation", operation)?;
             non_empty("pattern", pattern)?;
             let re = compile_raw(pattern)?;
-            check_operation_required(operation)?;
+            check_operation(operation)?;
             require_capture(*has_account, &re, pattern, &ACCOUNT)?;
         }
         RuleData::Location { location, .. } => {
@@ -168,15 +168,13 @@ fn compile_raw(pattern: &str) -> Result<Regex, RuleError> {
 }
 
 fn check_operation_opt(op: &Option<String>) -> Result<(), RuleError> {
-    if let Some(op) = op {
-        if BankingOperation::from_display_name(op).is_none() {
-            return Err(RuleError::BadOperation(op.clone()));
-        }
+    match op.as_deref() {
+        Some(op) => check_operation(op),
+        None => Ok(()),
     }
-    Ok(())
 }
 
-fn check_operation_required(op: &str) -> Result<(), RuleError> {
+fn check_operation(op: &str) -> Result<(), RuleError> {
     if BankingOperation::from_display_name(op).is_none() {
         Err(RuleError::BadOperation(op.to_string()))
     } else {
@@ -200,18 +198,16 @@ fn require_capture(
         Ok(())
     } else {
         Err(RuleError::MissingCapture {
-            feature: leak_feature_flag(spec.flag),
+            feature: has_flag_name(spec.flag),
             group: spec.group,
             pattern: pattern.to_string(),
         })
     }
 }
 
-/// `MissingCapture.feature` is `&'static str` and is the *has-* flag the
-/// user typed (e.g. `has-account`). The `FeatureSpec.flag` stems are
-/// static, so we can map them to their static `has-…` form without
-/// allocation.
-fn leak_feature_flag(flag: &'static str) -> &'static str {
+/// Map a [`FeatureSpec`] stem (e.g. `account`) to the static `--has-…`
+/// flag name the user typed, for [`RuleError::MissingCapture`].
+fn has_flag_name(flag: &'static str) -> &'static str {
     match flag {
         "account" => "has-account",
         "date" => "has-date",
