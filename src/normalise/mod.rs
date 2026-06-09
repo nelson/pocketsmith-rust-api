@@ -498,7 +498,7 @@ mod tests {
 
 
     /// Conversion test — **hermetic**. Defines its own prefix rule in the
-    /// DB (nothing to do with the production `src/rules/*.sql`) and proves
+    /// DB (nothing to do with the production `rules/*.sql`) and proves
     /// `apply_with_db` loads + compiles + applies + captures + strips from
     /// exactly the DB rows. Tests the conversion *machinery* without
     /// treating the current rules as an oracle or source of truth. This is
@@ -551,7 +551,7 @@ mod tests {
     /// Conversion test — **hermetic** (expand). Mirror of
     /// [`prefix_stage_reads_its_rules_from_the_db`] for the expand stage.
     /// Defines its own expansion rules in the DB (unrelated to the
-    /// production `src/rules/expansions.sql`) and proves `apply_with_db`
+    /// production `rules/expansions.sql`) and proves `apply_with_db`
     /// loads + compiles + word-boundary-replaces from exactly the DB rows,
     /// applying multiple rules in one pass via the expand loop.
     #[test]
