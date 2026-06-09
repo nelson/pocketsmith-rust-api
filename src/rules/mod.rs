@@ -2,18 +2,18 @@
 //! (editable-rules-v3 §6).
 //!
 //! The canonical copy of each pipeline stage's rule table lives in
-//! SQLite, and is mirrored to `src/rules/<stage>.sql` so that:
+//! SQLite, and is mirrored to `rules/<stage>.sql` so that:
 //!   * git diffs of rule edits are human-reviewable, and
 //!   * a blown-away database can be re-seeded with the *edited* rules.
 //!
-//! The `src/rules/*.sql` files — not the in-code `const` dictionaries —
+//! The `rules/*.sql` files — not the in-code `const` dictionaries —
 //! are the source of truth for the seed. (The constants still drive the
 //! pipeline until each stage is converted in later PRs, but they no
 //! longer feed the rule tables.)
 //!
 //! Lifecycle (§6.1):
 //!   * On serve startup, [`load_into_db`] seeds any empty rule table
-//!     from its `src/rules/*.sql` file.
+//!     from its `rules/*.sql` file.
 //!   * On every committed rule mutation, [`schedule_dump`] re-dumps the
 //!     affected stage on a background thread.
 //!   * `cargo run --bin dump` dumps the *live* DB to the `*.sql` files
@@ -26,7 +26,18 @@ use std::sync::Mutex;
 use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 
-/// Bump when an in-tree `src/rules/*.sql` file gains a new column, so a
+pub mod activity;
+pub mod commit;
+pub mod crud;
+pub mod dirty;
+pub mod impact;
+pub mod model;
+pub mod validate;
+
+pub use commit::{commit, CommitResult, DumpPolicy};
+pub use model::{LocationKind, MoveTarget, Mutation, Rule, RuleData, RuleError};
+
+/// Bump when an in-tree `rules/*.sql` file gains a new column, so a
 /// startup load knows to re-seed. Stored in `_meta.rules_schema_version`.
 pub const RULES_SCHEMA_VERSION: i64 = 1;
 
@@ -58,7 +69,7 @@ impl Stage {
         ]
     }
 
-    /// Short name: the `src/rules/<name>.sql` file stem and the suffix of
+    /// Short name: the `rules/<name>.sql` file stem and the suffix of
     /// the `rule_<name>` table. The single source for both (see
     /// [`table`](Self::table)).
     pub fn name(&self) -> &'static str {
@@ -128,14 +139,15 @@ impl Stage {
     }
 }
 
-/// Directory holding the canonical `*.sql` files. Defaults to
-/// `src/rules` (relative to the process cwd, i.e. the repo root for
-/// `cargo run`). Overridable via `POCKETSMITH_RULES_DIR` (used by
-/// tests and isolated runs).
+/// Directory holding the canonical `*.sql` data files. Defaults to
+/// `rules` (relative to the process cwd, i.e. the repo root for
+/// `cargo run`). The rule *logic* lives in `src/rules/`; the rule *data*
+/// lives here, kept separate. Overridable via `POCKETSMITH_RULES_DIR`
+/// (used by tests and isolated runs).
 pub fn rules_dir() -> PathBuf {
     std::env::var("POCKETSMITH_RULES_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("src/rules"))
+        .unwrap_or_else(|_| PathBuf::from("rules"))
 }
 
 fn row_count(conn: &Connection, stage: Stage) -> Result<i64> {
@@ -150,20 +162,22 @@ pub fn count(conn: &Connection, stage: Stage) -> Result<i64> {
 
 /// Columns shown in the read-only Pipeline-tab rule list for a stage,
 /// in display order. A subset/reorder of [`Stage::dump_columns`] chosen
-/// for legibility (drops `sort_order`, which the row order conveys).
+/// for legibility (drops `sort_order`, which the row order conveys, and
+/// `note`, a minor field carried only by `rule show` / JSON — rule-cli
+/// §12).
 fn display_columns(stage: Stage) -> &'static [&'static str] {
     match stage {
-        Stage::Prefixes => &["pattern", "gateway", "operation", "has_account", "has_date", "note"],
+        Stage::Prefixes => &["pattern", "gateway", "operation", "has_account", "has_date"],
         Stage::Suffixes => &[
             "pattern", "gateway", "operation", "institution", "has_account", "has_date",
-            "has_location", "has_currency_code", "has_amount", "note",
+            "has_location", "has_currency_code", "has_amount",
         ],
-        Stage::Expansions => &["pattern", "canonical", "note"],
-        Stage::Persons => &["canonical", "pattern", "note"],
-        Stage::Employers => &["canonical", "pattern", "note"],
-        Stage::Merchants => &["canonical", "pattern", "note"],
-        Stage::BankingOps => &["operation", "pattern", "has_account", "note"],
-        Stage::Locations => &["location", "note"],
+        Stage::Expansions => &["pattern", "canonical"],
+        Stage::Persons => &["canonical", "pattern"],
+        Stage::Employers => &["canonical", "pattern"],
+        Stage::Merchants => &["canonical", "pattern"],
+        Stage::BankingOps => &["operation", "pattern", "has_account"],
+        Stage::Locations => &["location"],
     }
 }
 
@@ -206,7 +220,7 @@ pub fn list_display(conn: &Connection, stage: Stage) -> Result<(Vec<&'static str
 }
 
 /// Seed any empty rule table on startup (§6.1) from its
-/// `src/rules/<stage>.sql` file. Tables that already hold rows are left
+/// `rules/<stage>.sql` file. Tables that already hold rows are left
 /// untouched, so an existing DB retains its (possibly UI-edited) data.
 pub fn load_into_db(conn: &Connection) -> Result<()> {
     let dir = rules_dir();
@@ -258,7 +272,7 @@ fn render_value(v: &rusqlite::types::Value) -> String {
 }
 
 /// Serialise one stage's table to a SQL string (the contents of
-/// `src/rules/<stage>.sql`). Pure — does no file I/O — so it's easy to
+/// `rules/<stage>.sql`). Pure — does no file I/O — so it's easy to
 /// unit-test and so the background dumper can read the DB independently.
 pub fn dump_stage_to_string(conn: &Connection, stage: Stage) -> Result<String> {
     let cols = stage.dump_columns();
@@ -300,10 +314,17 @@ pub fn dump_stage_to_string(conn: &Connection, stage: Stage) -> Result<String> {
     Ok(out)
 }
 
-/// Write one stage's canonical SQL file to `src/rules/<stage>.sql`.
+/// Write one stage's canonical SQL file to `rules/<stage>.sql`.
 pub fn dump_stage(conn: &Connection, stage: Stage) -> Result<()> {
-    let dir = rules_dir();
-    std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+    dump_stage_to(conn, stage, &rules_dir())
+}
+
+/// Write one stage's canonical SQL file into an explicit directory. The
+/// dir is injected (rather than read from the global `POCKETSMITH_RULES_DIR`)
+/// so callers — notably `commit` and tests — can target an isolated path
+/// without mutating process-global state, keeping tests parallel-safe.
+pub fn dump_stage_to(conn: &Connection, stage: Stage, dir: &Path) -> Result<()> {
+    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     let body = dump_stage_to_string(conn, stage)?;
     let path = dir.join(format!("{}.sql", stage.name()));
     write_atomic(&path, body.as_bytes())
@@ -357,11 +378,11 @@ mod tests {
     use super::*;
     use crate::db::initialize_in_memory;
 
-    /// Load the committed `src/rules/<stage>.sql` into a fresh DB.
+    /// Load the committed `rules/<stage>.sql` into a fresh DB.
     fn load_committed(stage: Stage) -> Connection {
         let manifest = env!("CARGO_MANIFEST_DIR");
         let path = std::path::Path::new(manifest)
-            .join("src/rules")
+            .join("rules")
             .join(format!("{}.sql", stage.name()));
         let sql = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
@@ -444,7 +465,7 @@ mod tests {
         let manifest = env!("CARGO_MANIFEST_DIR");
         for stage in Stage::all() {
             let path = std::path::Path::new(manifest)
-                .join("src/rules")
+                .join("rules")
                 .join(format!("{}.sql", stage.name()));
             let committed = std::fs::read_to_string(&path).unwrap();
             let conn = load_committed(stage);
