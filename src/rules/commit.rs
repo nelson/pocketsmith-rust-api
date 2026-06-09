@@ -68,11 +68,12 @@ pub fn commit(
     let stage = mutation.stage();
 
     // Snapshot the pre-edit row so the activity line can show old → new.
+    // Every mutation except Add identifies an existing row by id.
     let before: Option<Rule> = match mutation {
         Mutation::Add(_) => None,
-        Mutation::Edit { id, .. } => crud::get(conn, stage, *id)?,
-        Mutation::Delete { id, .. } => crud::get(conn, stage, *id)?,
-        Mutation::Move { id, .. } => crud::get(conn, stage, *id)?,
+        Mutation::Edit { id, .. } | Mutation::Delete { id, .. } | Mutation::Move { id, .. } => {
+            crud::get(conn, stage, *id)?
+        }
     };
 
     // One operation = one CRUD call = one `_operations` row.
@@ -172,22 +173,20 @@ mod tests {
                 DumpPolicy::Background { db_path: ":memory:".into() }
             };
             commit(&conn, &m, dump, Some(&cache)).unwrap();
-            let compiled = cache_merchants_len(&cache, &conn);
-            assert_eq!(compiled, 1, "cache must recompile from committed rows");
+            assert!(
+                cache_resolves_uber(&cache, &conn),
+                "cache must recompile from committed rows"
+            );
         }
     }
 
-    // Helper: count compiled merchants via the cache (exercises the
-    // public pipeline read path).
-    fn cache_merchants_len(cache: &RuleCache, conn: &Connection) -> usize {
+    /// Whether the (warm) cache resolves "UBER TRIP" to the just-committed
+    /// "Uber" merchant — exercises the public pipeline read path.
+    fn cache_resolves_uber(cache: &RuleCache, conn: &Connection) -> bool {
         use crate::normalise::{normalise, PipelineCtx};
         let ctx = PipelineCtx::new(conn, cache);
         let r = normalise("UBER TRIP", &ctx);
-        if r.features.entity_name.as_deref() == Some("Uber") {
-            1
-        } else {
-            0
-        }
+        r.features.entity_name.as_deref() == Some("Uber")
     }
 
     #[test]
