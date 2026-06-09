@@ -178,7 +178,7 @@ impl OwnedPipeline {
         }
     }
 
-    /// In-memory DB seeded from the canonical `src/rules/*.sql` files —
+    /// In-memory DB seeded from the canonical `rules/*.sql` files —
     /// the basis for the hermetic per-stage tests. Seeding the eight small
     /// rule tables is ~1ms.
     pub fn seeded_in_memory() -> anyhow::Result<Self> {

@@ -1,8 +1,8 @@
 //! `dump` — export the live database's rule tables to the canonical
-//! `src/rules/*.sql` files (editable-rules-v3 §6.2).
+//! `rules/*.sql` files (editable-rules-v3 §6.2).
 //!
 //! Reads the rule tables from the database at `POCKETSMITH_DB` (the same
-//! DB serve uses) and dumps all eight stages to `src/rules/<stage>.sql`.
+//! DB serve uses) and dumps all eight stages to `rules/<stage>.sql`.
 //! Use it to snapshot the current (possibly UI-edited) rules to disk, or
 //! to recover the canonical files after a manual DB edit.
 //!
@@ -10,7 +10,7 @@
 //! mutation, so you rarely need to run this by hand — it's the explicit
 //! export / recovery path.
 //!
-//! Output directory is `src/rules` by default; override with
+//! Output directory is `rules` by default; override with
 //! `POCKETSMITH_RULES_DIR`.
 
 use anyhow::Result;
