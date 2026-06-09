@@ -57,34 +57,23 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
     }
 }
 
-/// Load and compile the prefix rules from `rule_prefixes` in apply
-/// order (sort_order, then id).
+/// Load and compile the prefix rules from the typed
+/// [`crud::load_for_compile`] read in apply order (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledPrefix>> {
-    let mut stmt = conn.prepare(
-        "SELECT pattern, gateway, operation, has_account, has_date \
-           FROM rule_prefixes ORDER BY sort_order, id",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, Option<String>>(1)?,
-            row.get::<_, Option<String>>(2)?,
-            row.get::<_, i64>(3)? != 0,
-            row.get::<_, i64>(4)? != 0,
-        ))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (pattern, gateway, operation, has_account, has_date) = r?;
-        let regex = Regex::new(&pattern)
-            .map_err(|e| anyhow::anyhow!("invalid prefix pattern {pattern:?}: {e}"))?;
-        out.push(CompiledPrefix {
-            regex,
-            gateway,
-            operation: operation.as_deref().and_then(BankingOperation::from_display_name),
-            has_account,
-            has_date,
-        });
+    for data in crud::load_for_compile(conn, Stage::Prefixes)? {
+        if let RuleData::Prefix { pattern, gateway, operation, has_account, has_date, .. } = data {
+            let regex = Regex::new(&pattern)
+                .map_err(|e| anyhow::anyhow!("invalid prefix pattern {pattern:?}: {e}"))?;
+            out.push(CompiledPrefix {
+                regex,
+                gateway,
+                operation: operation.as_deref().and_then(BankingOperation::from_display_name),
+                has_account,
+                has_date,
+            });
+        }
     }
     Ok(out)
 }
@@ -95,7 +84,7 @@ mod tests {
     use crate::normalise::{BankingOperation, NormalisationResult, OwnedPipeline};
 
     /// Run the DB-backed prefix stage against the seeded in-memory pipeline
-    /// (rules from `src/rules/prefixes.sql`).
+    /// (rules from `rules/prefixes.sql`).
     fn run(input: &str) -> NormalisationResult {
         thread_local! {
             static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();

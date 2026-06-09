@@ -42,21 +42,15 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
 /// Load + compile person rules. Ordered by `id` (= declaration /
 /// insertion order) so the order-sensitive generic fallbacks
 /// (`MR`/`MISS`/`MRS`, single-token names) stay last under
-/// first-match-wins. See progress note Decision #2.
+/// first-match-wins. Rows come from the typed [`crud::load_for_compile`]
+/// read (rule-cli §3.1). See progress note Decision #2.
 pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledPerson>> {
-    let mut stmt =
-        conn.prepare("SELECT canonical, pattern FROM rule_persons ORDER BY id")?;
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (canonical, pattern) = r?;
-        out.push(CompiledPerson {
-            regex: compile_person(&pattern),
-            canonical,
-            pattern,
-        });
+    for data in crud::load_for_compile(conn, Stage::Persons)? {
+        if let RuleData::Person { canonical, pattern, .. } = data {
+            out.push(CompiledPerson { regex: compile_person(&pattern), canonical, pattern });
+        }
     }
     Ok(out)
 }
@@ -67,7 +61,7 @@ mod tests {
     use crate::normalise::OwnedPipeline;
 
     /// Run the DB-backed person stage against the seeded in-memory
-    /// pipeline (rules from `src/rules/persons.sql`).
+    /// pipeline (rules from `rules/persons.sql`).
     fn run(input: &str) -> NormalisationResult {
         thread_local! {
             static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();

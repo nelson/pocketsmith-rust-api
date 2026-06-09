@@ -32,19 +32,17 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &super::PipelineCtx)
     }
 }
 
-/// Load + compile employer rules in declaration order (`id`).
+/// Load + compile employer rules in declaration order (`id`). Rows come
+/// from the typed [`crud::load_for_compile`] read (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<CompiledEmployer>> {
-    let mut stmt =
-        conn.prepare("SELECT canonical, pattern FROM rule_employers ORDER BY id")?;
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (canonical, pattern) = r?;
-        let regex = Regex::new(&pattern)
-            .map_err(|e| anyhow::anyhow!("invalid employer pattern {pattern:?}: {e}"))?;
-        out.push(CompiledEmployer { regex, canonical, pattern });
+    for data in crud::load_for_compile(conn, Stage::Employers)? {
+        if let RuleData::Employer { canonical, pattern, .. } = data {
+            let regex = Regex::new(&pattern)
+                .map_err(|e| anyhow::anyhow!("invalid employer pattern {pattern:?}: {e}"))?;
+            out.push(CompiledEmployer { regex, canonical, pattern });
+        }
     }
     Ok(out)
 }
@@ -55,7 +53,7 @@ mod tests {
     use crate::normalise::OwnedPipeline;
 
     /// Run the DB-backed employer stage against the seeded in-memory
-    /// pipeline (rules from `src/rules/employers.sql`).
+    /// pipeline (rules from `rules/employers.sql`).
     fn run(input: &str) -> NormalisationResult {
         thread_local! {
             static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();
