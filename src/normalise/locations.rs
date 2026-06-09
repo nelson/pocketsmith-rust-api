@@ -53,22 +53,27 @@ pub(crate) struct LocationRules {
 }
 
 /// Load the known places (suburbs/cities as `location`, countries as
-/// `region`), longest-first for deterministic matching.
+/// `region`), longest-first for deterministic matching. Rows come from
+/// the typed [`crud::load_for_compile`] read; the `kind` is the typed
+/// [`LocationKind`] from `rules::model` (rule-cli §3.1), replacing the
+/// old stringly-typed match.
 pub(crate) fn load_compiled(conn: &Connection) -> Result<LocationRules> {
-    let mut stmt = conn.prepare(
-        "SELECT location, kind FROM rule_locations ORDER BY length(location) DESC, location",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    })?;
+    use crate::rules::{crud, model::{LocationKind, RuleData}, Stage};
     let mut rules = LocationRules { locations: Vec::new(), regions: Vec::new() };
-    for r in rows {
-        let (name, kind) = r?;
-        match kind.as_str() {
-            "region" => rules.regions.push(name),
-            _ => rules.locations.push(name),
+    for data in crud::load_for_compile(conn, Stage::Locations)? {
+        if let RuleData::Location { location, kind, .. } = data {
+            match kind {
+                LocationKind::Region => rules.regions.push(location),
+                LocationKind::Location => rules.locations.push(location),
+            }
         }
     }
+    // Longest-first within each partition for deterministic matching
+    // (crud returns id order, so sort here as the SQL ORDER BY used to).
+    let by_len_desc =
+        |a: &String, b: &String| b.len().cmp(&a.len()).then_with(|| a.cmp(b));
+    rules.locations.sort_by(by_len_desc);
+    rules.regions.sort_by(by_len_desc);
     Ok(rules)
 }
 

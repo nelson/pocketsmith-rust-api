@@ -46,26 +46,19 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &super::PipelineCtx)
 
 /// Load + compile banking-op rules in apply order (sort_order, id).
 /// Each row's `operation` is a stored display name mapped back to the
-/// enum; an unrecognised name is an error (corrupt rule table).
+/// enum; an unrecognised name is an error (corrupt rule table). Rows come
+/// from the typed [`crud::load_for_compile`] read (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<CompiledBankingOp>> {
-    let mut stmt = conn.prepare(
-        "SELECT operation, pattern, has_account FROM rule_banking_ops ORDER BY sort_order, id",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, i64>(2)? != 0,
-        ))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (operation, pattern, has_account) = r?;
-        let operation = BankingOperation::from_display_name(&operation)
-            .ok_or_else(|| anyhow::anyhow!("unknown banking operation {operation:?}"))?;
-        let regex = Regex::new(&pattern)
-            .map_err(|e| anyhow::anyhow!("invalid banking op pattern {pattern:?}: {e}"))?;
-        out.push(CompiledBankingOp { regex, operation, has_account, pattern });
+    for data in crud::load_for_compile(conn, Stage::BankingOps)? {
+        if let RuleData::BankingOp { operation, pattern, has_account, .. } = data {
+            let operation = BankingOperation::from_display_name(&operation)
+                .ok_or_else(|| anyhow::anyhow!("unknown banking operation {operation:?}"))?;
+            let regex = Regex::new(&pattern)
+                .map_err(|e| anyhow::anyhow!("invalid banking op pattern {pattern:?}: {e}"))?;
+            out.push(CompiledBankingOp { regex, operation, has_account, pattern });
+        }
     }
     Ok(out)
 }
@@ -76,7 +69,7 @@ mod tests {
     use crate::normalise::OwnedPipeline;
 
     /// Run the DB-backed banking-op stage against the seeded in-memory
-    /// pipeline (rules from `src/rules/banking_ops.sql`).
+    /// pipeline (rules from `rules/banking_ops.sql`).
     fn run(input: &str) -> NormalisationResult {
         thread_local! {
             static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();

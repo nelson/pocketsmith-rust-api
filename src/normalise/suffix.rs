@@ -83,42 +83,31 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &PipelineCtx) {
 }
 
 /// Load and compile the suffix rules from `rule_suffixes` in apply
-/// order (sort_order, then id).
+/// order (sort_order, then id). Rows come from the typed
+/// [`crud::load_for_compile`] read (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledSuffix>> {
-    let mut stmt = conn.prepare(
-        "SELECT pattern, gateway, operation, institution, has_account, has_date, \
-                has_location, has_currency_code, has_amount \
-           FROM rule_suffixes ORDER BY sort_order, id",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, Option<String>>(1)?,
-            row.get::<_, Option<String>>(2)?,
-            row.get::<_, Option<String>>(3)?,
-            row.get::<_, i64>(4)? != 0,
-            row.get::<_, i64>(5)? != 0,
-            row.get::<_, i64>(6)? != 0,
-            row.get::<_, i64>(7)? != 0,
-            row.get::<_, i64>(8)? != 0,
-        ))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (pattern, gateway, operation, institution, has_account, has_date, has_location, has_currency_code, has_amount) = r?;
-        let regex = Regex::new(&pattern)
-            .map_err(|e| anyhow::anyhow!("invalid suffix pattern {pattern:?}: {e}"))?;
-        out.push(CompiledSuffix {
-            regex,
-            gateway,
-            operation: operation.as_deref().and_then(BankingOperation::from_display_name),
-            institution,
-            has_account,
-            has_date,
-            has_location,
-            has_currency_code,
-            has_amount,
-        });
+    for data in crud::load_for_compile(conn, Stage::Suffixes)? {
+        if let RuleData::Suffix {
+            pattern, gateway, operation, institution, has_account, has_date, has_location,
+            has_currency_code, has_amount, ..
+        } = data
+        {
+            let regex = Regex::new(&pattern)
+                .map_err(|e| anyhow::anyhow!("invalid suffix pattern {pattern:?}: {e}"))?;
+            out.push(CompiledSuffix {
+                regex,
+                gateway,
+                operation: operation.as_deref().and_then(BankingOperation::from_display_name),
+                institution,
+                has_account,
+                has_date,
+                has_location,
+                has_currency_code,
+                has_amount,
+            });
+        }
     }
     Ok(out)
 }
@@ -140,7 +129,7 @@ mod tests {
     }
 
     /// Run the DB-backed suffix stage against the seeded in-memory pipeline
-    /// (rules from `src/rules/suffixes.sql`).
+    /// (rules from `rules/suffixes.sql`).
     fn run(input: &str) -> NormalisationResult {
         pipeline().with(|p| {
             let ctx = p.ctx();

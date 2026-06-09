@@ -33,18 +33,17 @@ pub fn apply_with_db(result: &mut NormalisationResult, ctx: &super::PipelineCtx)
 
 /// Load + compile merchant rules in declaration order (`id`), so the
 /// "more specific pattern must appear first" invariant is preserved.
+/// Rule rows come from the typed [`crud::load_for_compile`] read — the
+/// column shape lives once in `rules::model` (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &rusqlite::Connection) -> anyhow::Result<Vec<CompiledMerchant>> {
-    let mut stmt =
-        conn.prepare("SELECT canonical, pattern FROM rule_merchants ORDER BY id")?;
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (canonical, pattern) = r?;
-        let regex = Regex::new(&pattern)
-            .map_err(|e| anyhow::anyhow!("invalid merchant pattern {pattern:?}: {e}"))?;
-        out.push(CompiledMerchant { regex, canonical, pattern });
+    for data in crud::load_for_compile(conn, Stage::Merchants)? {
+        if let RuleData::Merchant { canonical, pattern, .. } = data {
+            let regex = Regex::new(&pattern)
+                .map_err(|e| anyhow::anyhow!("invalid merchant pattern {pattern:?}: {e}"))?;
+            out.push(CompiledMerchant { regex, canonical, pattern });
+        }
     }
     Ok(out)
 }
@@ -55,7 +54,7 @@ mod tests {
     use crate::normalise::OwnedPipeline;
 
     /// Run the DB-backed merchant stage against the seeded in-memory
-    /// pipeline (rules loaded from `src/rules/merchants.sql`). Seeded once
+    /// pipeline (rules loaded from `rules/merchants.sql`). Seeded once
     /// per test thread.
     fn run(input: &str) -> NormalisationResult {
         thread_local! {

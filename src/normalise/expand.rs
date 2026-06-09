@@ -48,22 +48,15 @@ fn compile_expansion(pattern: &str) -> Result<Regex> {
         .map_err(|e| anyhow::anyhow!("invalid expansion pattern {pattern:?}: {e}"))
 }
 
-/// Load + compile the expansion rules from `rule_expansions` in apply
-/// order (sort_order, then id).
+/// Load + compile the expansion rules from the typed
+/// [`crud::load_for_compile`] read in apply order (rule-cli §3.1).
 pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledExpansion>> {
-    let mut stmt = conn.prepare(
-        "SELECT pattern, canonical FROM rule_expansions ORDER BY sort_order, id",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-    })?;
+    use crate::rules::{crud, model::RuleData, Stage};
     let mut out = Vec::new();
-    for r in rows {
-        let (pattern, canonical) = r?;
-        out.push(CompiledExpansion {
-            regex: compile_expansion(&pattern)?,
-            canonical,
-        });
+    for data in crud::load_for_compile(conn, Stage::Expansions)? {
+        if let RuleData::Expansion { pattern, canonical, .. } = data {
+            out.push(CompiledExpansion { regex: compile_expansion(&pattern)?, canonical });
+        }
     }
     Ok(out)
 }
@@ -74,7 +67,7 @@ mod tests {
     use crate::normalise::{NormalisationResult, OwnedPipeline};
 
     /// Run the DB-backed expand stage against the seeded in-memory pipeline
-    /// (rules from `src/rules/expansions.sql`).
+    /// (rules from `rules/expansions.sql`).
     fn run(input: &str) -> NormalisationResult {
         thread_local! {
             static PIPELINE: OwnedPipeline = OwnedPipeline::seeded_in_memory().unwrap();
