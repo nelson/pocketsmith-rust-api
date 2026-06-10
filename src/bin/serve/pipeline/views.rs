@@ -10,8 +10,11 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::rules::{self, Stage};
+use pocketsmith_sync::rules::model::Rule;
+use pocketsmith_sync::rules::{self, crud, Stage};
 
+use super::editor::{self, Card, Mode};
+use super::regex_hl;
 use crate::render::render_page;
 use crate::state::AppState;
 
@@ -58,7 +61,8 @@ pub fn stage_tags(stage: Stage) -> &'static [&'static str] {
 
 /// Top-level page render: lists every stage with its live rule count,
 /// selects an active stage (the one last clicked, else the first), and
-/// renders the three-pane shell.
+/// renders the three-pane shell. The right column of the detail shows the
+/// editor card for the active rule (if any), else a help placeholder.
 pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let mut st = state.lock().unwrap();
     let stages = stage_views(&st.conn);
@@ -72,22 +76,55 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
 
     let queue = render_queue(&stages, active);
     let detail = match active {
-        Some(stage) => render_detail(&st.conn, stage),
+        Some(stage) => {
+            let card = match st.pipeline_active_rule {
+                Some(id) => edit_card(&st.conn, stage, id),
+                None => empty_card(),
+            };
+            render_detail(&st.conn, stage, st.pipeline_active_rule, card)
+        }
         None => empty_detail(),
     };
-    let activity = render_activity();
+    let activity = render_activity(&st);
     render_page("pipeline", "Pipeline", queue, detail, activity)
 }
 
-/// Detail fragment for one stage (HTMX target of a queue click / arrow
-/// nav). Records the active stage so a full page re-render keeps it.
+/// Stage-detail fragment (HTMX target of a queue click / arrow nav, and
+/// the editor's Cancel). Clears any open editor card so the detail shows
+/// the list with a help placeholder.
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) -> Markup {
     let mut st = state.lock().unwrap();
     let Some(stage) = Stage::from_name(stage_slug) else {
         return html! { div.empty-state { p { "Unknown pipeline stage." } } };
     };
     st.pipeline_active = Some(stage.name().to_string());
-    render_detail(&st.conn, stage)
+    st.pipeline_active_rule = None;
+    render_detail(&st.conn, stage, None, empty_card())
+}
+
+/// Editor card in **edit** mode for an existing rule (GET
+/// `/pipeline/stage/<slug>/rule/<id>`). Records the active rule so a full
+/// page re-render keeps it.
+pub fn render_edit_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str, id: i64) -> Markup {
+    let mut st = state.lock().unwrap();
+    let Some(stage) = Stage::from_name(stage_slug) else {
+        return html! { div.empty-state { p { "Unknown pipeline stage." } } };
+    };
+    st.pipeline_active = Some(stage.name().to_string());
+    st.pipeline_active_rule = Some(id);
+    let card = edit_card(&st.conn, stage, id);
+    render_detail(&st.conn, stage, Some(id), card)
+}
+
+/// Editor card in **new** mode (GET `/pipeline/stage/<slug>/new`).
+pub fn render_new_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) -> Markup {
+    let mut st = state.lock().unwrap();
+    let Some(stage) = Stage::from_name(stage_slug) else {
+        return html! { div.empty-state { p { "Unknown pipeline stage." } } };
+    };
+    st.pipeline_active = Some(stage.name().to_string());
+    st.pipeline_active_rule = None;
+    render_detail(&st.conn, stage, None, new_card(stage))
 }
 
 /// Build the queue rows (one per stage, in execution order) with live
@@ -139,12 +176,31 @@ fn render_queue_row(sv: &StageView, is_selected: bool) -> Markup {
     }
 }
 
-/// Stage detail: header + a read-only table of the stage's rules in
-/// apply order. Editing (the editor card, Edit/Evaluate, impact, and
-/// create/edit/delete/reorder mutations) lands in a later PR.
-fn render_detail(conn: &rusqlite::Connection, stage: Stage) -> Markup {
+/// Base URL for a stage's editor endpoints.
+fn base(stage: Stage) -> String {
+    format!("/pipeline/stage/{}", stage.name())
+}
+
+/// Two-column stage detail: the rule list (left) + the editor card or
+/// help placeholder (right, passed in as `card`). `active_rule` highlights
+/// the selected row. Shared by the GET fragments and the mutation
+/// handlers (which pass an evaluate-mode card).
+pub fn render_detail(
+    conn: &rusqlite::Connection,
+    stage: Stage,
+    active_rule: Option<i64>,
+    card: Markup,
+) -> Markup {
     let count = rules::count(conn, stage).unwrap_or(0);
-    let listing = rules::list_display(conn, stage);
+    let listing = crud::list(conn, stage).unwrap_or_default();
+    let movable = crud::is_movable(stage);
+    // Prefix/suffix rules have no canonical, so that column is always
+    // empty for them — drop it to give the editor/impact panel more room.
+    let has_canon = !matches!(stage, Stage::Prefixes | Stage::Suffixes);
+    // Cached per-rule impact (refreshed only by scan); empty until the
+    // first scan, in which case rows show a dim placeholder.
+    let impact = rules::impact::load_for_stage(conn, stage).unwrap_or_default();
+    let base = base(stage);
     html! {
         div.detail-header {
             div.row {
@@ -157,41 +213,111 @@ fn render_detail(conn: &rusqlite::Connection, stage: Stage) -> Markup {
                 }
             }
         }
-        @match listing {
-            Ok((headers, rows)) => (render_rule_table(&headers, &rows)),
-            Err(_) => div.empty-state { p { "Could not load rules for this stage." } },
-        }
-        div.note {
-            "Read-only for now. Editing (add / edit / delete / reorder), the "
-            "Edit/Evaluate editor card, and categorical impact land in a later PR."
+        div.detail-2col {
+            div.rules-pane.(if has_canon { "" } else { "no-canon" })
+                data-stage=(stage.name()) data-movable=(if movable { "1" } else { "0" })
+            {
+                div.rules-pane-head {
+                    h3 { (count) " rules" }
+                    button.btn.btn-shortcut.add type="button"
+                        hx-get=(format!("{base}/new")) hx-target="#detail" hx-swap="innerHTML"
+                    { "[A] Add rule" }
+                }
+                div.rule-list-header {
+                    span {}
+                    @if has_canon { span { "Canonical" } }
+                    span { "Pattern" }
+                    span.impact { "Impact" }
+                }
+                div.rule-list {
+                    @if listing.is_empty() {
+                        div.rule-empty { "No rules yet \u{2014} [A] add the first." }
+                    }
+                    @for r in &listing {
+                        (render_rule_row(stage, r, movable, has_canon, active_rule == Some(r.id), impact.get(&r.id).copied()))
+                    }
+                }
+            }
+            div.editor-col { (card) }
         }
     }
 }
 
-/// Render the rule rows as a simple table. Column headers come straight
-/// from the DB column names; NULL cells render as a dim dash.
-fn render_rule_table(headers: &[&str], rows: &[rules::DisplayRow]) -> Markup {
+/// One clickable rule-list row. Clicking opens the editor card (edit
+/// mode) for that rule. The pattern uses the same token colouring as the
+/// CLI; the impact cell shows the cached `"N txns · $X"` from the last
+/// scan, or a dim dash when the rule has no recorded impact yet.
+fn render_rule_row(
+    stage: Stage,
+    r: &Rule,
+    movable: bool,
+    has_canon: bool,
+    selected: bool,
+    impact: Option<(i64, i64)>,
+) -> Markup {
+    let url = format!("/pipeline/stage/{}/rule/{}", stage.name(), r.id);
     html! {
-        table.rule-table {
-            thead {
-                tr {
-                    @for h in headers {
-                        th { (h) }
-                    }
+        div.rule-row.(if selected { "selected" } else { "" })
+            data-rule-id=(r.id)
+            hx-get=(url) hx-target="#detail" hx-swap="innerHTML"
+        {
+            span.rule-handle { @if movable { "\u{283f}" } }
+            @if has_canon {
+                span.canonical { (r.data.canonical().unwrap_or("\u{2014}")) }
+            }
+            span.pattern {
+                @match r.data.pattern() {
+                    Some(p) => (regex_hl::highlight(p)),
+                    None => "\u{2014}",
                 }
             }
-            tbody {
-                @for row in rows {
-                    tr {
-                        @for cell in row {
-                            @match cell {
-                                Some(v) => td { (v) },
-                                None => td.rule-cell-null { "\u{2014}" },
-                            }
-                        }
+            span.impact data-impact-rule=(r.id) {
+                @match impact {
+                    Some((txns, cents)) => {
+                        (txns) " txns \u{00b7} " (crate::helpers::format_dollars_compact(cents))
                     }
+                    None => "\u{2014}",
                 }
             }
+        }
+    }
+}
+
+/// Editor card in edit mode for an existing rule, or the help placeholder
+/// if the id no longer resolves.
+pub fn edit_card(conn: &rusqlite::Connection, stage: Stage, id: i64) -> Markup {
+    match crud::get(conn, stage, id) {
+        Ok(Some(rule)) => editor::render(&Card {
+            stage,
+            mode: Mode::Edit,
+            id: Some(id),
+            data: &rule.data,
+            error: None,
+            eval_body: html! {},
+        }),
+        _ => empty_card(),
+    }
+}
+
+/// Editor card in new-rule mode, prefilled with empty fields for `stage`.
+pub fn new_card(stage: Stage) -> Markup {
+    let data = editor::empty(stage);
+    editor::render(&Card {
+        stage,
+        mode: Mode::New,
+        id: None,
+        data: &data,
+        error: None,
+        eval_body: html! {},
+    })
+}
+
+/// Right-column placeholder shown when no rule is selected.
+fn empty_card() -> Markup {
+    html! {
+        div.editor-empty {
+            p { "Select a rule to edit, or " strong { "[A]" } " add a new one." }
+            p.sub { "Editing never saves blindly: click " strong { "[E] Evaluate" } " to see the impact, then " strong { "[Y] Save" } "." }
         }
     }
 }
@@ -200,15 +326,33 @@ fn empty_detail() -> Markup {
     html! { div.empty-state { p { "Select a pipeline stage from the queue." } } }
 }
 
-/// Activity panel. PR 3 stub: the recent rule-change log and the
-/// dirty-rules re-scan chip land in PR 9.
-fn render_activity() -> Markup {
+/// Activity panel: the dirty-rules banner (when rule edits have
+/// out-paced the last scan) atop the rule-change log (newest first, with
+/// the add/edit/delete colour vocabulary).
+fn render_activity(st: &AppState) -> Markup {
+    let count = st.pipeline_activity.len();
+    let dirty = pocketsmith_sync::rules::dirty::would_restage(&st.conn).unwrap_or(0);
     html! {
         div.activity-header {
-            span.stat { "Rule edits this session " span.count-confirmed { "0" } }
+            @if dirty > 0 {
+                span.dirty-banner {
+                    span.warn { "\u{26a0} " (dirty) " payees would re-stage" }
+                    " since the last scan \u{00b7} "
+                    button.rescan-btn type="button"
+                        hx-post="/pipeline/rescan" hx-target="body" hx-swap="innerHTML"
+                    { "re-scan now \u{21bb}" }
+                }
+            } @else {
+                span.stat { "Rule edits this session " span.count-confirmed { (count) } }
+            }
         }
         div.activity-list {
-            div.activity-empty { "No rule changes yet." }
+            @if st.pipeline_activity.is_empty() {
+                div.activity-empty { "No rule changes yet." }
+            }
+            @for e in st.pipeline_activity.iter().rev() {
+                div.activity-row.(e.kind.css_class()) { (e.line) }
+            }
         }
     }
 }
@@ -278,21 +422,44 @@ mod tests {
     fn detail_shows_stage_name_and_count() {
         let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
         pocketsmith_sync::rules::load_into_db(&conn).unwrap();
-        let html = render_detail(&conn, Stage::Persons).into_string();
+        let html = render_detail(&conn, Stage::Persons, None, empty_card()).into_string();
         assert!(html.contains("Persons"), "{html}");
         assert!(html.contains("118 rules"), "{html}");
     }
 
     #[test]
-    fn detail_renders_rule_table_with_headers_and_rows() {
+    fn detail_renders_rule_list_with_headers_and_rows() {
         let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
         pocketsmith_sync::rules::load_into_db(&conn).unwrap();
-        let html = render_detail(&conn, Stage::Merchants).into_string();
-        // Column headers from the DB.
-        assert!(html.contains("rule-table"), "{html}");
-        assert!(html.contains("canonical") && html.contains("pattern"), "{html}");
-        // A known seeded merchant canonical appears as a cell.
+        let html = render_detail(&conn, Stage::Merchants, None, empty_card()).into_string();
+        // Two-column detail with the rule list + an [A] Add button.
+        assert!(html.contains("rule-list"), "{html}");
+        assert!(html.contains("detail-2col"), "{html}");
+        assert!(html.contains("[A] Add rule"), "{html}");
+        assert!(html.contains("Canonical") && html.contains("Pattern"), "{html}");
+        // A known seeded merchant canonical appears as a row, with an
+        // edit link carrying its id.
         assert!(html.contains("Woolworths"), "expected a merchant row: {html}");
+        assert!(html.contains("/pipeline/stage/merchants/rule/"), "row links to editor: {html}");
+    }
+
+    #[test]
+    fn detail_marks_active_rule_selected() {
+        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
+        let id = pocketsmith_sync::rules::crud::insert_rule(
+            &conn,
+            &pocketsmith_sync::rules::model::RuleData::Merchant {
+                canonical: "Uber".into(),
+                pattern: "(?i)UBER".into(),
+                note: None,
+            },
+        )
+        .unwrap();
+        let card = edit_card(&conn, Stage::Merchants, id);
+        let html = render_detail(&conn, Stage::Merchants, Some(id), card).into_string();
+        assert!(html.contains("rule-row selected"), "active row highlighted: {html}");
+        // The edit card is shown in the right column.
+        assert!(html.contains("edit mode"), "{html}");
     }
 
     #[test]

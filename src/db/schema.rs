@@ -336,6 +336,19 @@ CREATE TABLE IF NOT EXISTS rule_locations (
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- Per-rule impact cache (editable-rules-ui §3.7). Populated only by
+-- `normalise scan`, which attributes each distinct payee (its txn count +
+-- summed magnitude in cents) to the rule that won its stage. A plain rule
+-- list render reads this table and never recomputes; staleness after a
+-- rule edit is exactly what the dirty banner signals.
+CREATE TABLE IF NOT EXISTS rule_impact (
+    stage       TEXT    NOT NULL,
+    rule_id     INTEGER NOT NULL,
+    txn_count   INTEGER NOT NULL DEFAULT 0,
+    total_cents INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (stage, rule_id)
+);
+
 CREATE TRIGGER IF NOT EXISTS payee_normalisations_updated_at
 AFTER UPDATE ON payee_normalisations
 FOR EACH ROW

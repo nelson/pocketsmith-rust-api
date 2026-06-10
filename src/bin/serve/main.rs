@@ -15,6 +15,9 @@ mod transfers;
 #[cfg(test)]
 mod smoke_tests;
 
+#[cfg(test)]
+mod pipeline_integration;
+
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -37,7 +40,11 @@ fn main() -> Result<()> {
 
     // Single shared app-DB init (schema + rule seed) — see db::open_app_db.
     let conn = db::open_app_db()?;
-    let state = Arc::new(Mutex::new(AppState::new(conn)));
+    let mut app = AppState::new(conn);
+    // Remember the DB path so committed rule edits can re-dump their
+    // `rules/<stage>.sql` mirror on a background thread.
+    app.db_path = Some(db::path_from_env());
+    let state = Arc::new(Mutex::new(app));
 
     let addr = format!("127.0.0.1:{port}");
     let server = Server::http(&addr).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -51,7 +58,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
+fn handle_request(mut request: Request, state: Arc<Mutex<AppState>>) {
     let path = request.url().to_string();
     let method = request.method().clone();
 
@@ -155,11 +162,65 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
             normalise::views::render_page_shell(&state)
         }
 
-        // --- Pipeline tab (rule editing; shell only for now)
+        // --- Pipeline tab (rule editing)
         (Method::Get, "/pipeline" | "/pipeline/") => pipeline::views::render_page_shell(&state),
         (Method::Get, p) if p.starts_with("/pipeline/stage/") => {
-            let slug = p.trim_start_matches("/pipeline/stage/").split('/').next().unwrap_or("");
-            pipeline::views::render_detail_fragment(&state, slug)
+            let rest = &p["/pipeline/stage/".len()..];
+            let mut parts = rest.split('/');
+            let slug = parts.next().unwrap_or("");
+            match (parts.next(), parts.next(), parts.next()) {
+                (None, _, _) | (Some(""), None, _) => pipeline::views::render_detail_fragment(&state, slug),
+                (Some("new"), None, _) => pipeline::views::render_new_fragment(&state, slug),
+                (Some("rule"), Some(id), verb) => match id.parse::<i64>() {
+                    Ok(id) => match verb {
+                        None => pipeline::views::render_edit_fragment(&state, slug, id),
+                        // GET delete = the impact preview (pure read); the
+                        // actual removal is the POST to the same path.
+                        Some("delete") => pipeline::handlers::delete_preview(&state, slug, id),
+                        _ => html! { p { "Not found" } },
+                    },
+                    Err(_) => html! { p { "Invalid rule id" } },
+                },
+                _ => html! { p { "Not found" } },
+            }
+        }
+        // POST /pipeline/rescan re-scans payee proposals (clears dirty banner).
+        (Method::Post, "/pipeline/rescan") => {
+            let resp = pipeline::handlers::rescan(&state);
+            send_html(request, resp);
+            return;
+        }
+        // POST /pipeline/stage/<slug>/... mutations (create/edit/delete/
+        // evaluate/reorder). The body carries the urlencoded form.
+        (Method::Post, p) if p.starts_with("/pipeline/stage/") => {
+            let path = p.to_string();
+            let body = read_body(&mut request);
+            let rest = &path["/pipeline/stage/".len()..];
+            let mut parts = rest.split('/');
+            let slug = parts.next().unwrap_or("");
+            let resp = match (parts.next(), parts.next(), parts.next()) {
+                // /stage/<slug>/new/evaluate
+                (Some("new"), Some("evaluate"), None) => {
+                    pipeline::handlers::evaluate(&state, slug, None, &body)
+                }
+                // /stage/<slug>/rule   (create)
+                (Some("rule"), None, _) => pipeline::handlers::create(&state, slug, &body),
+                // /stage/<slug>/reorder
+                (Some("reorder"), None, _) => pipeline::handlers::reorder(&state, slug, &body),
+                // /stage/<slug>/rule/<id>[/evaluate|/delete]
+                (Some("rule"), Some(id_str), verb) => match id_str.parse::<i64>() {
+                    Ok(id) => match verb {
+                        None => pipeline::handlers::save_edit(&state, slug, id, &body),
+                        Some("evaluate") => pipeline::handlers::evaluate(&state, slug, Some(id), &body),
+                        Some("delete") => pipeline::handlers::delete(&state, slug, id),
+                        _ => return invalid_action_response(request),
+                    },
+                    Err(_) => return invalid_action_response(request),
+                },
+                _ => return invalid_action_response(request),
+            };
+            send_html(request, resp);
+            return;
         }
 
         // --- Transfers tab
@@ -229,6 +290,23 @@ fn handle_request(request: Request, state: Arc<Mutex<AppState>>) {
 
     let html_str = response.into_string();
     let resp = Response::from_data(html_str.as_bytes().to_vec())
+        .with_header(Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap());
+    let _ = request.respond(resp);
+}
+
+/// Read a request body to a String (urlencoded form). Best-effort: a
+/// read error yields an empty body, which the form decoder treats as
+/// "no fields".
+fn read_body(request: &mut Request) -> String {
+    let mut body = String::new();
+    let _ = request.as_reader().read_to_string(&mut body);
+    body
+}
+
+/// Respond with an HTML `Markup` fragment.
+fn send_html(request: Request, markup: maud::Markup) {
+    let html_str = markup.into_string();
+    let resp = Response::from_data(html_str.into_bytes())
         .with_header(Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap());
     let _ = request.respond(resp);
 }
