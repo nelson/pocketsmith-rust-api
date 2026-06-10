@@ -6,5 +6,14 @@
 //!
 //! Submodules:
 //! - [`views`] page + fragment rendering
+//! - [`form`] urlencoded body parsing + `RuleData` form decoding
+//! - [`editor`] the parameterised Edit/Evaluate/New editor card
+//! - [`impact`] HTML rendering of the evaluate impact buckets + tester
+//! - [`handlers`] create / edit / delete / reorder / re-scan mutations
 
+pub mod editor;
+pub mod form;
+pub mod handlers;
+pub mod impact;
+pub mod regex_hl;
 pub mod views;

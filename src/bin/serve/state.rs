@@ -106,6 +106,45 @@ impl TxnActionPillar {
     }
 }
 
+/// Activity-log entry for the Pipeline tab: one committed rule change,
+/// pre-formatted via `rules::activity::RuleChange::describe`. `kind`
+/// drives the add/edit/delete colour vocabulary in the activity panel.
+pub struct RuleChangeEntry {
+    /// The full activity line, e.g. "+ added Bunnings (?i)BUNNINGS".
+    pub line: String,
+    /// Coarse category for colouring.
+    pub kind: RuleChangeKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleChangeKind {
+    Added,
+    Edited,
+    Deleted,
+    Moved,
+}
+
+impl RuleChangeKind {
+    /// Infer the category from the leading glyph of a `RuleChange` line.
+    pub fn from_line(line: &str) -> RuleChangeKind {
+        match line.chars().next() {
+            Some('+') => RuleChangeKind::Added,
+            Some('~') => RuleChangeKind::Edited,
+            Some('\u{2212}') | Some('-') => RuleChangeKind::Deleted,
+            _ => RuleChangeKind::Moved,
+        }
+    }
+
+    pub fn css_class(self) -> &'static str {
+        match self {
+            RuleChangeKind::Added => "rc-added",
+            RuleChangeKind::Edited => "rc-edited",
+            RuleChangeKind::Deleted => "rc-deleted",
+            RuleChangeKind::Moved => "rc-moved",
+        }
+    }
+}
+
 pub struct AppState {
     pub conn: rusqlite::Connection,
 
@@ -145,6 +184,21 @@ pub struct AppState {
     // --- Pipeline tab ---
     /// `name` of the currently-selected pipeline stage, if any.
     pub pipeline_active: Option<String>,
+    /// Row id of the rule whose editor card is open in the detail panel,
+    /// if any. `None` means no card is open (list-only detail).
+    pub pipeline_active_rule: Option<i64>,
+    /// Rule-change activity log (newest at the tail), capped at 100 via
+    /// [`push_rule_change`](Self::push_rule_change).
+    pub pipeline_activity: Vec<RuleChangeEntry>,
+    /// SQLite file path, for the background `.sql` re-dump after a rule
+    /// commit (`DumpPolicy::Background`). `None` for in-memory test DBs,
+    /// where the handlers fall back to a synchronous dump into
+    /// [`rules_dir_override`](Self::rules_dir_override).
+    pub db_path: Option<String>,
+    /// Test-only override for where committed rules are dumped. `None` in
+    /// production (uses `rules::rules_dir()`); tests set a temp dir so the
+    /// dump is synchronous + isolated + parallel-safe.
+    pub rules_dir_override: Option<std::path::PathBuf>,
 }
 
 impl AppState {
@@ -164,6 +218,10 @@ impl AppState {
             txn_undone: 0,
             dash_active_month: None,
             pipeline_active: None,
+            pipeline_active_rule: None,
+            pipeline_activity: Vec::new(),
+            db_path: None,
+            rules_dir_override: None,
         }
     }
 
@@ -173,6 +231,32 @@ impl AppState {
         self.txn_activity.push(entry);
         if self.txn_activity.len() > 100 {
             self.txn_activity.remove(0);
+        }
+    }
+
+    /// Push a committed rule-change line onto the Pipeline activity log
+    /// (newest at the tail), trimming the oldest beyond 100.
+    pub fn push_rule_change(&mut self, line: String) {
+        let kind = RuleChangeKind::from_line(&line);
+        self.pipeline_activity.push(RuleChangeEntry { line, kind });
+        if self.pipeline_activity.len() > 100 {
+            self.pipeline_activity.remove(0);
+        }
+    }
+
+    /// How a committed rule mutation re-dumps its `rules/<stage>.sql`
+    /// mirror. Production has a file-backed DB → background dump (no
+    /// blocked HTTP response); in-memory test DBs dump synchronously into
+    /// an injected dir so the assertion is deterministic + isolated.
+    pub fn rule_dump_policy(&self) -> pocketsmith_sync::rules::DumpPolicy {
+        use pocketsmith_sync::rules::DumpPolicy;
+        match &self.db_path {
+            Some(p) => DumpPolicy::Background { db_path: p.clone() },
+            None => DumpPolicy::Sync(
+                self.rules_dir_override
+                    .clone()
+                    .unwrap_or_else(pocketsmith_sync::rules::rules_dir),
+            ),
         }
     }
 }

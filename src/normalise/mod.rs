@@ -73,6 +73,28 @@ impl BankingOperation {
             _ => return None,
         })
     }
+
+    /// Every operation, in declaration order. Used by the rule-editor
+    /// GUI to populate the `operation` select.
+    pub fn all() -> [BankingOperation; 15] {
+        [
+            Self::Interest,
+            Self::CreditCard,
+            Self::Transfer,
+            Self::AccountServicing,
+            Self::Loan,
+            Self::Deposit,
+            Self::Withdrawal,
+            Self::DirectDebit,
+            Self::DirectCredit,
+            Self::BPay,
+            Self::InternalTransfer,
+            Self::Fee,
+            Self::Purchase,
+            Self::Refund,
+            Self::Cash,
+        ]
+    }
 }
 
 /// Listed in order of priority for classification.

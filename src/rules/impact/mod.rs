@@ -12,6 +12,9 @@ use rusqlite::Connection;
 mod buckets;
 mod tester;
 
+pub mod attribution;
+
+pub use attribution::{attribute, load_for_stage, write_impacts, RuleImpact};
 pub use buckets::compute_buckets;
 pub use tester::{test_one, TestResult};
 

@@ -161,6 +161,10 @@ fn render_hints_overlay() -> Markup {
                     span.kbd { "N" } span { "reject the pending review" }
                     span.kbd { "S" } span { "skip the pending review" }
                     span.kbd { "U" } span { "undo the most recent action" }
+                    span.kbd { "A" } span { "add a new rule (Pipeline tab)" }
+                    span.kbd { "E" } span { "evaluate the edited rule (Pipeline tab)" }
+                    span.kbd { "B" } span { "back to edit from evaluate (Pipeline tab)" }
+                    span.kbd { "Alt+\u{2191}/\u{2193}" } span { "reorder a loop-stage rule (Pipeline tab)" }
                     span.kbd { "[" } span { "previous month (Dashboard tab)" }
                     span.kbd { "]" } span { "next month (Dashboard tab)" }
                     span.kbd { "?" } span { "toggle this overlay" }

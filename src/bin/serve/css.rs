@@ -310,6 +310,178 @@ body {
 }
 .rule-cell-null { color: var(--fg-dark); }
 
+/* ===== Pipeline editor: two-column detail (rule list + editor card) ===== */
+.detail-2col {
+    display: grid;
+    /* Give the editor + impact column the larger share — the rule list is
+       narrow (pattern + impact), the impact tables want the room. */
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 14px;
+    align-items: start;
+    margin-top: 8px;
+}
+.rules-pane {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+.rules-pane-head { display: flex; align-items: baseline; justify-content: space-between; }
+.rules-pane-head h3 { margin: 0 0 4px 0; font-size: 12px; color: var(--fg-dim); font-weight: 600; }
+.rule-list-header,
+.rule-row {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1.1fr) minmax(0, 1.4fr) max-content;
+    gap: 4px 12px;
+    align-items: baseline;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 11px;
+}
+/* Prefix/suffix stages drop the (always-empty) Canonical column. */
+.rules-pane.no-canon .rule-list-header,
+.rules-pane.no-canon .rule-row {
+    grid-template-columns: 16px minmax(0, 1fr) max-content;
+}
+.rule-list-header {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 4px 5px 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-dark);
+}
+.rule-list-header .impact { text-align: right; }
+.rule-list { overflow-y: auto; flex: 1; max-height: 560px; }
+.rule-row { cursor: pointer; padding: 3px 4px; border-bottom: 1px solid var(--border); }
+.rule-row:last-child { border-bottom: none; }
+.rule-row:hover { background: var(--bg-highlight); }
+.rule-row.selected { background: var(--bg-highlight); border-radius: 3px; }
+.rule-row .canonical { color: var(--fg); font-weight: 600; }
+.rule-row .pattern { overflow-wrap: anywhere; }
+.rule-row .impact { color: var(--fg); white-space: nowrap; text-align: right; }
+/* Regex token colouring, mirroring the CLI (rule-cli §14.2). */
+.rx-bracket { color: var(--fg-dim); }
+.rx-meta { color: var(--accent); }
+.rx-literal { color: var(--green); font-weight: 600; }
+.rule-handle { color: var(--fg-dark); cursor: grab; }
+.rule-empty, .rule-cell-null { color: var(--fg-dark); }
+
+/* Editor card (right column). */
+.editor-col { min-width: 0; }
+.editor-empty { color: var(--fg-dim); font-size: 12px; padding: 8px 4px; }
+.editor-empty .sub { color: var(--fg-dark); font-size: 11px; }
+.editor-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+}
+.editor-card.mode-new { border-color: rgba(158, 206, 106, 0.6); }
+.editor-card.mode-del { border-color: rgba(247, 118, 142, 0.6); }
+.editor-card h2 {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 0 8px 0; font-size: 14px;
+}
+.editor-card .mode-pill {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border); color: var(--fg-dim);
+}
+.editor-card.mode-edit .mode-pill { color: var(--cyan); border-color: rgba(125, 207, 255, 0.4); }
+.editor-card.mode-eval .mode-pill { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); }
+.editor-card.mode-new .mode-pill { color: var(--green); border-color: rgba(158, 206, 106, 0.4); }
+.editor-card.mode-del .mode-pill { color: var(--red); border-color: rgba(247, 118, 142, 0.4); }
+.editor-grid { display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; align-items: baseline; }
+.editor-grid label { color: var(--fg-dim); font-size: 12px; }
+.editor-grid input[type=text], .editor-grid select, .editor-grid textarea {
+    background: var(--bg-highlight); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+    font-size: 12px; width: 100%;
+}
+.editor-grid input.mono, .editor-grid .read-only-val.mono { font-family: "SF Mono", ui-monospace, monospace; }
+.editor-grid textarea { resize: vertical; font-family: inherit; }
+.editor-grid .read-only-val {
+    background: var(--bg-highlight); color: var(--fg);
+    border: 1px dashed var(--border); border-radius: 4px; padding: 4px 8px; font-size: 12px;
+}
+.flag-check { display: inline-flex; align-items: center; gap: 4px; color: var(--fg); font-size: 12px; }
+.note-details { grid-column: 1 / -1; margin-top: 4px; }
+.note-toggle { color: var(--fg-dim); font-size: 11px; cursor: pointer; }
+.note-block { margin-top: 6px; }
+.note-block label { color: var(--fg-dim); font-size: 11px; }
+.editor-error { color: var(--red); font-size: 12px; margin-top: 8px; font-family: "SF Mono", ui-monospace, monospace; }
+.editor-actions { display: flex; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); align-items: center; }
+.delete-wrap { margin-left: auto; }
+.delete-confirm { align-items: center; }
+.btn-shortcut { color: var(--fg); background: var(--bg-highlight); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; padding: 2px 10px; cursor: pointer; }
+.btn-shortcut:hover { border-color: var(--accent); }
+.btn-shortcut.add { color: var(--green); border-color: rgba(158, 206, 106, 0.4); }
+.btn-shortcut.eval { color: var(--accent); border-color: rgba(122, 162, 247, 0.4); }
+.btn-shortcut.save { color: var(--green); border-color: rgba(158, 206, 106, 0.6); font-weight: 600; }
+.btn-shortcut.save:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-shortcut.cancel { color: var(--fg-dim); }
+.btn-shortcut.del { color: var(--red); border-color: rgba(247, 118, 142, 0.4); }
+
+/* Evaluate: tester + categorical impact. */
+.eval-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.eval-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-dim); margin: 0 0 6px 0; }
+.eval-section .sub { color: var(--fg-dark); font-size: 11px; margin-bottom: 6px; }
+.tester-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.tester-input-row label { color: var(--fg-dim); font-size: 11px; }
+.tester-input-row input { flex: 1; background: var(--bg-highlight); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; }
+.tester-result { font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; padding: 4px 0; }
+.tester-hit { color: var(--green); font-weight: 600; }
+.tester-miss { color: var(--red); font-weight: 600; }
+.tester-canon, .tester-span { color: var(--fg-dim); }
+/* Categorical impact rendered as CLI-style tables: brighter, tabular. */
+.impact-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 11px;
+    margin: 6px 0 10px 0;
+    color: var(--fg);
+}
+.impact-table th {
+    text-align: left;
+    color: var(--fg-dim);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding: 3px 8px 3px 0;
+    font-variant: small-caps;
+    letter-spacing: 0.03em;
+}
+.impact-table th.r, .impact-table td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.impact-table td { padding: 2px 8px 2px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.impact-table td.payee { overflow-wrap: anywhere; }
+.impact-detail tbody tr:hover { background: var(--bg-highlight); }
+.impact-summary-tbl .row-unchanged td { color: var(--fg-dim); }
+.impact-table .row-more td { color: var(--fg-dim); font-style: italic; border-bottom: none; }
+.impact-table .cell-null { color: var(--fg-dark); }
+.imp-gain { color: var(--green); font-weight: 600; }
+.imp-move { color: var(--yellow); font-weight: 600; }
+.imp-fall { color: var(--red); font-weight: 600; }
+.imp-unchanged { color: var(--fg-dim); }
+.impact-none { color: var(--fg-dim); font-size: 11px; padding: 4px 0; }
+
+/* htmx loading spinner shown while Evaluate / the tester recompute. */
+.spinner { display: inline-block; margin-left: 8px; color: var(--accent); }
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline-block; }
+.htmx-request .spinner, .spinner.htmx-request { animation: pl-spin 0.8s linear infinite; }
+@keyframes pl-spin { to { transform: rotate(360deg); } }
+
+/* Pipeline activity log: add/edit/delete colour vocabulary. */
+.activity-row { font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; padding: 1px 0; color: var(--fg-dim); }
+.activity-row.rc-added { color: var(--green); }
+.activity-row.rc-edited { color: var(--fg); }
+.activity-row.rc-deleted { color: var(--red); }
+.activity-row.rc-moved { color: var(--cyan); }
+.dirty-banner { font-size: 12px; color: var(--fg-dim); }
+.dirty-banner .warn { color: var(--yellow); font-weight: 600; }
+.rescan-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; text-decoration: underline; }
+
 .conf-badge {
     font-size: 10px;
     font-weight: 700;

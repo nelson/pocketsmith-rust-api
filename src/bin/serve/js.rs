@@ -108,8 +108,37 @@ function navigateQueue(delta) {
     if (url) htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
 }
 
+// Pipeline editor: move the selected loop-stage rule before/after its
+// neighbour (Alt+Up / Alt+Down). Reads the stage + rule ids from the
+// list's data attributes and POSTs a reorder, which re-renders #detail.
+function reorderSelectedRule(delta) {
+    const pane = document.querySelector('.rules-pane');
+    if (!pane || pane.dataset.movable !== '1') return;
+    const stage = pane.dataset.stage;
+    const rows = Array.from(pane.querySelectorAll('.rule-row'));
+    const sel = pane.querySelector('.rule-row.selected');
+    if (!sel) return;
+    const idx = rows.indexOf(sel);
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= rows.length) return;
+    const id = sel.dataset.ruleId;
+    const anchor = rows[targetIdx].dataset.ruleId;
+    const dir = delta < 0 ? 'before' : 'after';
+    htmx.ajax('POST', '/pipeline/stage/' + stage + '/reorder',
+        {target: '#detail', swap: 'innerHTML', values: {id: id, dir: dir, anchor: anchor}});
+}
+
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // Pipeline editor: Alt+Up/Down reorders the selected loop-stage rule.
+    // Checked before the plain-arrow queue nav so the modifier wins.
+    if (document.body.classList.contains('tab-pipeline') && e.altKey &&
+        (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        reorderSelectedRule(e.key === 'ArrowUp' ? -1 : 1);
+        return;
+    }
 
     // Tab / Shift+Tab cycles between top-level tabs (Transfers / Normalise).
     if (e.key === 'Tab') {
@@ -143,6 +172,22 @@ document.addEventListener('keydown', function(e) {
 
     const actions = document.querySelector('.actions');
     const base = actions ? actions.dataset.actionBase : null;
+
+    // Pipeline editor shortcuts: A add · E evaluate · Y save · N cancel ·
+    // B back to edit. Each clicks the matching button in the detail panel
+    // if present (and enabled). Returns so these letters never fall through
+    // to the Y/N/S review actions of the other tabs.
+    if (document.body.classList.contains('tab-pipeline')) {
+        const map = {a: '.btn-shortcut.add', e: '.btn-shortcut.eval',
+                     y: '.btn-shortcut.save', n: '.btn-shortcut.cancel',
+                     b: '.btn-shortcut.cancel'};
+        const sel = map[e.key.toLowerCase()];
+        if (sel) {
+            const btn = document.querySelector('#detail ' + sel);
+            if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+            return;
+        }
+    }
 
     switch(e.key.toLowerCase()) {
         case 'y':

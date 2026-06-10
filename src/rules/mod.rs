@@ -42,7 +42,7 @@ pub use model::{LocationKind, MoveTarget, Mutation, Rule, RuleData, RuleError};
 pub const RULES_SCHEMA_VERSION: i64 = 1;
 
 /// The eight editable pipeline stages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Stage {
     Prefixes,
     Suffixes,

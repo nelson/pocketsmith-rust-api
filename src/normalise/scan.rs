@@ -117,6 +117,12 @@ pub fn scan(conn: &Connection) -> Result<ScanStats> {
                 }
             }
         }
+        // Refresh the per-rule impact cache from the same committed rules
+        // (editable-rules-ui §3.7). Folded into the scan the user already
+        // triggers, sharing this single operation row.
+        let payees = crate::rules::impact::load_payees(conn)?;
+        let impacts = crate::rules::impact::attribute(conn, &payees)?;
+        crate::rules::impact::write_impacts(conn, &impacts)?;
         Ok(())
     })?;
 
