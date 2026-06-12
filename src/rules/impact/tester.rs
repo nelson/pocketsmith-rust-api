@@ -62,3 +62,17 @@ fn compile_for_stage(stage: Stage, pattern: &str) -> Result<regex::Regex, regex:
         _ => regex::Regex::new(pattern),
     }
 }
+
+/// The compiled matcher for a candidate rule at `stage`, the way the
+/// pipeline would compile it (locations match on their escaped text).
+/// `None` if the pattern doesn't compile. Used by the evaluate fast-path
+/// to test the candidate against many cleaned inputs without recompiling.
+pub(crate) fn candidate_regex(stage: Stage, data: &RuleData) -> Option<regex::Regex> {
+    match data.pattern() {
+        Some(p) => compile_for_stage(stage, p).ok(),
+        None => {
+            let loc = data.canonical().unwrap_or("");
+            regex::Regex::new(&format!(r"(?i)\b{}\b", regex::escape(loc))).ok()
+        }
+    }
+}
