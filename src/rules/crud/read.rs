@@ -17,6 +17,21 @@ pub fn list(conn: &Connection, stage: Stage) -> Result<Vec<Rule>> {
     for r in rows {
         out.push(r?);
     }
+    // First-match entity stages are ordered by the shared alphabetical /
+    // longer-substring-first comparator (editable-rules-ui §0) for both
+    // display and apply, so first-match is correct without a manual
+    // sort_order. Ordering is by the **pattern** (the text matched against
+    // the payee) so the more specific rule wins — e.g. `JANE CRICKET`
+    // before `CRICKET`. Locations have no pattern, so fall back to the
+    // location text (canonical). The comparator runs in Rust (SQL can't
+    // express the substring tie-break).
+    if super::super::is_entity_ordered(stage) {
+        let key = |r: &Rule| {
+            let raw = r.data.pattern().or_else(|| r.data.canonical()).unwrap_or("");
+            super::super::literal_key(raw)
+        };
+        out.sort_by(|a, b| super::super::entity_cmp(&key(a), &key(b)));
+    }
     Ok(out)
 }
 

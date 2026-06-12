@@ -25,6 +25,7 @@ use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
+use std::cmp::Ordering;
 
 pub mod activity;
 pub mod commit;
@@ -158,6 +159,87 @@ fn row_count(conn: &Connection, stage: Stage) -> Result<i64> {
 /// Number of rules currently stored for `stage`.
 pub fn count(conn: &Connection, stage: Stage) -> Result<i64> {
     row_count(conn, stage)
+}
+
+/// Stages whose rules are ordered alphabetically for **both** display and
+/// apply (first-match-wins entity stages, editable-rules-ui §0). Ordering
+/// is the [`entity_cmp`] comparator, so first-match is correct-by-
+/// construction without a manual `sort_order`.
+pub fn is_entity_ordered(stage: Stage) -> bool {
+    matches!(stage, Stage::Persons | Stage::Employers | Stage::Merchants | Stage::Locations)
+}
+
+/// Ordering for first-match entity stages (editable-rules-ui §0):
+/// case-insensitive alphabetical, **except** a longer string that contains
+/// the other as a substring sorts first — so the specific
+/// `Gamma Radiation Scans` precedes the generic `Gamma Rad`, and
+/// `Amazon Prime` precedes `Amazon`. This single order is both the
+/// displayed order and the apply order, so first-match-wins is correct
+/// without a manual `sort_order`.
+pub fn entity_cmp(a: &str, b: &str) -> Ordering {
+    let la = a.to_lowercase();
+    let lb = b.to_lowercase();
+    if la != lb {
+        // Substring tie-break: the container (longer, more specific) first.
+        if la.contains(&lb) {
+            return Ordering::Less;
+        }
+        if lb.contains(&la) {
+            return Ordering::Greater;
+        }
+    }
+    la.cmp(&lb).then_with(|| a.cmp(b))
+}
+
+/// The lowercased **literal core** of a (possibly regex) pattern: drop
+/// inline-flag / group constructs (`(?i)`, `(?:`, `(?P<name>`), escapes
+/// (`\b`, `\s`, `\d`, …), and metacharacters, keeping only the literal
+/// text being matched. Used as the [`entity_cmp`] sort key so the
+/// substring tie-break sees `UBER\b` as `uber` and
+/// `UBER\s*\*?\s*EATS\b` as `ubereats` — making the specific rule sort
+/// before the generic one regardless of regex noise.
+pub fn literal_key(pattern: &str) -> String {
+    let mut out = String::new();
+    let mut chars = pattern.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            // Escape: drop the backslash and the escaped char.
+            '\\' => {
+                chars.next();
+            }
+            // Group open: drop a construct prefix, keep group content.
+            '(' => {
+                if chars.peek() == Some(&'?') {
+                    chars.next(); // '?'
+                    if matches!(chars.peek(), Some('P') | Some('<')) {
+                        // Named group: consume through '>'.
+                        while let Some(n) = chars.next() {
+                            if n == '>' {
+                                break;
+                            }
+                        }
+                    } else {
+                        // Inline flags / non-capturing: consume flag letters
+                        // (and '-'), then an optional ':' terminator. The
+                        // group content (if any) is left for the main loop.
+                        while let Some(&n) = chars.peek() {
+                            if n.is_ascii_alphabetic() || n == '-' {
+                                chars.next();
+                            } else if n == ':' {
+                                chars.next();
+                                break;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            ')' | '[' | ']' | '{' | '}' | '*' | '+' | '?' | '.' | '|' | '^' | '$' => {}
+            other => out.push(other),
+        }
+    }
+    out.to_lowercase()
 }
 
 /// Columns shown in the read-only Pipeline-tab rule list for a stage,
@@ -377,6 +459,30 @@ pub fn schedule_dump(stage: Stage, db_path: String) {
 mod tests {
     use super::*;
     use crate::db::initialize_in_memory;
+
+    #[test]
+    fn entity_cmp_orders_specific_before_generic_substring() {
+        // Longer string containing the other sorts first (specific wins).
+        assert_eq!(entity_cmp("Gamma Radiation Scans", "Gamma Rad"), Ordering::Less);
+        assert_eq!(entity_cmp("Gamma Rad", "Gamma Radiation Scans"), Ordering::Greater);
+        assert_eq!(entity_cmp("Amazon Prime", "Amazon"), Ordering::Less);
+        // Unrelated strings sort alphabetically (case-insensitive).
+        assert_eq!(entity_cmp("Alpha Corp", "Beta Corp"), Ordering::Less);
+    }
+
+    #[test]
+    fn literal_key_strips_regex_noise() {
+        assert_eq!(literal_key(r"(?i)UBER\b"), "uber");
+        assert_eq!(literal_key(r"(?i)UBER\s*\*?\s*EATS\b"), "ubereats");
+        assert_eq!(literal_key(r"(?P<account>\d+)"), "");
+        assert_eq!(literal_key("JANE CRICKET"), "jane cricket");
+        // The specific Uber Eats literal contains the bare Uber literal, so
+        // the comparator orders it first.
+        assert_eq!(
+            entity_cmp(&literal_key(r"(?i)UBER\s*\*?\s*EATS\b"), &literal_key(r"(?i)UBER\b")),
+            Ordering::Less
+        );
+    }
 
     /// Load the committed `rules/<stage>.sql` into a fresh DB.
     fn load_committed(stage: Stage) -> Connection {
