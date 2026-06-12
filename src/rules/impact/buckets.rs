@@ -25,22 +25,117 @@ pub fn compute_buckets(
 ) -> Result<Buckets> {
     // Base: committed rules, cold cache.
     let base = run_all(conn, payees);
+    compute_buckets_with_base(conn, stage, mutation, payees, &base)
+}
 
-    // Scratch: apply the mutation, run again, then roll back.
-    let scratch = {
-        let tx = conn.unchecked_transaction()?;
-        apply_mutation(&tx, mutation)?;
-        let res = run_all(&tx, payees);
-        // Drop without commit → ROLLBACK; the committed DB is untouched.
-        drop(tx);
-        res
+/// Run the full pipeline for each payee on the committed rules. Exposed so
+/// a long-running host (serve) can cache this expensive pass across
+/// re-evaluates and reuse it as the base for [`compute_buckets_with_base`]
+/// (editable-rules-ui §4). The base only changes when a rule is committed.
+pub fn run_base(conn: &Connection, payees: &[PayeeSample]) -> Vec<NormalisationResult> {
+    run_all(conn, payees)
+}
+
+/// Like [`compute_buckets`] but reusing a precomputed `base` (the
+/// committed-rules pass).
+///
+/// **Loop stages** (prefix/suffix/expand) re-run the full scratch pass:
+/// the loop re-feeds its own output, so a payee far from the edited rule
+/// can still change — there's no safe "affected subset".
+///
+/// **First-match stages** only run the scratch pipeline for the *affected*
+/// payees (editable-rules-ui §9): a payee can change vs base only if the
+/// candidate matches its cleaned input, or the base attributed it to the
+/// edited/deleted rule. Everyone else keeps the base outcome (unchanged).
+/// This is the slow part of evaluate, so the subset is the speedup; it's
+/// provably identical to the full pass (see the equivalence test).
+pub fn compute_buckets_with_base(
+    conn: &Connection,
+    stage: Stage,
+    mutation: &Mutation,
+    payees: &[PayeeSample],
+    base: &[NormalisationResult],
+) -> Result<Buckets> {
+    if is_loop_stage(stage) {
+        let scratch = {
+            let tx = conn.unchecked_transaction()?;
+            apply_mutation(&tx, mutation)?;
+            let res = run_all(&tx, payees);
+            drop(tx);
+            res
+        };
+        return Ok(bucket_loop(stage, payees, base, &scratch));
+    }
+    compute_first_match_subset(conn, stage, mutation, payees, base)
+}
+
+/// First-match buckets via the affected-subset scratch (§9).
+fn compute_first_match_subset(
+    conn: &Connection,
+    stage: Stage,
+    mutation: &Mutation,
+    payees: &[PayeeSample],
+    base: &[NormalisationResult],
+) -> Result<Buckets> {
+    // The candidate's compiled matcher (Add/Edit); `None` for Delete.
+    let cand_re = match mutation {
+        Mutation::Add(d) | Mutation::Edit { data: d, .. } => {
+            super::tester::candidate_regex(stage, d)
+        }
+        _ => None,
+    };
+    // The committed pattern of the edited/deleted rule, to spot the payees
+    // the base currently attributes to it.
+    let old_pattern: Option<String> = match mutation {
+        Mutation::Edit { id, .. } | Mutation::Delete { id, .. } => {
+            crud::get(conn, stage, *id)?.and_then(|r| r.data.pattern().map(|p| p.to_string()))
+        }
+        _ => None,
+    };
+    let tag = trace_name(stage);
+    let owned = |res: &NormalisationResult| -> bool {
+        match &old_pattern {
+            Some(op) => res.trace.iter().any(|t| {
+                t.stage == tag && t.match_info.as_ref().map(|m| m.pattern.as_str()) == Some(op.as_str())
+            }),
+            None => false,
+        }
     };
 
-    if is_loop_stage(stage) {
-        Ok(bucket_loop(stage, payees, &base, &scratch))
-    } else {
-        Ok(bucket_first_match(stage, payees, &base, &scratch))
+    let mut newly_matched = BucketCount::default();
+    let mut stolen = BucketCount::default();
+    let mut new_fallthrough = BucketCount::default();
+    let mut unchanged_payees = 0i64;
+
+    let tx = conn.unchecked_transaction()?;
+    apply_mutation(&tx, mutation)?;
+    let scratch_cache = RuleCache::new();
+    let sctx = PipelineCtx::new(&tx, &scratch_cache);
+
+    for (i, p) in payees.iter().enumerate() {
+        let b = stage_match(&base[i], stage);
+        let affected = owned(&base[i])
+            || cand_re.as_ref().map(|re| re.is_match(&base[i].matcher_input)).unwrap_or(false);
+        if !affected {
+            // Only this rule changed and it neither matches nor owned this
+            // payee → its first-match outcome is identical to base.
+            unchanged_payees += 1;
+            continue;
+        }
+        let s = stage_match(&normalise(&p.original_payee, &sctx), stage);
+        match (&b, &s) {
+            (None, None) => unchanged_payees += 1,
+            (Some(bc), Some(sc)) if bc == sc => unchanged_payees += 1,
+            (None, Some(sc)) => newly_matched.add(p, None, Some(sc.clone())),
+            (Some(bc), None) => new_fallthrough.add(p, Some(bc.clone()), None),
+            (Some(bc), Some(sc)) => stolen.add(p, Some(bc.clone()), Some(sc.clone())),
+        }
     }
+    drop(tx);
+    newly_matched.finish();
+    stolen.finish();
+    new_fallthrough.finish();
+    Ok(Buckets::FirstMatch { newly_matched, stolen, new_fallthrough, unchanged_payees })
 }
 
 /// Stages whose order/loop semantics give them the 2-bucket model.
@@ -112,6 +207,31 @@ fn run_all(conn: &Connection, payees: &[PayeeSample]) -> Vec<NormalisationResult
     payees.iter().map(|p| normalise(&p.original_payee, &ctx)).collect()
 }
 
+/// Full (non-subset) scratch computation — the reference oracle the
+/// equivalence test compares the §9 fast path against.
+#[cfg(test)]
+pub(crate) fn compute_buckets_full(
+    conn: &Connection,
+    stage: Stage,
+    mutation: &Mutation,
+    payees: &[PayeeSample],
+) -> Result<Buckets> {
+    let base = run_all(conn, payees);
+    let scratch = {
+        let tx = conn.unchecked_transaction()?;
+        apply_mutation(&tx, mutation)?;
+        let r = run_all(&tx, payees);
+        drop(tx);
+        r
+    };
+    Ok(if is_loop_stage(stage) {
+        bucket_loop(stage, payees, &base, &scratch)
+    } else {
+        bucket_first_match(stage, payees, &base, &scratch)
+    })
+}
+
+#[cfg(test)]
 fn bucket_first_match(
     stage: Stage,
     payees: &[PayeeSample],
