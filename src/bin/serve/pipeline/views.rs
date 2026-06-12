@@ -10,13 +10,15 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::rules::model::Rule;
+use pocketsmith_sync::db::payee_normalisations as pn;
+use pocketsmith_sync::rules::impact::SAMPLE_LIMIT;
+use pocketsmith_sync::rules::model::{LocationKind, Rule, RuleData};
 use pocketsmith_sync::rules::{self, crud, Stage};
 
 use super::editor::{self, Card, Mode};
 use super::regex_hl;
 use crate::render::render_page;
-use crate::state::AppState;
+use crate::state::{AppState, PipelineBase};
 
 /// A queue row: a stage plus its current rule count.
 #[derive(Debug, Clone, Copy)]
@@ -78,7 +80,7 @@ pub fn render_page_shell(state: &Arc<Mutex<AppState>>) -> Markup {
     let detail = match active {
         Some(stage) => {
             let card = match st.pipeline_active_rule {
-                Some(id) => edit_card(&st.conn, stage, id),
+                Some(id) => edit_card(&st.conn, stage, id, None),
                 None => empty_card(),
             };
             render_detail(&st.conn, stage, st.pipeline_active_rule, card)
@@ -103,8 +105,10 @@ pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) ->
 }
 
 /// Editor card in **edit** mode for an existing rule (GET
-/// `/pipeline/stage/<slug>/rule/<id>`). Records the active rule so a full
-/// page re-render keeps it.
+/// `/pipeline/stage/<slug>/rule/<id>`). Returns just the editor-column
+/// content (the rule list is left untouched, so the panel doesn't jump),
+/// and ensures the base pass for loop-stage "matching payees". Records the
+/// active rule so a full page re-render keeps it.
 pub fn render_edit_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str, id: i64) -> Markup {
     let mut st = state.lock().unwrap();
     let Some(stage) = Stage::from_name(stage_slug) else {
@@ -112,11 +116,16 @@ pub fn render_edit_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str, id: 
     };
     st.pipeline_active = Some(stage.name().to_string());
     st.pipeline_active_rule = Some(id);
-    let card = edit_card(&st.conn, stage, id);
-    render_detail(&st.conn, stage, Some(id), card)
+    // Loop-stage "matching payees" reads the cached base pass; ensure it.
+    if is_loop_stage(stage) {
+        st.ensure_pipeline_base();
+    }
+    let base = st.pipeline_base.as_ref();
+    edit_card(&st.conn, stage, id, base)
 }
 
-/// Editor card in **new** mode (GET `/pipeline/stage/<slug>/new`).
+/// Editor card in **new** mode (GET `/pipeline/stage/<slug>/new`). Returns
+/// just the editor-column content.
 pub fn render_new_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) -> Markup {
     let mut st = state.lock().unwrap();
     let Some(stage) = Stage::from_name(stage_slug) else {
@@ -124,7 +133,12 @@ pub fn render_new_fragment(state: &Arc<Mutex<AppState>>, stage_slug: &str) -> Ma
     };
     st.pipeline_active = Some(stage.name().to_string());
     st.pipeline_active_rule = None;
-    render_detail(&st.conn, stage, None, new_card(stage))
+    new_card(stage)
+}
+
+/// Loop stages re-feed their output; matcher stages are first-match.
+fn is_loop_stage(stage: Stage) -> bool {
+    matches!(stage, Stage::Prefixes | Stage::Suffixes | Stage::Expansions)
 }
 
 /// Build the queue rows (one per stage, in execution order) with live
@@ -195,39 +209,35 @@ pub fn render_detail(
     let listing = crud::list(conn, stage).unwrap_or_default();
     let movable = crud::is_movable(stage);
     // Prefix/suffix rules have no canonical, so that column is always
-    // empty for them — drop it to give the editor/impact panel more room.
+    // empty for them — drop it.
     let has_canon = !matches!(stage, Stage::Prefixes | Stage::Suffixes);
-    // Cached per-rule impact (refreshed only by scan); empty until the
-    // first scan, in which case rows show a dim placeholder.
     let impact = rules::impact::load_for_stage(conn, stage).unwrap_or_default();
     let base = base(stage);
     html! {
+        // Compact one-line header (name · count · tags) with Add on the
+        // right, outside the dark rule pane.
         div.detail-header {
-            div.row {
-                h2 { (stage_name(stage)) }
-                span.chip { (count) " rules" }
-            }
-            div.meta {
+            h2 { (stage_name(stage)) }
+            span.head-meta {
+                "\u{00b7} " (count) " rules"
                 @for tag in stage_tags(stage) {
-                    span.pipeline-tag { (tag) }
+                    " \u{00b7} " (tag)
                 }
             }
+            button.btn.btn-shortcut.add type="button"
+                hx-get=(format!("{base}/new")) hx-target="#editor-col" hx-swap="innerHTML"
+            { "[A] Add rule" }
         }
         div.detail-2col {
             div.rules-pane.(if has_canon { "" } else { "no-canon" })
                 data-stage=(stage.name()) data-movable=(if movable { "1" } else { "0" })
             {
-                div.rules-pane-head {
-                    h3 { (count) " rules" }
-                    button.btn.btn-shortcut.add type="button"
-                        hx-get=(format!("{base}/new")) hx-target="#detail" hx-swap="innerHTML"
-                    { "[A] Add rule" }
-                }
                 div.rule-list-header {
                     span {}
                     @if has_canon { span { "Canonical" } }
                     span { "Pattern" }
-                    span.impact { "Impact" }
+                    span.num title="Txns matched, refreshed on re-scan" { "Txns" }
+                    span.num title="$ value, refreshed on re-scan" { "Value" }
                 }
                 div.rule-list {
                     @if listing.is_empty() {
@@ -238,15 +248,15 @@ pub fn render_detail(
                     }
                 }
             }
-            div.editor-col { (card) }
+            div.editor-col #editor-col { (card) }
         }
     }
 }
 
-/// One clickable rule-list row. Clicking opens the editor card (edit
-/// mode) for that rule. The pattern uses the same token colouring as the
-/// CLI; the impact cell shows the cached `"N txns · $X"` from the last
-/// scan, or a dim dash when the rule has no recorded impact yet.
+/// One clickable rule-list row. Clicking refreshes only the editor column
+/// (`#editor-col`) so the list keeps its scroll position. The pattern uses
+/// the CLI token colouring; Txns / Value are the cached per-rule impact
+/// (from the last re-scan), or dim dashes when not yet computed.
 fn render_rule_row(
     stage: Stage,
     r: &Rule,
@@ -256,10 +266,14 @@ fn render_rule_row(
     impact: Option<(i64, i64)>,
 ) -> Markup {
     let url = format!("/pipeline/stage/{}/rule/{}", stage.name(), r.id);
+    let (txns, value) = match impact {
+        Some((t, c)) => (t.to_string(), crate::helpers::format_dollars_compact(c)),
+        None => ("\u{2014}".to_string(), "\u{2014}".to_string()),
+    };
     html! {
         div.rule-row.(if selected { "selected" } else { "" })
             data-rule-id=(r.id)
-            hx-get=(url) hx-target="#detail" hx-swap="innerHTML"
+            hx-get=(url) hx-target="#editor-col" hx-swap="innerHTML"
         {
             span.rule-handle { @if movable { "\u{283f}" } }
             @if has_canon {
@@ -271,31 +285,147 @@ fn render_rule_row(
                     None => "\u{2014}",
                 }
             }
-            span.impact data-impact-rule=(r.id) {
-                @match impact {
-                    Some((txns, cents)) => {
-                        (txns) " txns \u{00b7} " (crate::helpers::format_dollars_compact(cents))
-                    }
-                    None => "\u{2014}",
-                }
-            }
+            span.num.impact-txns data-impact-rule=(r.id) { (txns) }
+            span.num.impact-value { (value) }
         }
     }
 }
 
 /// Editor card in edit mode for an existing rule, or the help placeholder
-/// if the id no longer resolves.
-pub fn edit_card(conn: &rusqlite::Connection, stage: Stage, id: i64) -> Markup {
+/// if the id no longer resolves. Followed by a "payees matching this rule"
+/// panel: matcher stages read the `payee_normalisations` cache; loop
+/// stages read the supplied base pass (editable-rules-ui §8,9).
+pub fn edit_card(
+    conn: &rusqlite::Connection,
+    stage: Stage,
+    id: i64,
+    base: Option<&PipelineBase>,
+) -> Markup {
     match crud::get(conn, stage, id) {
-        Ok(Some(rule)) => editor::render(&Card {
-            stage,
-            mode: Mode::Edit,
-            id: Some(id),
-            data: &rule.data,
-            error: None,
-            eval_body: html! {},
-        }),
+        Ok(Some(rule)) => html! {
+            (editor::render(&Card {
+                stage,
+                mode: Mode::Edit,
+                id: Some(id),
+                data: &rule.data,
+                error: None,
+                eval_body: html! {},
+            }))
+            (matches_panel(conn, stage, &rule.data, base))
+        },
         _ => empty_card(),
+    }
+}
+
+/// The `(json_key, value)` identifying which `payee_normalisations` rows
+/// resulted from a matcher rule, or `None` for loop stages.
+fn feature_key(stage: Stage, data: &RuleData) -> Option<(&'static str, String)> {
+    match stage {
+        Stage::Persons | Stage::Employers | Stage::Merchants => {
+            data.canonical().map(|c| ("entity_name", c.to_string()))
+        }
+        Stage::BankingOps => data.canonical().map(|op| ("operation", op.to_string())),
+        Stage::Locations => match data {
+            RuleData::Location { location, kind, .. } => {
+                let key = match kind {
+                    LocationKind::Region => "region",
+                    LocationKind::Location => "location",
+                };
+                Some((key, location.clone()))
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The loop-stage trace tag (differs from `stage.name()`).
+fn loop_trace_name(stage: Stage) -> Option<&'static str> {
+    match stage {
+        Stage::Prefixes => Some("prefix"),
+        Stage::Suffixes => Some("suffix"),
+        Stage::Expansions => Some("expand"),
+        _ => None,
+    }
+}
+
+/// "Payees matching this rule": for matcher stages, the distinct payees
+/// whose last scan produced this rule's feature (from `payee_normalisations`);
+/// for loop stages, the payees whose cached base pass fired this rule.
+fn matches_panel(
+    conn: &rusqlite::Connection,
+    stage: Stage,
+    data: &RuleData,
+    base: Option<&PipelineBase>,
+) -> Markup {
+    // Loop stages: read the cached base pass (fired patterns).
+    if let Some(tag) = loop_trace_name(stage) {
+        let Some(pattern) = data.pattern() else {
+            return html! {};
+        };
+        let Some(base) = base else {
+            return html! {
+                div.matches-panel {
+                    h3 { "Payees matching this rule" }
+                    div.sub { "Re-scan or re-select to compute matches." }
+                }
+            };
+        };
+        let mut rows: Vec<(&str, i64)> = Vec::new();
+        for (p, res) in base.payees.iter().zip(base.results.iter()) {
+            let fired = res
+                .trace
+                .iter()
+                .any(|t| t.stage == tag && t.fired.iter().any(|f| f == pattern));
+            if fired {
+                rows.push((p.original_payee.as_str(), p.txn_count));
+            }
+        }
+        rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        return matches_table(&rows);
+    }
+
+    // Matcher stages: cheap query against the staging cache.
+    let Some((key, value)) = feature_key(stage, data) else {
+        return html! {};
+    };
+    let rows = pn::payees_with_feature(conn, key, &value).unwrap_or_default();
+    let rows: Vec<(&str, i64)> = rows.iter().map(|(p, n)| (p.as_str(), *n)).collect();
+    matches_table(&rows)
+}
+
+/// Render the matching-payees table (expandable to show everything).
+fn matches_table(rows: &[(&str, i64)]) -> Markup {
+    let txns: i64 = rows.iter().map(|(_, n)| n).sum();
+    html! {
+        div.matches-panel {
+            h3 {
+                "Payees matching this rule "
+                span.matches-count { "(" (rows.len()) " payees \u{00b7} " (txns) " txns)" }
+            }
+            @if rows.is_empty() {
+                div.sub { "None staged \u{2014} run re-scan to refresh, or this rule matches no payee." }
+            } @else {
+                table.impact-table.matches-table {
+                    thead { tr { th.l { "Payee" } th.r { "Txns" } } }
+                    tbody {
+                        @for (i, (payee, n)) in rows.iter().enumerate() {
+                            tr.(if i >= SAMPLE_LIMIT { "impact-extra" } else { "" }) {
+                                td.payee { (payee) }
+                                td.r { (n) }
+                            }
+                        }
+                        @if rows.len() > SAMPLE_LIMIT {
+                            tr.impact-more {
+                                td colspan="2" onclick="this.closest('table').classList.add('show-all')" {
+                                    "show " (rows.len() - SAMPLE_LIMIT) " more"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -455,7 +585,7 @@ mod tests {
             },
         )
         .unwrap();
-        let card = edit_card(&conn, Stage::Merchants, id);
+        let card = edit_card(&conn, Stage::Merchants, id, None);
         let html = render_detail(&conn, Stage::Merchants, Some(id), card).into_string();
         assert!(html.contains("rule-row selected"), "active row highlighted: {html}");
         // The edit card is shown in the right column.

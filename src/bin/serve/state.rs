@@ -145,6 +145,16 @@ impl RuleChangeKind {
     }
 }
 
+/// A cached full-pipeline pass over every distinct payee on the
+/// **committed** rules — the expensive "base" of an evaluate. Reused
+/// across re-evaluates within an editing session (the committed rules
+/// don't change between them) so each re-evaluate runs only the scratch
+/// pass. Invalidated (dropped) on any commit / re-scan.
+pub struct PipelineBase {
+    pub payees: Vec<pocketsmith_sync::rules::impact::PayeeSample>,
+    pub results: Vec<pocketsmith_sync::normalise::NormalisationResult>,
+}
+
 pub struct AppState {
     pub conn: rusqlite::Connection,
 
@@ -190,6 +200,10 @@ pub struct AppState {
     /// Rule-change activity log (newest at the tail), capped at 100 via
     /// [`push_rule_change`](Self::push_rule_change).
     pub pipeline_activity: Vec<RuleChangeEntry>,
+    /// Cached committed-rules pipeline pass for fast re-evaluates
+    /// (editable-rules-ui §4). `None` until first computed; dropped on any
+    /// rule commit / re-scan.
+    pub pipeline_base: Option<PipelineBase>,
     /// SQLite file path, for the background `.sql` re-dump after a rule
     /// commit (`DumpPolicy::Background`). `None` for in-memory test DBs,
     /// where the handlers fall back to a synchronous dump into
@@ -220,6 +234,7 @@ impl AppState {
             pipeline_active: None,
             pipeline_active_rule: None,
             pipeline_activity: Vec::new(),
+            pipeline_base: None,
             db_path: None,
             rules_dir_override: None,
         }
@@ -231,6 +246,25 @@ impl AppState {
         self.txn_activity.push(entry);
         if self.txn_activity.len() > 100 {
             self.txn_activity.remove(0);
+        }
+    }
+
+    /// Drop the cached base pipeline pass — call after any committed rule
+    /// change or re-scan so the next evaluate recomputes against the new
+    /// committed rules.
+    pub fn invalidate_pipeline_base(&mut self) {
+        self.pipeline_base = None;
+    }
+
+    /// Compute the committed-rules base pass once and cache it
+    /// (editable-rules-ui §4). Reused by evaluate and by the loop-stage
+    /// "matching payees" panel until a commit / re-scan drops it.
+    pub fn ensure_pipeline_base(&mut self) {
+        if self.pipeline_base.is_none() {
+            let payees =
+                pocketsmith_sync::rules::impact::load_payees(&self.conn).unwrap_or_default();
+            let results = pocketsmith_sync::rules::impact::run_base(&self.conn, &payees);
+            self.pipeline_base = Some(PipelineBase { payees, results });
         }
     }
 
