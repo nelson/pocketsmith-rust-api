@@ -11,8 +11,9 @@ use std::sync::{Arc, Mutex};
 use maud::{html, Markup};
 
 use pocketsmith_sync::normalise::scan;
+use pocketsmith_sync::normalise::NormalisationResult;
 use pocketsmith_sync::rules::crud;
-use pocketsmith_sync::rules::impact::{compute_buckets, load_payees, test_one};
+use pocketsmith_sync::rules::impact::{compute_buckets_with_base, test_one, PayeeSample};
 use pocketsmith_sync::rules::model::{MoveTarget, Mutation, RuleData};
 use pocketsmith_sync::rules::validate::validate_draft;
 use pocketsmith_sync::rules::{commit, Stage};
@@ -48,9 +49,12 @@ pub fn evaluate(
     let data = build_rule_data(stage, &form);
     let test_string = form.get("test_string").cloned().unwrap_or_default();
 
-    let st = state.lock().unwrap();
-    let card_markup = build_eval_card(&st.conn, stage, id, &data, &test_string);
-    views::render_detail(&st.conn, stage, id, card_markup)
+    let mut st = state.lock().unwrap();
+    st.ensure_pipeline_base();
+    let base = st.pipeline_base.as_ref().expect("base just ensured");
+    // Returns just the editor-column content (target #editor-col), so the
+    // rule list keeps its place.
+    build_eval_card(&st.conn, stage, id, &data, &test_string, &base.payees, &base.results)
 }
 
 /// Build the evaluate-mode editor card (validation error → no buckets,
@@ -61,6 +65,8 @@ fn build_eval_card(
     id: Option<i64>,
     data: &RuleData,
     test_string: &str,
+    payees: &[PayeeSample],
+    base: &[NormalisationResult],
 ) -> Markup {
     let evaluate_url = match id {
         Some(id) => format!("/pipeline/stage/{}/rule/{id}/evaluate", stage.name()),
@@ -88,9 +94,8 @@ fn build_eval_card(
         Some(id) => Mutation::Edit { id, data: data.clone() },
         None => Mutation::Add(data.clone()),
     };
-    let payees = load_payees(conn).unwrap_or_default();
     let payee_total = payees.len() as i64;
-    let eval_body = match compute_buckets(conn, stage, &mutation, &payees) {
+    let eval_body = match compute_buckets_with_base(conn, stage, &mutation, payees, base) {
         Ok(buckets) => {
             let test_result =
                 (!test_string.is_empty()).then(|| test_one(conn, stage, data, test_string));
@@ -144,13 +149,21 @@ pub fn delete_preview(state: &Arc<Mutex<AppState>>, slug: &str, id: i64) -> Mark
     let Some(rule) = crud::get(&st.conn, stage, id).ok().flatten() else {
         // Rule already gone — fall back to the list with no card open.
         st.pipeline_active_rule = None;
-        return views::render_detail(&st.conn, stage, None, empty_card_markup());
+        return empty_card_markup();
     };
+    let rule_data = rule.data;
 
-    let payees = load_payees(&st.conn).unwrap_or_default();
-    let payee_total = payees.len() as i64;
+    st.ensure_pipeline_base();
+    let base = st.pipeline_base.as_ref().expect("base just ensured");
+    let payee_total = base.payees.len() as i64;
     let mutation = Mutation::Delete { stage, id };
-    let eval_body = match compute_buckets(&st.conn, stage, &mutation, &payees) {
+    let eval_body = match compute_buckets_with_base(
+        &st.conn,
+        stage,
+        &mutation,
+        &base.payees,
+        &base.results,
+    ) {
         Ok(buckets) => html! {
             div.eval-section {
                 h3 { "Impact of deleting this rule" }
@@ -164,15 +177,15 @@ pub fn delete_preview(state: &Arc<Mutex<AppState>>, slug: &str, id: i64) -> Mark
         Err(_) => html! { div.editor-error { "could not evaluate this deletion" } },
     };
 
-    let card = editor::render(&Card {
+    // Returns just the editor-column content (target #editor-col).
+    editor::render(&Card {
         stage,
         mode: Mode::EvaluateDelete,
         id: Some(id),
-        data: &rule.data,
+        data: &rule_data,
         error: None,
         eval_body,
-    });
-    views::render_detail(&st.conn, stage, Some(id), card)
+    })
 }
 
 /// POST delete: remove a rule, then re-render the list with no card open.
@@ -185,6 +198,7 @@ pub fn delete(state: &Arc<Mutex<AppState>>, slug: &str, id: i64) -> Markup {
         Ok(res) => {
             st.pipeline_active_rule = None;
             st.push_rule_change(res.change);
+            st.invalidate_pipeline_base();
             views::render_detail(&st.conn, stage, None, empty_card_markup())
         }
         Err(e) => {
@@ -228,10 +242,11 @@ pub fn reorder(state: &Arc<Mutex<AppState>>, slug: &str, body: &str) -> Markup {
     let mutation = Mutation::Move { stage, id, target };
     if let Ok(res) = commit(&st.conn, &mutation, policy, Some(&st.rule_cache)) {
         st.push_rule_change(res.change);
+        st.invalidate_pipeline_base();
     }
     // Keep the moved rule selected so the user keeps context.
     st.pipeline_active_rule = Some(id);
-    let card = views::edit_card(&st.conn, stage, id);
+    let card = views::edit_card(&st.conn, stage, id, None);
     views::render_detail(&st.conn, stage, Some(id), card)
 }
 
@@ -242,6 +257,10 @@ pub fn rescan(state: &Arc<Mutex<AppState>>) -> Markup {
     {
         let st = state.lock().unwrap();
         let _ = scan::scan(&st.conn);
+    }
+    {
+        let mut st = state.lock().unwrap();
+        st.invalidate_pipeline_base();
     }
     views::render_page_shell(state)
 }
@@ -261,8 +280,9 @@ fn commit_mutation(
             let saved_id = id.or(res.new_id);
             st.pipeline_active_rule = saved_id;
             st.push_rule_change(res.change);
+            st.invalidate_pipeline_base();
             let card = match saved_id {
-                Some(sid) => views::edit_card(&st.conn, stage, sid),
+                Some(sid) => views::edit_card(&st.conn, stage, sid, None),
                 None => empty_card_markup(),
             };
             views::render_detail(&st.conn, stage, saved_id, card)
@@ -380,11 +400,13 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_invalid_regex_disables_save() {
+    fn evaluate_invalid_regex_shows_evaluate_only() {
         let state = state_with_dump_dir(tmpdir());
         let html = evaluate(&state, "merchants", None, &body_merchant("X", "(?i)UBER%28")).into_string();
         assert!(html.contains("syntax error"), "{html}");
-        assert!(html.contains("disabled"), "Save must be disabled: {html}");
+        // Invalid pattern → Evaluate offered, Save withheld.
+        assert!(html.contains("act-evaluate"), "{html}");
+        assert!(!html.contains("act-save"), "no Save while pattern invalid: {html}");
     }
 
     #[test]
