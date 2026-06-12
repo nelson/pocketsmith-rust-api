@@ -128,6 +128,7 @@ mod tests {
             feature_values: Vec::new(),
             class_set: None,
             match_info: None,
+            fired: Vec::new(),
         }
     }
 
@@ -144,6 +145,7 @@ mod tests {
                 haystack: "PURCHASE ZEBRA CAFE SYDNEY".into(),
                 span: Some((9, 19)),
             }),
+            fired: Vec::new(),
         }
     }
 

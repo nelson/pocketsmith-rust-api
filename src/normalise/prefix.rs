@@ -10,6 +10,8 @@ pub(crate) struct CompiledPrefix {
     operation: Option<BankingOperation>,
     has_account: bool,
     has_date: bool,
+    /// Authored pattern, recorded on fire for loop-stage impact.
+    pattern: String,
 }
 
 /// One pass of the prefix loop over a compiled rule set: strip metadata
@@ -39,6 +41,7 @@ fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledPrefix]) {
                 // Remove the matched prefix, trim remaining whitespace.
                 let remainder = &result.normalised[caps.get(0).unwrap().end()..];
                 result.normalised = remainder.trim().to_string();
+                result.record_fire(pat.pattern.clone());
                 matched = true;
                 break;
             }
@@ -72,6 +75,7 @@ pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledPrefix>> {
                 operation: operation.as_deref().and_then(BankingOperation::from_display_name),
                 has_account,
                 has_date,
+                pattern,
             });
         }
     }

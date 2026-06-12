@@ -8,6 +8,8 @@ use super::{NormalisationResult, PipelineCtx};
 pub(crate) struct CompiledExpansion {
     regex: Regex,
     canonical: String,
+    /// Authored pattern, recorded on fire for loop-stage impact.
+    pattern: String,
 }
 
 /// One run of the expand loop over a compiled rule set. Driven by the
@@ -23,6 +25,7 @@ fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledExpansion]) {
                     exp.canonical,
                     &result.normalised[m.end()..]
                 );
+                result.record_fire(exp.pattern.clone());
                 matched = true;
                 break;
             }
@@ -55,7 +58,11 @@ pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledExpansion>>
     let mut out = Vec::new();
     for data in crud::load_for_compile(conn, Stage::Expansions)? {
         if let RuleData::Expansion { pattern, canonical, .. } = data {
-            out.push(CompiledExpansion { regex: compile_expansion(&pattern)?, canonical });
+            out.push(CompiledExpansion {
+                regex: compile_expansion(&pattern)?,
+                canonical,
+                pattern,
+            });
         }
     }
     Ok(out)

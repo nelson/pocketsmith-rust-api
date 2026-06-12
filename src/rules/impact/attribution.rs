@@ -41,13 +41,28 @@ const MATCHER_STAGES: [Stage; 5] = [
     Stage::Locations,
 ];
 
-/// Attribute every payee to the rule that won each matcher stage,
-/// returning the folded per-rule totals. Pure read-side: never mutates.
+/// Loop stages: a rule "hits" a payee if it fired ≥ 1× during that payee's
+/// pass; hits are summed across payees (editable-rules-ui §7).
+const LOOP_STAGES: [Stage; 3] = [Stage::Prefixes, Stage::Suffixes, Stage::Expansions];
+
+/// The pipeline trace tag for a loop stage (differs from `stage.name()`).
+fn loop_trace_name(stage: Stage) -> &'static str {
+    match stage {
+        Stage::Prefixes => "prefix",
+        Stage::Suffixes => "suffix",
+        Stage::Expansions => "expand",
+        _ => "",
+    }
+}
+
+/// Attribute every payee to the rule that won each matcher stage (and to
+/// every loop rule that fired), returning the folded per-rule totals.
+/// Pure read-side: never mutates.
 pub fn attribute(conn: &Connection, payees: &[PayeeSample]) -> Result<Vec<RuleImpact>> {
-    // Pre-load each matcher stage's rules once (id + typed data).
+    // Pre-load each matcher + loop stage's rules once (id + typed data).
     let mut rules_by_stage: HashMap<Stage, Vec<Rule>> = HashMap::new();
-    for s in MATCHER_STAGES {
-        rules_by_stage.insert(s, crud::list(conn, s)?);
+    for s in MATCHER_STAGES.iter().chain(LOOP_STAGES.iter()) {
+        rules_by_stage.insert(*s, crud::list(conn, *s)?);
     }
 
     let cache = RuleCache::new();
@@ -74,6 +89,25 @@ pub fn attribute(conn: &Connection, payees: &[PayeeSample]) -> Result<Vec<RuleIm
                 let e = acc.entry((s, id)).or_default();
                 e.0 += p.txn_count;
                 e.1 += p.total_cents;
+            }
+        }
+        // Loop stages: each distinct fired pattern attributes this payee
+        // once to that rule (so a rule firing twice on one payee counts the
+        // payee/txns once).
+        for s in LOOP_STAGES {
+            let name = loop_trace_name(s);
+            let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+            for entry in result.trace.iter().filter(|t| t.stage == name) {
+                for pat in &entry.fired {
+                    if !seen.insert(pat.as_str()) {
+                        continue;
+                    }
+                    if let Some(id) = find_rule(&rules_by_stage[&s], pat, None) {
+                        let e = acc.entry((s, id)).or_default();
+                        e.0 += p.txn_count;
+                        e.1 += p.total_cents;
+                    }
+                }
             }
         }
     }
