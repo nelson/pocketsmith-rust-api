@@ -261,7 +261,11 @@ pub fn render(card: &Card) -> Markup {
     let texts = text_values(card.data);
     let flags = flag_values(card.data);
     let fields = fields_for(card.stage);
-    let readonly = matches!(card.mode, Mode::Evaluate | Mode::EvaluateDelete);
+    // Fields are editable everywhere except the delete-confirm card. In
+    // Evaluate mode they carry a `data-eval-val` snapshot so the client can
+    // flip Save↔Evaluate when the user edits after evaluating (§8).
+    let editable = !matches!(card.mode, Mode::EvaluateDelete);
+    let snapshot = matches!(card.mode, Mode::Evaluate);
 
     let (title, pill, mode_class) = match card.mode {
         Mode::Edit => ("Edit rule", "edit mode", "mode-edit"),
@@ -280,16 +284,16 @@ pub fn render(card: &Card) -> Markup {
         div.editor-card.(mode_class) {
             h2 {
                 (title)
+                span.spinner.htmx-indicator #card-spin {}
                 span.mode-pill { (pill) }
-                span.spinner.htmx-indicator #card-spin { "\u{27f3}" }
             }
             form #rule-form {
                 div.editor-grid {
                     @for f in &fields {
-                        (render_field(f, &texts, &flags, readonly))
+                        (render_field(f, &texts, &flags, editable, snapshot))
                     }
                 }
-                (render_note(note, readonly))
+                (render_note(note, editable, snapshot))
 
                 @if let Some(err) = card.error {
                     div.editor-error { (err) }
@@ -303,13 +307,17 @@ pub fn render(card: &Card) -> Markup {
     }
 }
 
-/// One labelled field row. In evaluate mode the value is shown read-only
-/// and re-embedded as a hidden input so Save re-posts it unchanged.
+/// One labelled field row. When `editable` the field is an input/select/
+/// checkbox; otherwise (delete-confirm) it's a read-only value plus a
+/// hidden input so the confirm POST still carries it. When `snapshot`
+/// (Evaluate mode) each input also carries a `data-eval-val` of the
+/// just-evaluated value, so the client can detect post-evaluate edits.
 fn render_field(
     f: &Field,
     texts: &HashMap<&'static str, String>,
     flags: &HashMap<&'static str, bool>,
-    readonly: bool,
+    editable: bool,
+    snapshot: bool,
 ) -> Markup {
     let val = texts.get(f.name).cloned().unwrap_or_default();
     html! {
@@ -317,22 +325,25 @@ fn render_field(
         @match &f.kind {
             FieldKind::Flag => {
                 @let on = flags.get(f.name).copied().unwrap_or(false);
-                @if readonly {
+                @if !editable {
                     span.read-only-val { (if on { "\u{2713} yes" } else { "\u{2014} no" }) }
                     @if on { input type="hidden" name=(f.name) value="on"; }
                 } @else {
                     label.flag-check {
-                        input type="checkbox" id=(format!("r-{}", f.name)) name=(f.name) checked[on];
+                        input type="checkbox" id=(format!("r-{}", f.name)) name=(f.name)
+                            checked[on] data-eval-val=[snapshot.then(|| if on { "on" } else { "" })];
                         " " (f.label)
                     }
                 }
             }
             FieldKind::Select { options, blank } => {
-                @if readonly {
+                @if !editable {
                     span.read-only-val { (if val.is_empty() { "\u{2014}" } else { &val }) }
                     @if !val.is_empty() { input type="hidden" name=(f.name) value=(val); }
                 } @else {
-                    select id=(format!("r-{}", f.name)) name=(f.name) {
+                    select id=(format!("r-{}", f.name)) name=(f.name)
+                        data-eval-val=[snapshot.then(|| val.clone())]
+                    {
                         @if *blank { option value="" selected[val.is_empty()] { "\u{2014}" } }
                         @for opt in options {
                             option value=(opt) selected[(*opt == val)] { (opt) }
@@ -342,7 +353,7 @@ fn render_field(
             }
             kind => {
                 @let mono = matches!(kind, FieldKind::Regex);
-                @if readonly {
+                @if !editable {
                     span.read-only-val.(if mono { "mono" } else { "" }) {
                         @if val.is_empty() {
                             "\u{2014}"
@@ -360,6 +371,7 @@ fn render_field(
                         name=(f.name)
                         class=(if mono { "mono" } else { "" })
                         value=(val)
+                        data-eval-val=[snapshot.then(|| val.clone())]
                         required[f.required]
                         placeholder=(if mono { "(?i)PATTERN" } else { "" });
                 }
@@ -368,9 +380,11 @@ fn render_field(
     }
 }
 
-/// Collapsible note field — open when the rule already has a note.
-fn render_note(note: &str, readonly: bool) -> Markup {
-    if readonly {
+/// Collapsible note field. Editable (textarea) in edit/evaluate; read-only
+/// display + hidden input in delete-confirm. Carries a `data-eval-val`
+/// snapshot in Evaluate mode.
+fn render_note(note: &str, editable: bool, snapshot: bool) -> Markup {
+    if !editable {
         return html! {
             @if !note.is_empty() {
                 div.note-block {
@@ -387,7 +401,9 @@ fn render_note(note: &str, readonly: bool) -> Markup {
         details.note-details open[!note.is_empty()] {
             summary.note-toggle { "+ note" }
             div.note-block {
-                textarea name="note" rows="2" placeholder="optional note" { (note) }
+                textarea name="note" rows="2" placeholder="optional note"
+                    data-eval-val=[snapshot.then(|| note.to_string())]
+                { (note) }
             }
         }
     }
@@ -398,7 +414,11 @@ fn render_note(note: &str, readonly: bool) -> Markup {
 /// inside `#rule-form` means HTMX serialises the form automatically.
 fn render_actions(card: &Card) -> Markup {
     let base = base(card.stage);
-    let target = "#detail";
+    // Selection / evaluate / cancel only refresh the editor column, so the
+    // rule list (and its scroll position) stays put. Save / delete /
+    // reorder change the list, so they refresh the whole detail.
+    let col = "#editor-col";
+    let detail = "#detail";
 
     match card.mode {
         Mode::Edit | Mode::New => {
@@ -409,37 +429,50 @@ fn render_actions(card: &Card) -> Markup {
             html! {
                 div.editor-actions {
                     button.btn.btn-shortcut.eval type="button"
-                        hx-post=(eval_url) hx-target=(target) hx-swap="innerHTML" hx-indicator="#card-spin"
+                        hx-post=(eval_url) hx-target=(col) hx-swap="innerHTML" hx-indicator="#card-spin"
                     { "[E] Evaluate" }
                     button.btn.btn-shortcut.cancel type="button"
-                        hx-get=(base) hx-target=(target) hx-swap="innerHTML"
+                        hx-get=(base) hx-target=(detail) hx-swap="innerHTML"
                     { "[N] Cancel" }
                     @if let Some(id) = card.id {
                         // Delete routes through an impact preview first
                         // (GET), so a rule is never removed un-evaluated.
                         button.btn.btn-shortcut.del type="button" style="margin-left:auto"
-                            hx-get=(format!("{base}/rule/{id}/delete")) hx-target=(target) hx-swap="innerHTML"
+                            hx-get=(format!("{base}/rule/{id}/delete")) hx-target=(col) hx-swap="innerHTML"
                         { "\u{1f5d1} Delete" }
                     }
                 }
             }
         }
         Mode::Evaluate => {
-            let (save_url, back_url) = match card.id {
-                Some(id) => (format!("{base}/rule/{id}"), format!("{base}/rule/{id}")),
-                None => (format!("{base}/rule"), format!("{base}/new")),
+            let (save_url, eval_url, back_url) = match card.id {
+                Some(id) => (
+                    format!("{base}/rule/{id}"),
+                    format!("{base}/rule/{id}/evaluate"),
+                    format!("{base}/rule/{id}"),
+                ),
+                None => (format!("{base}/rule"), format!("{base}/new/evaluate"), format!("{base}/new")),
             };
             html! {
                 div.editor-actions {
                     @if card.error.is_some() {
-                        button.btn.btn-shortcut.save disabled title="fix the pattern to save" { "[Y] Save" }
+                        // Bad pattern: must re-evaluate after fixing; no Save.
+                        button.btn.btn-shortcut.eval.act-evaluate type="button"
+                            hx-post=(eval_url) hx-target=(col) hx-swap="innerHTML" hx-indicator="#card-spin"
+                        { "[E] Evaluate" }
                     } @else {
-                        button.btn.btn-shortcut.save type="button"
-                            hx-post=(save_url) hx-target=(target) hx-swap="innerHTML"
+                        // Clean (matches the evaluated values) → Save shown;
+                        // edited since evaluate → Evaluate shown. Toggled by
+                        // the `.dirty` class the client sets (§8).
+                        button.btn.btn-shortcut.save.act-save type="button"
+                            hx-post=(save_url) hx-target=(detail) hx-swap="innerHTML"
                         { "[Y] Save" }
+                        button.btn.btn-shortcut.eval.act-evaluate type="button"
+                            hx-post=(eval_url) hx-target=(col) hx-swap="innerHTML" hx-indicator="#card-spin"
+                        { "[E] Evaluate" }
                     }
                     button.btn.btn-shortcut.cancel type="button"
-                        hx-get=(back_url) hx-target=(target) hx-swap="innerHTML"
+                        hx-get=(back_url) hx-target=(col) hx-swap="innerHTML"
                     { "[B] Back to edit" }
                 }
             }
@@ -451,10 +484,10 @@ fn render_actions(card: &Card) -> Markup {
                     // Mouse-only confirm (destructive actions are never
                     // bound to a single key, editable-rules-ui §3.4).
                     button.btn.btn-shortcut.del type="button"
-                        hx-post=(format!("{base}/rule/{id}/delete")) hx-target=(target) hx-swap="innerHTML"
+                        hx-post=(format!("{base}/rule/{id}/delete")) hx-target=(detail) hx-swap="innerHTML"
                     { "\u{1f5d1} Confirm delete" }
                     button.btn.btn-shortcut.cancel type="button"
-                        hx-get=(format!("{base}/rule/{id}")) hx-target=(target) hx-swap="innerHTML"
+                        hx-get=(format!("{base}/rule/{id}")) hx-target=(col) hx-swap="innerHTML"
                     { "[B] Back to edit" }
                 }
             }
@@ -528,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_mode_readonly_with_hidden_inputs_and_save() {
+    fn evaluate_mode_editable_with_snapshot_and_save() {
         let d = merchant();
         let card = Card {
             stage: Stage::Merchants,
@@ -540,14 +573,15 @@ mod tests {
         };
         let h = render(&card).into_string();
         assert!(h.contains("evaluate mode"), "{h}");
-        // Read-only display + hidden input carrying the value for Save.
-        assert!(h.contains("read-only-val"), "{h}");
-        assert!(h.contains("type=\"hidden\" name=\"canonical\" value=\"Amazon\""), "{h}");
-        // Save posts to the edit endpoint; eval body embedded.
+        // Fields are now editable, with a data-eval-val snapshot for the
+        // client-side Save↔Evaluate toggle.
+        assert!(h.contains("name=\"canonical\""), "{h}");
+        assert!(h.contains("data-eval-val=\"Amazon\""), "{h}");
+        // Both Save and Evaluate present (CSS/JS toggles which is shown).
+        assert!(h.contains("act-save") && h.contains("[Y] Save"), "{h}");
+        assert!(h.contains("act-evaluate") && h.contains("[E] Evaluate"), "{h}");
         assert!(h.contains("hx-post=\"/pipeline/stage/merchants/rule/7\""), "{h}");
         assert!(h.contains("buckets here"), "{h}");
-        // Delete is NOT offered in plain evaluate mode (edit mode only).
-        assert!(!h.contains("Delete"), "evaluate mode must not show Delete: {h}");
     }
 
     #[test]
@@ -573,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_with_error_disables_save() {
+    fn evaluate_with_error_shows_evaluate_not_save() {
         let d = merchant();
         let card = Card {
             stage: Stage::Merchants,
@@ -585,7 +619,9 @@ mod tests {
         };
         let h = render(&card).into_string();
         assert!(h.contains("syntax error: regex parse error"), "{h}");
-        assert!(h.contains("save disabled") || h.contains("disabled"), "Save must be disabled: {h}");
+        // A bad pattern can't be saved: only Evaluate is offered.
+        assert!(h.contains("act-evaluate"), "{h}");
+        assert!(!h.contains("act-save"), "no Save while the pattern is invalid: {h}");
     }
 
     #[test]
