@@ -35,7 +35,7 @@ pub fn render(e: &Eval) -> Markup {
                 label for="t-string" { "String" }
                 input #t-string type="text" name="test_string" value=(e.test_string)
                     placeholder="paste a raw payee to test"
-                    hx-post=(e.evaluate_url) hx-target="#detail" hx-swap="innerHTML"
+                    hx-post=(e.evaluate_url) hx-target="#editor-col" hx-swap="innerHTML"
                     hx-trigger="change, keyup changed delay:400ms" hx-include="#rule-form"
                     hx-indicator="#card-spin";
             }
@@ -123,7 +123,7 @@ pub fn render_buckets(buckets: &Buckets) -> Markup {
         Buckets::FirstMatch { newly_matched, stolen, new_fallthrough, unchanged_payees } => (
             vec![
                 Section { outcome: Outcome::Gain, label: "newly matched", bucket: newly_matched },
-                Section { outcome: Outcome::Moved, label: "stolen from other", bucket: stolen },
+                Section { outcome: Outcome::Moved, label: "moved", bucket: stolen },
                 Section { outcome: Outcome::Fall, label: "new fallthrough", bucket: new_fallthrough },
             ],
             *unchanged_payees,
@@ -170,8 +170,10 @@ fn summary_table(sections: &[Section], unchanged: i64) -> Markup {
 }
 
 /// Detail of changed payees: Payee | Txns | Value | Was | Now, with the
-/// outcome glyph colouring each payee. Up to [`SAMPLE_LIMIT`] rows per
-/// bucket, then a muted “… N more” row.
+/// outcome glyph colouring each payee. The first [`SAMPLE_LIMIT`] rows of
+/// each bucket show inline; the rest are hidden until a “show N more” row
+/// is clicked, which reveals **everything** (no cap) via a `show-all`
+/// class on the table.
 fn detail_table(sections: &[Section]) -> Markup {
     let any = sections.iter().any(|s| !s.bucket.samples.is_empty());
     if !any {
@@ -184,8 +186,8 @@ fn detail_table(sections: &[Section]) -> Markup {
             }
             tbody {
                 @for s in sections {
-                    @for sample in s.bucket.samples.iter().take(SAMPLE_LIMIT) {
-                        tr {
+                    @for (i, sample) in s.bucket.samples.iter().enumerate() {
+                        tr.(if i >= SAMPLE_LIMIT { "impact-extra" } else { "" }) {
                             td.payee {
                                 span.(s.outcome.class()) { (s.outcome.glyph()) }
                                 " " (sample.original_payee)
@@ -197,9 +199,9 @@ fn detail_table(sections: &[Section]) -> Markup {
                         }
                     }
                     @if s.bucket.samples.len() > SAMPLE_LIMIT {
-                        tr.row-more {
-                            td colspan="5" {
-                                "\u{2026} " (s.bucket.samples.len() - SAMPLE_LIMIT) " more " (s.label)
+                        tr.impact-more {
+                            td colspan="5" onclick="this.closest('table').classList.add('show-all')" {
+                                "show " (s.bucket.samples.len() - SAMPLE_LIMIT) " more " (s.label)
                             }
                         }
                     }
@@ -284,14 +286,15 @@ mod tests {
         assert!(h.contains("impact-detail"), "detail table: {h}");
         assert!(h.contains("newly matched"), "{h}");
         assert!(h.contains("new fallthrough"), "{h}");
-        assert!(h.contains("stolen from other"), "{h}");
+        assert!(h.contains("moved"), "{h}");
         assert!(h.contains("unchanged"), "{h}");
         assert!(h.contains("423"), "payee total: {h}");
     }
 
     #[test]
-    fn overflow_samples_show_more_row() {
-        // 8 samples, SAMPLE_LIMIT=6 → a "… 2 more" row in the detail table.
+    fn overflow_samples_show_expandable_rows() {
+        // 8 samples, SAMPLE_LIMIT=6 → 2 hidden `impact-extra` rows + a
+        // clickable "show 2 more" toggle that reveals everything.
         let b = first_match();
         let e = Eval {
             test_string: "",
@@ -301,8 +304,10 @@ mod tests {
             evaluate_url: "x",
         };
         let h = render(&e).into_string();
-        assert!(h.contains("\u{2026} 2 more"), "{h}");
-        assert!(h.contains("row-more"), "{h}");
+        assert!(h.contains("show 2 more"), "{h}");
+        assert!(h.contains("impact-more"), "{h}");
+        assert!(h.contains("impact-extra"), "hidden rows present: {h}");
+        assert!(h.contains("show-all"), "toggle reveals everything: {h}");
     }
 
     #[test]
