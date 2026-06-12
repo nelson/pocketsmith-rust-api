@@ -15,7 +15,7 @@ mod tester;
 pub mod attribution;
 
 pub use attribution::{attribute, load_for_stage, write_impacts, RuleImpact};
-pub use buckets::compute_buckets;
+pub use buckets::{compute_buckets, compute_buckets_with_base, run_base};
 pub use tester::{test_one, TestResult};
 
 /// Default number of sample payees surfaced per bucket (rule-cli §10);
@@ -211,20 +211,22 @@ mod tests {
     fn edit_first_match_stolen_when_canonical_changes() {
         let conn = initialize_in_memory().unwrap();
         seed_account(&conn, 1, "A").unwrap();
-        let shop = crud::insert_rule(&conn, &merchant("Shop", r"(?i)SHOP")).unwrap();
-        let _mall = crud::insert_rule(&conn, &merchant("Mall", r"(?i)SHOP 12")).unwrap();
-        // id order: shop (lower) wins for "SHOP 12" in base → "Shop".
+        // Entity stages are ordered by pattern (longer-substring-first), so
+        // the specific `(?i)SHOP 12` (Mall) wins over the generic `(?i)SHOP`
+        // (Shop) for "SHOP 12 ..." in the base.
+        let mall = crud::insert_rule(&conn, &merchant("Mall", r"(?i)SHOP 12")).unwrap();
+        let _shop = crud::insert_rule(&conn, &merchant("Shop", r"(?i)SHOP")).unwrap();
         seed_txn(&conn, 1, 1, "SHOP 12 SYDNEY", "SHOP 12 SYDNEY").unwrap();
 
-        // Edit Shop so it no longer matches "SHOP 12...", letting Mall win.
-        let m = Mutation::Edit { id: shop, data: merchant("Shop", r"(?i)SHOPPING") };
+        // Edit Mall so it no longer matches "SHOP 12 ...", letting Shop win.
+        let m = Mutation::Edit { id: mall, data: merchant("Mall", r"(?i)SHOP 12 PLAZA") };
         let payees = load_payees(&conn).unwrap();
         let b = compute_buckets(&conn, Stage::Merchants, &m, &payees).unwrap();
         match b {
             Buckets::FirstMatch { stolen, .. } => {
-                assert_eq!(stolen.payees, 1, "canonical switched Shop → Mall");
-                assert_eq!(stolen.samples[0].was.as_deref(), Some("Shop"));
-                assert_eq!(stolen.samples[0].now.as_deref(), Some("Mall"));
+                assert_eq!(stolen.payees, 1, "canonical switched Mall → Shop");
+                assert_eq!(stolen.samples[0].was.as_deref(), Some("Mall"));
+                assert_eq!(stolen.samples[0].now.as_deref(), Some("Shop"));
             }
             _ => panic!("first-match"),
         }
@@ -298,5 +300,70 @@ mod tests {
             test_one(&conn, Stage::Merchants, &bad, "UBER"),
             TestResult::SyntaxError(_)
         ));
+    }
+
+    /// The §9 affected-subset fast path must produce byte-identical buckets
+    /// to the full scratch pass across add / edit / delete on a fixture
+    /// with overlapping rules. Guards the cache optimisation.
+    #[test]
+    fn subset_fast_path_matches_full_scratch() {
+        let conn = initialize_in_memory().unwrap();
+        seed_account(&conn, 1, "A").unwrap();
+        let uber = crud::insert_rule(&conn, &merchant("Uber", r"(?i)UBER\b")).unwrap();
+        let _eats = crud::insert_rule(&conn, &merchant("Uber Eats", r"(?i)UBER\s*\*?\s*EATS\b")).unwrap();
+        for (i, payee) in [
+            "UBER *EATS SYDNEY",
+            "UBER TRIP",
+            "UBER ONE",
+            "WOOLWORTHS METRO",
+            "AMAZON AU",
+        ]
+        .iter()
+        .enumerate()
+        {
+            seed_txn(&conn, i as i64 + 1, 1, payee, payee).unwrap();
+        }
+        let payees = load_payees(&conn).unwrap();
+
+        let mutations = [
+            Mutation::Add(merchant("Woolworths", r"(?i)WOOLWORTHS")),
+            Mutation::Edit { id: uber, data: merchant("Uber", r"(?i)UBER TRIP") },
+            Mutation::Edit { id: uber, data: merchant("Uber Rides", r"(?i)UBER\b") },
+            Mutation::Delete { stage: Stage::Merchants, id: uber },
+        ];
+        for m in &mutations {
+            let fast = compute_buckets(&conn, Stage::Merchants, m, &payees).unwrap();
+            let full = super::buckets::compute_buckets_full(&conn, Stage::Merchants, m, &payees).unwrap();
+            assert_eq!(fast, full, "subset != full for {m:?}");
+        }
+    }
+
+    /// Loop-stage impact: a prefix rule that fires accrues the txns of the
+    /// payees it touched (editable-rules-ui §7).
+    #[test]
+    fn loop_stage_attribution_sums_hits() {
+        use crate::rules::impact::attribute;
+        let conn = initialize_in_memory().unwrap();
+        seed_account(&conn, 1, "A").unwrap();
+        let eftpos = crud::insert_rule(
+            &conn,
+            &RuleData::Prefix {
+                pattern: r"^EFTPOS ".into(),
+                gateway: None,
+                operation: None,
+                has_account: false,
+                has_date: false,
+                note: None,
+            },
+        )
+        .unwrap();
+        seed_txn(&conn, 1, 1, "EFTPOS WOOLWORTHS", "EFTPOS WOOLWORTHS").unwrap();
+        seed_txn(&conn, 2, 1, "EFTPOS COLES", "EFTPOS COLES").unwrap();
+        seed_txn(&conn, 3, 1, "PLAIN PAYEE", "PLAIN PAYEE").unwrap();
+
+        let payees = load_payees(&conn).unwrap();
+        let impacts = attribute(&conn, &payees).unwrap();
+        let hit = impacts.iter().find(|r| r.stage == Stage::Prefixes && r.rule_id == eftpos).unwrap();
+        assert_eq!(hit.txn_count, 2, "both EFTPOS payees attributed to the prefix rule");
     }
 }

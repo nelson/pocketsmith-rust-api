@@ -14,6 +14,30 @@ use crate::review::Status;
 
 pub use crate::normalise::slug_for;
 
+/// Payees whose last-scan features include `json_key = value` (e.g.
+/// `entity_name = "Bunnings"`), with their txn count, ordered by weight.
+/// Reads the existing `payee_normalisations` cache via SQLite JSON1 — no
+/// extra table, no pipeline recompute — to answer "which payees currently
+/// match this rule" for the Pipeline editor (editable-rules-ui §9).
+pub fn payees_with_feature(
+    conn: &Connection,
+    json_key: &str,
+    value: &str,
+) -> Result<Vec<(String, i64)>> {
+    let path = format!("$.{json_key}");
+    let mut stmt = conn.prepare(
+        "SELECT original_payee, txn_count FROM payee_normalisations \
+           WHERE json_extract(features_json, ?1) = ?2 \
+           ORDER BY txn_count DESC, original_payee",
+    )?;
+    let rows = stmt.query_map(params![path, value], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayeeNormalisationRow {
     pub original_payee: String,
@@ -181,6 +205,29 @@ mod tests {
             txn_count: 1,
             status,
         }
+    }
+
+    #[test]
+    fn payees_with_feature_filters_by_json_feature() {
+        let conn = initialize_in_memory().unwrap();
+        let mut bunnings = sample("BUNNINGS 391 KOTARA", "Bunnings", Status::Pending);
+        bunnings.features_json = r#"{"entity_name":"Bunnings"}"#.into();
+        bunnings.txn_count = 5;
+        let mut bunnings2 = sample("BUNNINGS WAREHOUSE", "Bunnings", Status::Pending);
+        bunnings2.features_json = r#"{"entity_name":"Bunnings"}"#.into();
+        bunnings2.txn_count = 2;
+        let mut woolies = sample("WOOLWORTHS METRO", "Woolworths", Status::Pending);
+        woolies.features_json = r#"{"entity_name":"Woolworths"}"#.into();
+        upsert(&conn, &bunnings).unwrap();
+        upsert(&conn, &bunnings2).unwrap();
+        upsert(&conn, &woolies).unwrap();
+
+        let rows = payees_with_feature(&conn, "entity_name", "Bunnings").unwrap();
+        // Both Bunnings payees, ordered by txn_count desc; Woolworths excluded.
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ("BUNNINGS 391 KOTARA".to_string(), 5));
+        assert_eq!(rows[1], ("BUNNINGS WAREHOUSE".to_string(), 2));
+        assert!(payees_with_feature(&conn, "entity_name", "Nope").unwrap().is_empty());
     }
 
     #[test]
