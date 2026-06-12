@@ -131,11 +131,20 @@ pub struct NormalisationResult {
     /// changed `normalised` or attached a feature. Populated only by
     /// [`normalise`] (raw stages don't write this).
     pub trace: Vec<TraceEntry>,
+    /// The cleaned string entering the matcher stages (after prefix /
+    /// suffix / expand / locations, before persons). Snapshotted so the
+    /// evaluate fast-path can re-run a single first-match stage without
+    /// re-running the whole pipeline (editable-rules-ui §9).
+    pub matcher_input: String,
     /// Transient: a matcher stage sets this when one of its rules fires,
     /// so [`run_traced`] can attach it to the stage's [`TraceEntry`] as
     /// [`TraceEntry::match_info`]. Always drained (`take`) per stage, so
     /// it never leaks across stages. Not part of the persisted result.
     pending_match: Option<MatchInfo>,
+    /// Transient: loop stages (prefix/suffix/expand) push the authored
+    /// pattern of each rule that fires, drained by [`run_traced`] into
+    /// [`TraceEntry::fired`]. Lets impact attribute loop hits per rule.
+    pending_fires: Vec<String>,
 }
 
 /// What a first-match-wins / matcher stage matched, for the pipeline
@@ -181,6 +190,10 @@ pub struct TraceEntry {
     /// merchants, locations, banking_ops). `None` for pure string
     /// transforms (prefix/suffix/expand), whose line 1 is the diff.
     pub match_info: Option<MatchInfo>,
+    /// Authored patterns of the loop-stage rules that fired during this
+    /// stage (prefix/suffix/expand). Empty for matcher/raw stages. Used by
+    /// impact to attribute loop hits to individual rules.
+    pub fired: Vec<String>,
 }
 
 impl NormalisationResult {
@@ -191,7 +204,9 @@ impl NormalisationResult {
             class: None,
             features: Features::default(),
             trace: Vec::new(),
+            matcher_input: String::new(),
             pending_match: None,
+            pending_fires: Vec::new(),
         }
     }
 
@@ -207,6 +222,12 @@ impl NormalisationResult {
             haystack: self.normalised.clone(),
             span,
         });
+    }
+
+    /// Record that a loop-stage rule (prefix/suffix/expand) fired, by its
+    /// authored pattern. Drained per stage by [`run_traced`].
+    pub(crate) fn record_fire(&mut self, pattern: impl Into<String>) {
+        self.pending_fires.push(pattern.into());
     }
 
     pub fn original(&self) -> &str {
@@ -338,6 +359,10 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
     run_traced(&mut result, "suffix", |r| suffix::apply_with_db(r, ctx));
     run_traced(&mut result, "expand", |r| expand::apply_with_db(r, ctx));
     run_traced(&mut result, "locations", |r| locations::apply_with_db(r, ctx));
+    // The string is fully cleaned now (matcher stages don't modify it);
+    // snapshot it so the evaluate fast-path can re-run a single matcher
+    // stage without the whole pipeline (§9).
+    result.matcher_input = result.normalised.clone();
     run_traced(&mut result, "persons", |r| persons::apply_with_db(r, ctx));
     run_traced(&mut result, "employers", |r| employers::apply_with_db(r, ctx));
     run_traced(&mut result, "merchants", |r| merchants::apply_with_db(r, ctx));
@@ -357,6 +382,7 @@ pub fn normalise(original: &str, ctx: &PipelineCtx) -> NormalisationResult {
             feature_values: Vec::new(),
             class_set: None,
             match_info: None,
+            fired: Vec::new(),
         });
     }
     result
@@ -376,6 +402,8 @@ fn run_traced(
     // A matcher stage may have recorded which rule fired; drain it so it
     // attaches to *this* stage's entry only (never leaks to the next).
     let match_info = result.pending_match.take();
+    // Loop stages may have recorded which rules fired; drain likewise.
+    let fired = std::mem::take(&mut result.pending_fires);
     // Entries the stage newly populated, each carrying its own display
     // string, so the added keys and their trace values come from one
     // pass over the canonical field list.
@@ -396,6 +424,7 @@ fn run_traced(
         || !features_added.is_empty()
         || class_set.is_some()
         || match_info.is_some()
+        || !fired.is_empty()
     {
         result.trace.push(TraceEntry {
             stage,
@@ -405,6 +434,7 @@ fn run_traced(
             feature_values,
             class_set,
             match_info,
+            fired,
         });
     }
 }
@@ -616,19 +646,21 @@ mod tests {
     /// Conversion test — **hermetic** (persons). Defines its own person
     /// rules in the DB and proves `apply_with_db` matches case-insensitively,
     /// tags `entity_name` + `Person` class, and honours first-match-wins in
-    /// `id` (declaration) order — the specific rule, inserted first, beats
-    /// the generic fallback. Independent of production content.
+    /// the entity comparator order (longer-substring-first) — the specific
+    /// `JANE CRICKET` beats the generic `CRICKET` regardless of insertion
+    /// order. Independent of production content.
     #[test]
     fn persons_stage_reads_its_rules_from_the_db() {
         let conn = crate::db::initialize_in_memory().unwrap(); // schema only
-        // Specific rule first (lower id) so it wins over the generic one.
+        // Insertion order is irrelevant now: the entity comparator orders by
+        // pattern, so the specific `JANE CRICKET` (contains `CRICKET`) wins.
         conn.execute(
-            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Jane Cricket', 'JANE CRICKET')",
+            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Generic Cricket', 'CRICKET')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Generic Cricket', 'CRICKET')",
+            "INSERT INTO rule_persons (canonical, pattern) VALUES ('Jane Cricket', 'JANE CRICKET')",
             [],
         )
         .unwrap();

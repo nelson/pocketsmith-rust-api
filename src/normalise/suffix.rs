@@ -14,6 +14,8 @@ pub(crate) struct CompiledSuffix {
     has_location: bool,
     has_currency_code: bool,
     has_amount: bool,
+    /// Authored pattern, recorded on fire for loop-stage impact.
+    pattern: String,
 }
 
 /// One run of the suffix loop over a compiled rule set (first match wins
@@ -64,6 +66,7 @@ fn run_loop(result: &mut NormalisationResult, compiled: &[CompiledSuffix]) {
                 // Remove the matched suffix, trim remaining whitespace.
                 let remainder = &result.normalised[..caps.get(0).unwrap().start()];
                 result.normalised = remainder.trim().to_string();
+                result.record_fire(pat.pattern.clone());
                 matched = true;
                 break;
             }
@@ -106,6 +109,7 @@ pub(crate) fn load_compiled(conn: &Connection) -> Result<Vec<CompiledSuffix>> {
                 has_location,
                 has_currency_code,
                 has_amount,
+                pattern,
             });
         }
     }
