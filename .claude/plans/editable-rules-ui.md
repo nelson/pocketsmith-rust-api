@@ -4,7 +4,10 @@
 > and fidelity-proven; the Pipeline tab is a working **read-only** rule
 > browser). Continues the editable-rules work now that v3's DB conversion
 > has landed.
-> Status: **in progress — PR 1 complete (see Progress below).**
+> Status: **in progress — PRs 1, 2, 4, 5 done; the parameterised editor
+> (branch `editor-gui-framework`, PR #39) ships the GUI for *all* stages,
+> folding in 6–9. Remaining: `pipeline-trace-cli` (3) and
+> `transaction-add-rule` (10). See Progress below.**
 >
 > Mockups (unchanged from v3):
 > - [`pipeline-A-merchants.html`](../../mockups/pipeline-A-merchants.html) — edit mode + activity-log add/edit/delete vocabulary
@@ -432,15 +435,15 @@ by `rule-cli` and merely *consumed* by `editor-gui-framework`.
 | Order | Branch | Status | Scope | Depends on |
 |------:|--------|--------|-------|------------|
 | 1 | `feat/pipeline-trace-two-line` | ✅ | uniform two-line pipeline trace (matched pattern + span) | — |
-| 2 | `remove-const-oracle` | ⏳ | retire const oracle + `--features fidelity` scaffolding; `rule_*` `updated_at` triggers | 1 |
-| 3 | `pipeline-trace-cli` | | headless CLI: print the per-stage pipeline trace for a payee / txn (text + `--json`) | 1 (trace data); slot after 2 |
-| 4 | `rule-cli` | | scriptable rule editing: introduces the **library core** (CRUD + `compute_buckets`) + `--evaluate`/`--apply`/`--json` | 2 (edits must post-date oracle removal) |
-| 5 | `editor-gui-framework` | | Pipeline-tab editor: Edit/Evaluate card, impact buckets, mutation handlers, activity log, dirty banner, `rule_impact` cache — *consumes* the rule-cli library core | 4 |
-| 6 | `expand-editor` | | `pipeline(expand)` editor | 5 |
-| 7 | `entity-editor` | | `pipeline(persons+employers+merchants)` editor | 5 |
-| 8 | `location-editor` | | `pipeline(locations)` editor | 5 |
-| 9 | `ops-editor` | | `pipeline(banking_ops)` editor | 5 |
-| 10 | `transaction-add-rule` | | `transactions: "+ Add rule for this payee"` + `guess_stage` heuristic | 5 |
+| 2 | `remove-const-oracle` | ✅ | retire const oracle + `--features fidelity` scaffolding; `rule_*` `updated_at` triggers | 1 |
+| 3 | `pipeline-trace-cli` | ⏳ | headless CLI: print the per-stage pipeline trace for a payee / txn (text + `--json`) | 1 (trace data); slot after 2 |
+| 4 | `rule-cli` | ✅ | scriptable rule editing: introduces the **library core** (CRUD + `compute_buckets`) + `--evaluate`/`--apply`/`--json` | 2 (edits must post-date oracle removal) |
+| 5 | `editor-gui-framework` | ✅ | Pipeline-tab editor: Edit/Evaluate card, impact buckets, mutation handlers, activity log, dirty banner, `rule_impact` cache — *consumes* the rule-cli library core (PR #39) | 4 |
+| 6 | `expand-editor` | ✅ | `pipeline(expand)` editor — delivered via the parameterised editor in PR #39 | 5 |
+| 7 | `entity-editor` | ✅ | `pipeline(persons+employers+merchants)` editor + alphabetical (longer-substring-first) ordering — delivered in PR #39 | 5 |
+| 8 | `location-editor` | ✅ | `pipeline(locations)` editor — delivered in PR #39 | 5 |
+| 9 | `ops-editor` | ✅ | `pipeline(banking_ops)` editor — delivered in PR #39 | 5 |
+| 10 | `transaction-add-rule` | ⏳ | `transactions: "+ Add rule for this payee"` + `guess_stage` heuristic | 5 |
 
 Acceptance gates per branch:
 - `remove-const-oracle` — net-negative LOC; hermetic per-stage tests still cover; triggers stamp `updated_at`.
@@ -503,6 +506,55 @@ Landed the data-model + capture + shared renderer for the two-line trace:
 
 **Next: PR 2** — retire the const oracle + `--features fidelity`
 scaffolding and add `rule_*` `updated_at` triggers.
+
+### PRs 2, 4 — const-oracle removal + rule-cli — ✅ done (merged on `master`)
+
+The const oracle + `--features fidelity` scaffolding were retired and the
+`rule_*` `updated_at` triggers added; the scriptable `rule` CLI landed the
+rule-editing **library core** (typed CRUD, `commit`, `compute_buckets`,
+`test_one`, `validate_draft`, `RuleChange`, `dirty::would_restage`) that
+the GUI consumes.
+
+### PR 5 (+ 6–9) — editor GUI for all stages — ✅ done (branch `editor-gui-framework`, PR #39)
+
+The Pipeline tab is now a full editable rule editor. Built as three
+reviewable sub-PRs then polished over two follow-up rounds; the editor is
+**parameterised over every stage**, so the per-stage editors (6–9) are
+delivered by this one branch rather than separately.
+
+- **Editor core:** urlencoded form decode + `RuleData` builder; the
+  Edit/New/Evaluate card (`editor.rs`); CRUD/reorder handlers over the
+  shared `rules::commit` seam; create→evaluate→save→dirty→re-scan flow.
+- **Activity log + dirty banner:** rule-change log (add/edit/delete
+  vocabulary) in `AppState`; `⚠ N payees would re-stage · re-scan` banner
+  via `would_restage`; `/pipeline/rescan`.
+- **Per-rule impact cache:** `rule_impact` table, refreshed by `scan`;
+  attribution covers **loop stages** too (prefix/suffix/expand record
+  fired patterns in the trace; hits summed per rule).
+- **Evaluate impact:** CLI-style summary + detail tables, expandable to
+  show every affected payee; single-string tester; `moved` bucket label.
+- **Safety / UX:** delete routes through an impact preview with a
+  mouse-only confirm; pattern editable in evaluate mode with a dynamic
+  Save⇄Evaluate toggle; regex token colouring matching the CLI; inline
+  ring spinner (no layout shift); compact one-line header; Add button in
+  the panel header; split Txns/Value columns; clicking a rule swaps only
+  the editor column (no scroll jump) and shows a “payees matching this
+  rule” panel (matcher stages from the `payee_normalisations` cache, loop
+  stages from the cached base pass).
+- **Entity ordering:** persons/employers/merchants/locations are ordered
+  alphabetically (longer-substring-first, on each pattern's literal core)
+  for **both** display and apply, so first-match is correct-by-
+  construction; `dump` stays id-ordered so the `.sql` seeds are unchanged.
+- **Performance:** the committed-rules base pipeline pass is cached on
+  `AppState` (invalidated on commit/re-scan); first-match evaluate runs
+  the scratch pass only over the **affected subset** (payees matching the
+  candidate ∪ payees the rule owns). Loop stages still run the full
+  scratch pass. A full-scratch oracle backs an equivalence test.
+- **Verification:** `cargo test --features web` — 243 lib + 190 serve, 0
+  failures, 0 warnings. `rules/*.sql` unchanged; dump round-trip intact.
+
+**Remaining:** `pipeline-trace-cli` (3) — headless trace inspector; and
+`transaction-add-rule` (10) — “+ Add rule for this payee” + `guess_stage`.
 
 ## 10. Rule-editing CLI — scriptable evaluate + apply (branch `rule-cli`)
 

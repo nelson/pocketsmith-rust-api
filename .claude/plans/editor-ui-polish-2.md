@@ -1,49 +1,51 @@
 # Plan: Pipeline editor UI polish round 2 + loop-stage impact + faster evaluate
 
+> ✅ **Delivered** on branch `editor-gui-framework` (PR #39).
+
 > Branch: continue on `editor-gui-framework`. Ten items grouped into
 > layout/CSS, interaction, and library/perf. Investigation done:
 > loop-stage compiled rules (`CompiledPrefix/Suffix/Expansion`) don't keep
 > the authored pattern, and the trace records no fired-rule info for loop
-> stages — so loop impact/matches need a small capture addition.
+> stages â so loop impact/matches need a small capture addition.
 
 ## A. Layout & CSS (`css.rs`, `views.rs`, `editor.rs`)
 
-### 4 + 5 + 10 — compact one-line header, drop redundant count, Add in panel header
+### 4 + 5 + 10 â compact one-line header, drop redundant count, Add in panel header
 - `views.rs::render_detail`: collapse the header to a single line
-  `Persons · 119 rules · first match` (name + count + the first
+  `Persons Â· 119 rules Â· first match` (name + count + the first
   tag), and move the **[A] Add rule** button into this panel header
   (`.detail-header`, outside the dark `.rules-pane`). Remove the
   `.rules-pane-head` (its "N rules" count is now redundant).
 - `css.rs`: `.detail-header` becomes a single flex row (title, dim
   count, dim tag, Add button pushed right).
 
-### 5 — shrink the rule list to ~30% of the panel
+### 5 â shrink the rule list to ~30% of the panel
 - `css.rs`: `.rule-list { max-height: 30vh }` (was 340px) so the list
   takes roughly a third and the editor/impact/matches get the rest.
 
-### 3 — split the impact column into Txns and Value
+### 3 â split the impact column into Txns and Value
 - `views.rs`: rule-list header + `render_rule_row` get separate **Txns**
-  and **Value** columns (was one "N txns · $X" cell). Grid template gains
+  and **Value** columns (was one "N txns Â· $X" cell). Grid template gains
   a column; `no-canon` variant updated too.
 
-### 2 — pattern alignment
-- `css.rs`: align the rule-row grid on a common baseline — set
+### 2 â pattern alignment
+- `css.rs`: align the rule-row grid on a common baseline â set
   `.rule-row { align-items: baseline }`, give every cell the same
   `line-height`, make the numeric columns `font-variant-numeric:
   tabular-nums` and right-aligned, and ensure the regex spans don't shift
   the baseline (`.rx-* { vertical-align: baseline }`). The pattern cell
   stays monospace and left-aligned with the header.
 
-### 6 — spinner left of the pill, no overlap/shift
+### 6 â spinner left of the pill, no overlap/shift
 - `editor.rs`: render the spinner **inline just before** the `mode-pill`
   in the `h2` (not absolutely positioned).
 - `css.rs`: `.spinner` is an inline-block ring sized with a fixed box and
   toggled via `visibility` (reserves its space, so showing it never
-  shifts the pill) — still rotates about its own centre.
+  shifts the pill) â still rotates about its own centre.
 
-## B. Interaction — no scroll jump on rule selection (`views.rs`, `handlers.rs`, `main.rs`, `js.rs`)
+## B. Interaction â no scroll jump on rule selection (`views.rs`, `handlers.rs`, `main.rs`, `js.rs`)
 
-### 1 — clicking a rule must not scroll the panel to the top
+### 1 â clicking a rule must not scroll the panel to the top
 Root cause: a rule click swaps the **whole** `#detail` (incl. the rule
 list), resetting the panel scroll and re-rendering the list. Fix: split
 the detail so rule-level interactions only swap the editor side.
@@ -59,7 +61,7 @@ the detail so rule-level interactions only swap the editor side.
 
 ## C. Library & performance
 
-### 7 — loop-stage impact (prefix / suffix / expand), summed over hits
+### 7 â loop-stage impact (prefix / suffix / expand), summed over hits
 Loop rules don't surface in the trace, so capture which fired:
 - `normalise/mod.rs`: add a transient `pending_fires: Vec<String>` to
   `NormalisationResult` + `record_fire(pattern)`, drained by `run_traced`
@@ -68,12 +70,12 @@ Loop rules don't surface in the trace, so capture which fired:
   compiled struct and call `record_fire(pattern)` each time a rule fires
   in the loop.
 - `rules/impact/attribution.rs`: for loop stages, for each payee, map each
-  distinct fired pattern → rule id and add the payee's txn_count /
-  total_cents (a rule "hits" a payee if it fired ≥1×; summed across
+  distinct fired pattern â rule id and add the payee's txn_count /
+  total_cents (a rule "hits" a payee if it fired â¥1Ã; summed across
   payees). Writes into the existing `rule_impact` table (already keyed by
   `stage, rule_id`), so the rule-list Impact column populates on re-scan.
 
-### 8 — loop-stage "payees that hit this rule" panel
+### 8 â loop-stage "payees that hit this rule" panel
 Matcher stages use `payee_normalisations.features_json`; loop stages have
 no such feature. Reuse the cached base pass instead:
 - `views.rs::matches_panel`: for loop stages, filter the cached base
@@ -84,7 +86,7 @@ no such feature. Reuse the cached base pass instead:
   base results to `edit_card` so loop matches are available on selection
   (first loop-rule selection builds the base once, then it's cached).
 
-### 9 — make evaluate genuinely fast (affected-subset scratch)
+### 9 â make evaluate genuinely fast (affected-subset scratch)
 Today `compute_buckets_with_base` reuses the cached base but still runs the
 **full** pipeline over **all** payees for the scratch side. For
 first-match stages only the affected payees can change buckets:
@@ -92,12 +94,12 @@ first-match stages only the affected payees can change buckets:
   expand/locations, before the matcher stages) on each result.
 - `rules/impact/buckets.rs`: for first-match Add/Edit/Delete, compute the
   **affected subset** = payees whose `matcher_input` matches the
-  candidate pattern ∪ payees the base attributed to this rule id. Run the
+  candidate pattern âª payees the base attributed to this rule id. Run the
   scratch pipeline only over that subset; everything else keeps its base
   outcome (counted unchanged). Correct for first-match (an unaffected
   payee's first-match can't change when only this rule changed). Loop
   stages keep the full scratch pass.
-- This avoids a full N-payee scratch pass on every evaluate — the common
+- This avoids a full N-payee scratch pass on every evaluate â the common
   merchants/persons/employers edit becomes ~instant after the first base.
 - **Verification:** add a timing note / assert buckets match the
   full-scratch result on a fixture (equivalence test) so the fast path is
@@ -122,7 +124,7 @@ first-match stages only the affected payees can change buckets:
 
 ## Notes / risks
 - The loop `fired` capture adds a `Vec<String>` per loop-stage trace entry
-  (small). `TraceEntry` gains one field — check the existing trace
+  (small). `TraceEntry` gains one field â check the existing trace
   renderer/tests compile.
 - Affected-subset scratch is an optimisation behind an equivalence test;
   if any edge case diverges, fall back to full scratch for that case.
