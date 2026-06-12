@@ -44,6 +44,28 @@ function scrollSelectedIntoView() {
     if (sel) sel.scrollIntoView({block: 'nearest'});
 }
 
+// Pipeline editor (§8): mark the rule form 'dirty' when any field differs
+// from its post-evaluate snapshot (data-eval-val), so the Save↔Evaluate
+// toggle flips — and flips back when the value is restored.
+function updateRuleFormDirty() {
+    const form = document.getElementById('rule-form');
+    if (!form) return;
+    let dirty = false;
+    form.querySelectorAll('[data-eval-val]').forEach(function(el) {
+        const snap = el.getAttribute('data-eval-val');
+        const cur = el.type === 'checkbox' ? (el.checked ? 'on' : '') : el.value;
+        if (cur !== snap) dirty = true;
+    });
+    form.classList.toggle('dirty', dirty);
+}
+
+document.addEventListener('input', function(e) {
+    if (e.target.closest && e.target.closest('#rule-form')) updateRuleFormDirty();
+});
+document.addEventListener('change', function(e) {
+    if (e.target.closest && e.target.closest('#rule-form')) updateRuleFormDirty();
+});
+
 // Captured between beforeSwap and afterSwap so a body innerHTML swap
 // (the only kind that destroys #queue) doesn't drop the user's scroll
 // position. Null means 'no .queue-list existed at capture time' — e.g.
@@ -82,6 +104,7 @@ document.addEventListener('htmx:afterSwap', function() {
     // off-screen (e.g. user pressed J past the viewport) gets the
     // minimal scroll to make it visible.
     scrollSelectedIntoView();
+    updateRuleFormDirty();
 });
 
 function getSelectedIndex() {
@@ -93,6 +116,13 @@ function getSelectedIndex() {
 document.addEventListener('click', function(e) {
     const item = e.target.closest('.queue-item');
     if (item) selectItem(item);
+    // Rule rows only swap #editor-col, so move the selection highlight here
+    // (the list isn't re-rendered).
+    const row = e.target.closest('.rule-row');
+    if (row) {
+        document.querySelectorAll('.rule-row.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+    }
 });
 
 function navigateQueue(delta) {
@@ -184,7 +214,9 @@ document.addEventListener('keydown', function(e) {
         const sel = map[e.key.toLowerCase()];
         if (sel) {
             const btn = document.querySelector('#detail ' + sel);
-            if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+            // Only act on a visible, enabled button (offsetParent is null
+            // for display:none elements, e.g. the hidden Save/Evaluate).
+            if (btn && !btn.disabled && btn.offsetParent !== null) { e.preventDefault(); btn.click(); }
             return;
         }
     }

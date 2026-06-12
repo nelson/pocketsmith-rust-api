@@ -313,9 +313,9 @@ body {
 /* ===== Pipeline editor: two-column detail (rule list + editor card) ===== */
 .detail-2col {
     display: grid;
-    /* Give the editor + impact column the larger share — the rule list is
-       narrow (pattern + impact), the impact tables want the room. */
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    /* Top/bottom: rule list above, editor + impact + matches below at full
+       width (better for the wide impact tables). */
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     align-items: start;
     margin-top: 8px;
@@ -333,16 +333,18 @@ body {
 .rule-list-header,
 .rule-row {
     display: grid;
-    grid-template-columns: 16px minmax(0, 1.1fr) minmax(0, 1.4fr) max-content;
+    /* marker | canonical | pattern | txns | value */
+    grid-template-columns: 16px minmax(0, 1.1fr) minmax(0, 1.6fr) 5.5em 5em;
     gap: 4px 12px;
     align-items: baseline;
     font-family: "SF Mono", ui-monospace, monospace;
     font-size: 11px;
+    line-height: 1.5;
 }
 /* Prefix/suffix stages drop the (always-empty) Canonical column. */
 .rules-pane.no-canon .rule-list-header,
 .rules-pane.no-canon .rule-row {
-    grid-template-columns: 16px minmax(0, 1fr) max-content;
+    grid-template-columns: 16px minmax(0, 1fr) 5.5em 5em;
 }
 .rule-list-header {
     border-bottom: 1px solid var(--border);
@@ -352,15 +354,17 @@ body {
     letter-spacing: 0.05em;
     color: var(--fg-dark);
 }
-.rule-list-header .impact { text-align: right; }
-.rule-list { overflow-y: auto; flex: 1; max-height: 560px; }
+.rule-list-header .num { text-align: right; }
+/* ~30% of the panel so the editor + impact + matches get the rest. */
+.rule-list { overflow-y: auto; flex: 1; max-height: 30vh; }
 .rule-row { cursor: pointer; padding: 3px 4px; border-bottom: 1px solid var(--border); }
 .rule-row:last-child { border-bottom: none; }
 .rule-row:hover { background: var(--bg-highlight); }
 .rule-row.selected { background: var(--bg-highlight); border-radius: 3px; }
 .rule-row .canonical { color: var(--fg); font-weight: 600; }
-.rule-row .pattern { overflow-wrap: anywhere; }
-.rule-row .impact { color: var(--fg); white-space: nowrap; text-align: right; }
+.rule-row .pattern { overflow-wrap: anywhere; white-space: pre-wrap; }
+.rule-row .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rule-row .impact-value { color: var(--fg-dim); }
 /* Regex token colouring, mirroring the CLI (rule-cli §14.2). */
 .rx-bracket { color: var(--fg-dim); }
 .rx-meta { color: var(--accent); }
@@ -377,6 +381,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 12px 14px;
+    position: relative;
 }
 .editor-card.mode-new { border-color: rgba(158, 206, 106, 0.6); }
 .editor-card.mode-del { border-color: rgba(247, 118, 142, 0.6); }
@@ -465,11 +470,41 @@ body {
 .imp-unchanged { color: var(--fg-dim); }
 .impact-none { color: var(--fg-dim); font-size: 11px; padding: 4px 0; }
 
-/* htmx loading spinner shown while Evaluate / the tester recompute. */
-.spinner { display: inline-block; margin-left: 8px; color: var(--accent); }
-.htmx-indicator { display: none; }
-.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline-block; }
-.htmx-request .spinner, .spinner.htmx-request { animation: pl-spin 0.8s linear infinite; }
+/* Expand-to-show-everything toggle, shared by the impact + matches tables. */
+.impact-extra { display: none; }
+.impact-table.show-all .impact-extra { display: table-row; }
+.impact-table.show-all .impact-more { display: none; }
+.impact-more td { cursor: pointer; color: var(--accent); }
+.impact-more td:hover { text-decoration: underline; }
+
+/* "Payees matching this rule" panel (under the editor card). */
+.matches-panel { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.matches-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-dim); margin: 0 0 6px 0; }
+.matches-panel .matches-count { color: var(--fg); text-transform: none; letter-spacing: 0; }
+.matches-panel .sub { color: var(--fg-dark); font-size: 11px; }
+
+/* Save↔Evaluate toggle: clean form shows Save; edited-since-evaluate
+   shows Evaluate (editable-rules-ui §8). */
+#rule-form:not(.dirty) .act-evaluate { display: none; }
+#rule-form.dirty .act-save { display: none; }
+
+/* htmx loading spinner: a ring that rotates about its own centre, placed
+   inline just left of the mode pill. Toggled via visibility so its
+   reserved box never shifts the pill. */
+.spinner {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 6px 0 8px;
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    visibility: hidden;
+    animation: pl-spin 0.7s linear infinite;
+}
+.spinner.htmx-request { visibility: visible; }
 @keyframes pl-spin { to { transform: rotate(360deg); } }
 
 /* Pipeline activity log: add/edit/delete colour vocabulary. */
@@ -570,6 +605,18 @@ body {
     font-weight: 600;
     margin-bottom: 4px;
 }
+
+/* Pipeline: compact one-line header (name · count · tags) with Add on the
+   right, outside the dark rule pane. */
+.tab-pipeline .detail-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.tab-pipeline .detail-header h2 { font-size: 15px; margin: 0; }
+.tab-pipeline .detail-header .head-meta { color: var(--fg-dim); font-size: 12px; }
+.tab-pipeline .detail-header .add { margin-left: auto; }
 
 .confidence-reason {
     font-size: 12px;
