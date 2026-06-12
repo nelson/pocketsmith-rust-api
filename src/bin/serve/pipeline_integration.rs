@@ -57,10 +57,14 @@ fn create_evaluate_save_flow_then_pipeline_resolves() {
         seed_txn(&st.conn, 2, 1, "WOOLWORTHS METRO", "WOOLWORTHS METRO").unwrap();
     }
 
-    // 1. New-rule card: list empty, [A] Add present.
+    // 1. New-rule card (just the editor column; the Add button lives in the
+    //    panel header rendered by render_detail).
     let new_card = views::render_new_fragment(&state, "merchants").into_string();
-    assert!(new_card.contains("[A] Add rule"), "{new_card}");
     assert!(new_card.contains("new rule"), "{new_card}");
+    assert!(new_card.contains("name=\"pattern\""), "editable form: {new_card}");
+    // The Add button is in the stage detail header.
+    let detail = views::render_detail_fragment(&state, "merchants").into_string();
+    assert!(detail.contains("[A] Add rule"), "{detail}");
 
     // 2. Evaluate the candidate (writes nothing) → impact buckets show the
     //    newly-matched payee, Save enabled.
@@ -182,22 +186,82 @@ fn rule_impact_cache_is_scan_only() {
         .unwrap()
     };
 
-    // Before any scan the cache is empty → list shows the dim dash, no count.
-    let before = views::render_edit_fragment(&state, "merchants", id).into_string();
-    assert!(!before.contains("txns"), "no cached impact before scan: {before}");
+    // The impact column lives in the rule list (the detail fragment). The
+    // Txns cell carries data-impact-rule=<id>; assert on its content.
+    let txn_cell = format!("data-impact-rule=\"{id}\">2<");
+
+    // Before any scan the cache is empty → the impact column shows the dim
+    // dash, not a count.
+    let before = views::render_detail_fragment(&state, "merchants").into_string();
+    assert!(!before.contains(&txn_cell), "no cached impact before scan: {before}");
 
     // Scan populates rule_impact (2 Bunnings payees).
     handlers::rescan(&state);
-    let after = views::render_edit_fragment(&state, "merchants", id).into_string();
-    assert!(after.contains("2 txns"), "cached impact rendered after scan: {after}");
+    let after = views::render_detail_fragment(&state, "merchants").into_string();
+    assert!(after.contains(&txn_cell), "cached impact rendered after scan: {after}");
 
     // Editing the rule does NOT change the cached number until re-scan.
     handlers::save_edit(&state, "merchants", id, "canonical=Bunnings&pattern=%28%3Fi%29BUNNINGS%5Cb");
-    let edited = views::render_edit_fragment(&state, "merchants", id).into_string();
-    assert!(edited.contains("2 txns"), "cache is stale-until-rescan: {edited}");
+    let edited = views::render_detail_fragment(&state, "merchants").into_string();
+    assert!(edited.contains(&txn_cell), "cache is stale-until-rescan: {edited}");
 
     // Confirm the cached row is unchanged in the table directly.
     let st = state.lock().unwrap();
     let cached = pocketsmith_sync::rules::impact::load_for_stage(&st.conn, Stage::Merchants).unwrap();
     assert_eq!(cached.get(&id).unwrap().0, 2);
+}
+
+#[test]
+fn commit_invalidates_the_base_cache() {
+    let state = state_with(tmpdir());
+    let id = {
+        let st = state.lock().unwrap();
+        seed_txn(&st.conn, 1, 1, "UBER TRIP", "UBER TRIP").unwrap();
+        crud::insert_rule(
+            &st.conn,
+            &pocketsmith_sync::rules::model::RuleData::Merchant {
+                canonical: "Uber".into(),
+                pattern: "(?i)UBER".into(),
+                note: None,
+            },
+        )
+        .unwrap()
+    };
+    // Evaluating builds + caches the committed-rules base pass.
+    handlers::evaluate(&state, "merchants", Some(id), "canonical=Uber&pattern=%28%3Fi%29UBER");
+    assert!(state.lock().unwrap().pipeline_base.is_some(), "evaluate caches the base");
+    // Committing an edit must drop it so the next evaluate is fresh.
+    handlers::save_edit(&state, "merchants", id, "canonical=Uber&pattern=%28%3Fi%29UBER%5Cb");
+    assert!(
+        state.lock().unwrap().pipeline_base.is_none(),
+        "commit must invalidate the cached base"
+    );
+}
+
+#[test]
+fn selecting_a_rule_lists_matching_payees_from_scan_cache() {
+    let state = state_with(tmpdir());
+    let id = {
+        let st = state.lock().unwrap();
+        seed_txn(&st.conn, 1, 1, "BUNNINGS 391 KOTARA", "BUNNINGS 391 KOTARA").unwrap();
+        seed_txn(&st.conn, 2, 1, "WOOLWORTHS METRO", "WOOLWORTHS METRO").unwrap();
+        crud::insert_rule(
+            &st.conn,
+            &pocketsmith_sync::rules::model::RuleData::Merchant {
+                canonical: "Bunnings".into(),
+                pattern: "(?i)BUNNINGS".into(),
+                note: None,
+            },
+        )
+        .unwrap()
+    };
+    // A scan stages the payees with their features (entity_name).
+    handlers::rescan(&state);
+
+    // Selecting the rule shows the payees that currently resolve to it,
+    // read from payee_normalisations — no extra table, no recompute.
+    let h = views::render_edit_fragment(&state, "merchants", id).into_string();
+    assert!(h.contains("Payees matching this rule"), "{h}");
+    assert!(h.contains("BUNNINGS 391 KOTARA"), "matching payee listed: {h}");
+    assert!(!h.contains("WOOLWORTHS METRO"), "non-matching payee excluded: {h}");
 }
