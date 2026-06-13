@@ -1,0 +1,13 @@
+[Unit]
+Description=Run PocketSmith pipeline nightly
+
+[Timer]
+# 03:30 local VM time. Set the VM timezone (e.g. `timedatectl set-timezone
+# Australia/Sydney`) or adjust this value. Persistent runs a missed job after
+# downtime. NOTE: only fires on always-on VMs (exe.dev / boxd). On sprites the
+# VM sleeps and this never fires -- use the external GitHub Actions schedule.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

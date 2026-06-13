@@ -1,0 +1,14 @@
+[Unit]
+Description=PocketSmith nightly pipeline (sync -> transfers -> categorise -> push)
+After=network.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/pocketsmith
+EnvironmentFile=/data/pocketsmith.env
+# Each ExecStart runs in order; a non-zero exit aborts the chain.
+ExecStart=/usr/local/bin/sync
+ExecStart=/usr/local/bin/transfers
+ExecStart=/usr/local/bin/transfers --apply
+ExecStart=/usr/local/bin/categorise
+ExecStart=/usr/local/bin/push
