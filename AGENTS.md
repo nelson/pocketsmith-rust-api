@@ -2,6 +2,49 @@
 
 Guidance for AI coding agents working in this repo.
 
+## Commit messages: Conventional Commits are REQUIRED
+
+Releases are automated with **release-please**, which derives the next version
+and the changelog **solely from commit messages**. Non-conforming commits are
+silently ignored for versioning, so a release will simply not happen. Always
+use the [Conventional Commits](https://www.conventionalcommits.org) format:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+[optional footer(s)]
+```
+
+Common types and their release effect:
+
+| Type | Use for | Version bump |
+|------|---------|--------------|
+| `feat:` | a new user-facing capability | **minor** (0.X.0) |
+| `fix:` | a bug fix | **patch** (0.0.X) |
+| `docs:`, `chore:`, `refactor:`, `test:`, `ci:`, `perf:`, `style:`, `build:` | everything else | none |
+| `feat!:` / `fix!:` or a `BREAKING CHANGE:` footer | incompatible change | **major** (X.0.0) (pre-1.0: minor) |
+
+Rules:
+
+- The description must start **immediately** after `type: ` (a bare
+  `Add thing` line is *not* parseable and will be dropped from the changelog).
+- Use a scope when it helps, e.g. `feat(serve):`, `fix(sync):`,
+  `chore(sprites):`.
+- Only `feat:` and `fix:` (and breaking changes) cut a release. If a batch of
+  work contains no `feat:`/`fix:`, no release PR is opened — add at least one,
+  or force a specific version with a `Release-As: X.Y.Z` footer on an
+  (optionally empty) commit.
+- One logical change per commit; keep the subject ≤ ~72 chars.
+
+Examples:
+
+```
+feat(categorise): add category + labels pipeline stage via Google Places
+fix(sync): stop advancing the watermark when a page fetch fails
+chore(ci): make the release build Cargo.toml-driven
+```
+
 ## Pushing from the sandboxed environment
 
 Plain `git push` (and `git push -u origin …`) **fails in this sandbox**:
