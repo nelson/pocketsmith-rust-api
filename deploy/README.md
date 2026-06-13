@@ -14,7 +14,7 @@ Releases — no registry, no system dependencies on the VM.
 | `install.sh` | Vendor-agnostic in-VM bootstrap: downloads the latest release, installs binaries + `rules/`, writes systemd units, starts `serve`. Only `SERVE_PORT` differs per vendor. |
 | `systemd/pocketsmith-serve.service` | Runs the web UI. |
 | `systemd/pocketsmith-pipeline.{service,timer}` | Nightly `sync → transfers → categorise → push`. **Fires only on always-on VMs** (exe.dev / boxd). |
-| `provision-*.sh` | Per-vendor laptop-side wrappers (create VM, seed env, run `install.sh`). |
+| `provision-*.sh` (exe/boxd), `deploy-sprites.sh` | Per-vendor deploy entrypoints. sprites uses `deploy-sprites.sh` (install **and** upgrade); exe/boxd use `provision-*.sh` + `install.sh`. |
 | `../.github/workflows/sprites-pipeline.yml` | **sprites only** — external nightly scheduler (a sleeping Sprite can't run an in-VM timer). Currently runs `sync` only. |
 
 State (`pocketsmith.db`, the review decisions) lives on the VM's persistent disk
@@ -24,12 +24,22 @@ at `/data` and is never baked into the artifact.
 
 1. Merge a `feat:`/`fix:` PR to `master`, then merge the release-please PR it
    opens → first release + binary tarball.
-2. `export PS_KEY=<your-pocketsmith-key>` then `bash deploy/provision-sprites.sh`
-   (sprites CLI authed; `serve` listens on port **8080**).
+2. **First install:** `export PS_KEY=<your-pocketsmith-key>` then
+   `bash deploy/deploy-sprites.sh` (sprites CLI authed; `serve` on port **8080**).
+   The same script is the **upgrade** path — re-run it (no `PS_KEY` needed) to
+   pull a newer release; it reuses the sprite, reinstalls binaries, recreates
+   the service, and skips the env write + DB seed.
 3. Add repo secret `SPRITE_TOKEN` (a `sprite auth setup` token) so
-   `.github/workflows/sprites-pipeline.yml` can wake the Sprite nightly.
+   `.github/workflows/sprites-pipeline.yml` can wake the Sprite nightly **and**
+   so releases auto-deploy (below).
 
-**sprites.dev has no systemd.** `provision-sprites.sh` does *not* use
+**Continuous deploy:** once `SPRITE_TOKEN` is set, the `deploy-sprites` job in
+`.github/workflows/release.yml` runs `deploy-sprites.sh` automatically on every
+release (after the binary is attached), so the sprite always tracks the latest
+release. It skips cleanly if the secret is absent. The first install stays
+manual (it needs `PS_KEY`); CI only performs upgrades.
+
+**sprites.dev has no systemd.** `deploy-sprites.sh` does *not* use
 `install.sh`/`systemd/`; it talks to the sprite's own service manager
 (`sprite-env services`) over the `sprite` CLI. serve is registered as a service
 so it **auto-restarts whenever the sprite wakes** (processes started via
