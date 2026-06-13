@@ -4,7 +4,7 @@
 #
 # NOTE on scheduling: a Sprite scales to zero (sleeps when idle), so the in-VM
 # systemd timer will NOT fire the nightly pipeline. Scheduling is handled
-# externally by deploy/github/sprites-pipeline.yml (a scheduled GitHub Actions
+# externally by .github/workflows/sprites-pipeline.yml (a scheduled GitHub Actions
 # job that wakes the Sprite over SSH and runs the chain). Enable that workflow
 # and add the Sprite's SSH host as a repo secret after provisioning.
 #
@@ -22,4 +22,4 @@ ssh "$HOST" "sudo mkdir -p /data && printf 'POCKETSMITH_API_KEY=%s\n' '$PS_KEY' 
 scp -r deploy "$HOST:~/"
 ssh "$HOST" "SERVE_PORT=8080 bash deploy/install.sh"
 echo "==> Web UI: your Sprite URL (port 8080)"
-echo "==> Enable deploy/github/sprites-pipeline.yml for scheduled runs."
+echo "==> Scheduled runs use .github/workflows/sprites-pipeline.yml (add SPRITE_SSH_* secrets)."
