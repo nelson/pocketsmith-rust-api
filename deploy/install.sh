@@ -22,12 +22,16 @@ curl -fsSL "https://github.com/$REPO/releases/latest/download/$TARBALL" \
   | sudo tar -xz -C /opt/pocketsmith
 
 echo "==> Installing binaries"
-sudo install /opt/pocketsmith/serve      /usr/local/bin/serve
-sudo install /opt/pocketsmith/sync       /usr/local/bin/sync
-sudo install /opt/pocketsmith/transfers  /usr/local/bin/transfers
-sudo install /opt/pocketsmith/normalise  /usr/local/bin/normalise
-sudo install /opt/pocketsmith/categorise /usr/local/bin/categorise
-sudo install /opt/pocketsmith/push       /usr/local/bin/push
+# Install whichever binaries the release tarball actually contains, so a
+# release built before `categorise` (or any future bin) merged still installs
+# the rest. The set of binaries is driven by Cargo.toml via the release build.
+for b in serve sync transfers normalise categorise push; do
+  if [ -f "/opt/pocketsmith/$b" ]; then
+    sudo install "/opt/pocketsmith/$b" "/usr/local/bin/$b"
+  else
+    echo "    (skipping $b — not in this release)"
+  fi
+done
 
 if [ ! -f /data/pocketsmith.env ]; then
   echo "ERROR: /data/pocketsmith.env missing (needs POCKETSMITH_API_KEY)" >&2
