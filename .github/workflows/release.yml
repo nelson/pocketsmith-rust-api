@@ -1,0 +1,60 @@
+name: Release
+
+# Auto-release on merge to master. release-please maintains a release PR from
+# conventional-commit history; merging that PR tags + creates the GitHub
+# Release, which triggers the static-binary build + asset upload below.
+# (The existing ci.yml continues to build+test every push.)
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          release-type: rust
+
+  build-binary:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (musl target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build static binaries
+        run: |
+          cargo build --release --features web --target x86_64-unknown-linux-musl \
+            --bin serve --bin sync --bin transfers --bin normalise \
+            --bin categorise --bin push
+
+      - name: Package tarball
+        run: |
+          mkdir -p dist/rules
+          cp -r rules/* dist/rules/
+          cp target/x86_64-unknown-linux-musl/release/{serve,sync,transfers,normalise,categorise,push} dist/
+          tar -C dist -czf pocketsmith-sync-x86_64-linux-musl.tar.gz .
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: pocketsmith-sync-x86_64-linux-musl.tar.gz

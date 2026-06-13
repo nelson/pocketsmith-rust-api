@@ -46,7 +46,8 @@ fn main() -> Result<()> {
     app.db_path = Some(db::path_from_env());
     let state = Arc::new(Mutex::new(app));
 
-    let addr = format!("127.0.0.1:{port}");
+    let host = std::env::var("SERVE_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let addr = format!("{host}:{port}");
     let server = Server::http(&addr).map_err(|e| anyhow::anyhow!("{e}"))?;
     eprintln!("Serving on http://{addr}");
 

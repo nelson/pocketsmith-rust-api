@@ -1,0 +1,13 @@
+[Unit]
+Description=PocketSmith web UI (transfer/transaction review)
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/default/pocketsmith
+EnvironmentFile=/data/pocketsmith.env
+ExecStart=/usr/local/bin/serve
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
