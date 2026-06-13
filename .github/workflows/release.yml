@@ -66,3 +66,27 @@ jobs:
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: pocketsmith-sync-x86_64-linux-musl.tar.gz
+
+  deploy-sprites:
+    # Auto-deploy (upgrade) to the sprites.dev VM on every real release, after
+    # the binary is attached. Keeps production on the latest release. Skips
+    # cleanly if SPRITE_TOKEN isn't configured. First-time install is still
+    # manual (needs PS_KEY): bash deploy/deploy-sprites.sh
+    needs: [release-please, build-binary]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to sprite (skips if SPRITE_TOKEN unset)
+        env:
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$SPRITE_TOKEN" ]; then
+            echo "SPRITE_TOKEN not set; skipping auto-deploy."
+            exit 0
+          fi
+          # Install the sprite CLI (verify the URL against docs.sprites.dev).
+          curl -fsSL https://sprites.dev/install.sh | sh
+          sprite auth setup --token "$SPRITE_TOKEN"
+          bash deploy/deploy-sprites.sh
