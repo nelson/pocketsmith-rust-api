@@ -42,16 +42,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Build static binaries
+        # `--bins` builds every [[bin]] declared in Cargo.toml whose
+        # required-features are satisfied. The set of shipped binaries is
+        # therefore driven entirely by Cargo.toml — add a [[bin]] there and it
+        # is released automatically (e.g. `categorise` once that work lands on
+        # master), with no edit to this workflow.
         run: |
-          cargo build --release --features web --target x86_64-unknown-linux-musl \
-            --bin serve --bin sync --bin transfers --bin normalise \
-            --bin categorise --bin push
+          cargo build --release --features web --target x86_64-unknown-linux-musl --bins
 
       - name: Package tarball
+        # Copy every binary cargo actually produced (top-level executables in
+        # the target dir), not a hardcoded list, so the tarball always matches
+        # Cargo.toml's [[bin]] declarations.
         run: |
           mkdir -p dist/rules
           cp -r rules/* dist/rules/
-          cp target/x86_64-unknown-linux-musl/release/{serve,sync,transfers,normalise,categorise,push} dist/
+          find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -executable \
+            ! -name '*.d' -exec cp {} dist/ \;
           tar -C dist -czf pocketsmith-sync-x86_64-linux-musl.tar.gz .
 
       - name: Attach to release
