@@ -11,7 +11,7 @@
 # (and optionally GOOGLE_PLACES_API_KEY) before running.
 set -euo pipefail
 
-REPO="${REPO:-<owner>/pocketsmith-rust-api}"   # set me (GitHub owner/repo)
+REPO="${REPO:-nelson/pocketsmith-rust-api}"   # GitHub owner/repo
 PORT="${SERVE_PORT:-3141}"
 TARBALL="pocketsmith-sync-x86_64-linux-musl.tar.gz"
 
