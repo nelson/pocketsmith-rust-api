@@ -35,10 +35,12 @@ jobs:
       - name: Wake sprite and run sync
         run: |
           # Daily run is sync-only for now. Re-enable the rest of the pipeline
-          # when ready by adding more `sprite exec` lines (or a single chained
-          # command).
-          sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/sync
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers --apply
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/categorise
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/push
+          # Daily run is sync-only for now. sync needs POCKETSMITH_API_KEY (from
+          # /data/pocketsmith.env) and the /data DB path, and /data is root-owned
+          # (serve runs as root), so run under sudo with the env sourced.
+          # Re-enable later stages by appending more commands to the chain.
+          sprite -s "$SPRITE_NAME" exec -- sudo bash -c 'set -a; . /data/pocketsmith.env; \
+            export POCKETSMITH_DB=/data/pocketsmith.db POCKETSMITH_RULES_DIR=/opt/pocketsmith/rules; \
+            /usr/local/bin/sync'
+          # ... && /usr/local/bin/transfers && /usr/local/bin/transfers --apply \
+          # ... && /usr/local/bin/categorise && /usr/local/bin/push
