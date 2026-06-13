@@ -34,11 +34,10 @@ jobs:
 
       - name: Wake sprite and run sync
         run: |
-          # Daily run is sync-only for now. Re-enable the rest of the pipeline
-          # when ready by adding more `sprite exec` lines (or a single chained
-          # command).
-          sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/sync
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers --apply
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/categorise
-          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/push
+          # Daily run is sync-only for now. Run with cwd=/data so the binaries
+          # auto-load /data/.env (dotenv) for POCKETSMITH_API_KEY + the DB path;
+          # sudo -E because serve owns /data as the service user.
+          # Re-enable later stages by extending the && chain.
+          sprite -s "$SPRITE_NAME" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync'
+          # ... && sudo -E /usr/local/bin/transfers && sudo -E /usr/local/bin/transfers --apply \
+          # ... && sudo -E /usr/local/bin/categorise && sudo -E /usr/local/bin/push

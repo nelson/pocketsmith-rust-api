@@ -10,15 +10,17 @@
 # Idempotent: if a sprite named "$VM" already exists it is REUSED, not
 # recreated. Safe to re-run to re-provision / upgrade binaries.
 #
-# sprites.dev has no SSH, so everything runs through `sprite exec`. The sprite's
-# public URL is proxied to port 8080, so `serve` listens there. The nightly
-# `sync` is driven externally by .github/workflows/sprites-pipeline.yml (a
-# sleeping sprite can't run its own cron).
+# IMPORTANT: sprites.dev has NO systemd. It runs its own service manager
+# (`sprite-env services`, executed inside the sprite). Services auto-restart
+# when the sprite wakes from sleep; processes started via `exec`/`console` do
+# NOT survive sleep. The sprite's public URL is proxied to the service's
+# --http-port (8080 here). serve + sync auto-load /data/.env via dotenv when
+# run with cwd=/data, so we keep a single env file there.
 set -euo pipefail
 : "${PS_KEY:?export PS_KEY=your-pocketsmith-api-key first}"
 VM="${VM:-pocketsmith}"
 REPO="${REPO:-nelson/pocketsmith-rust-api}"
-PORT=8080   # sprites proxy the public URL to port 8080
+PORT=8080   # sprites proxy the public URL to this port
 
 # Release assets live in a (private) repo, so pass a GitHub token for download.
 GH_TOKEN="${GH_TOKEN:-$(gh auth token --hostname github.com 2>/dev/null || true)}"
@@ -40,7 +42,15 @@ echo "==> Provisioning '$VM'..."
 sprite -s "$VM" exec -- bash -se <<REMOTE
 set -euo pipefail
 sudo mkdir -p /data /opt/pocketsmith
-printf 'POCKETSMITH_API_KEY=%s\n' '$PS_KEY' | sudo tee /data/pocketsmith.env >/dev/null
+
+# Single env file, auto-loaded by serve and sync (dotenv) when cwd=/data.
+sudo tee /data/.env >/dev/null <<ENVF
+POCKETSMITH_API_KEY=$PS_KEY
+POCKETSMITH_DB=/data/pocketsmith.db
+POCKETSMITH_RULES_DIR=/opt/pocketsmith/rules
+SERVE_HOST=0.0.0.0
+SERVE_PORT=$PORT
+ENVF
 
 curl -fsSL $AUTH_HEADER \
   "https://github.com/$REPO/releases/latest/download/pocketsmith-sync-x86_64-linux-musl.tar.gz" \
@@ -52,28 +62,20 @@ for b in serve sync transfers normalise categorise push; do
   [ -f "/opt/pocketsmith/\$b" ] && sudo install "/opt/pocketsmith/\$b" "/usr/local/bin/\$b" || true
 done
 
-sudo tee /etc/systemd/system/pocketsmith-serve.service >/dev/null <<UNIT
-[Unit]
-Description=PocketSmith web UI
-After=network.target
-[Service]
-Environment=POCKETSMITH_DB=/data/pocketsmith.db
-Environment=POCKETSMITH_RULES_DIR=/opt/pocketsmith/rules
-Environment=SERVE_HOST=0.0.0.0
-Environment=SERVE_PORT=$PORT
-EnvironmentFile=/data/pocketsmith.env
-ExecStart=/usr/local/bin/serve
-Restart=always
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now pocketsmith-serve.service
-echo "serve installed and started on port $PORT"
+# Register serve as a Sprite service (auto-restarts on wake, proxied to $PORT).
+# Wrapped in 'bash -c cd /data && exec serve' so dotenv finds /data/.env.
+# Idempotent: drop any prior definition first.
+sprite-env services delete pocketsmith-serve >/dev/null 2>&1 || true
+sprite-env services create pocketsmith-serve \
+  --cmd bash --args '-c,cd /data && exec /usr/local/bin/serve' \
+  --http-port $PORT
+echo "serve registered as a sprite service on port $PORT"
 REMOTE
 
-echo "==> Web UI URL:"
+echo "==> Seeding the database (first sync)..."
+sprite -s "$VM" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync' || \
+  echo "    (seed skipped/failed; run manually: sprite -s $VM exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync')"
+
+echo "==> Web UI URL (first hit wakes the sprite + starts the service):"
 sprite -s "$VM" url || true
-echo "==> Seed the DB once:  sprite -s $VM exec -- /usr/local/bin/sync"
 echo "==> Nightly sync: set repo secret SPRITE_TOKEN; see .github/workflows/sprites-pipeline.yml"
