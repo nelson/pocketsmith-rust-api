@@ -349,6 +349,44 @@ CREATE TABLE IF NOT EXISTS rule_impact (
     PRIMARY KEY (stage, rule_id)
 );
 
+-- =====================================================================
+-- Categorisation (final pipeline stage). Two tables: a Google Places
+-- response cache and a proposal staging table. The Google-type ->
+-- category/label mapping is HARDCODED in `src/categorise/map.rs`, not a
+-- table (the place-type set is small + static), so there is no rule_*
+-- table here.
+-- =====================================================================
+
+-- Cache of Google Places (New) `searchText` lookups, keyed by the
+-- normalised query so the distinct merchants drive at most one API call
+-- each, ever. A scan reads this first and only hits the network on a miss.
+CREATE TABLE IF NOT EXISTS place_lookups (
+    query         TEXT PRIMARY KEY,   -- normalised entity+location+region
+    place_id      TEXT,               -- Google place id (NULL = no result)
+    display_name  TEXT,
+    primary_type  TEXT,               -- e.g. 'cafe'
+    types_json    TEXT NOT NULL,      -- full types array as JSON
+    response_json TEXT NOT NULL,      -- raw API body (audit / re-derive)
+    fetched_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    status        TEXT NOT NULL DEFAULT 'ok'  -- 'ok' | 'no_result' | 'error'
+);
+
+-- Staging table for category proposals, parallel to payee_normalisations.
+-- One row per distinct confirmed-merchant key. `proposed_labels` holds a
+-- JSON array of LEAF labels drawn from the hardcoded taxonomy only.
+CREATE TABLE IF NOT EXISTS category_proposals (
+    merchant_key      TEXT PRIMARY KEY,   -- the normalised query / merchant identity
+    proposed_category INTEGER,            -- category_id (resolved), NULL = unmapped
+    proposed_labels   TEXT,               -- JSON array of leaf labels
+    place_type        TEXT,               -- the type that drove the mapping
+    txn_count         INTEGER NOT NULL,
+    status            INTEGER NOT NULL DEFAULT 0 REFERENCES statuses(id),
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    FOREIGN KEY (proposed_category) REFERENCES categories(id)
+);
+CREATE INDEX IF NOT EXISTS idx_category_proposals_status ON category_proposals(status);
+
 CREATE TRIGGER IF NOT EXISTS payee_normalisations_updated_at
 AFTER UPDATE ON payee_normalisations
 FOR EACH ROW
@@ -444,6 +482,16 @@ BEGIN
     UPDATE rule_locations
     SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS category_proposals_updated_at
+AFTER UPDATE ON category_proposals
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at  -- guard against trigger recursion
+BEGIN
+    UPDATE category_proposals
+    SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE merchant_key = NEW.merchant_key;
 END;
 
 CREATE TRIGGER IF NOT EXISTS _transaction_changes_insert

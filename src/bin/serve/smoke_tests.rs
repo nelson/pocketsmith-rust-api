@@ -394,3 +394,51 @@ fn pipeline_detail_fragment_selects_stage() {
         Some("persons")
     );
 }
+
+#[test]
+fn categorise_page_renders_tab_bar_queue_detail_and_actions() {
+    use pocketsmith_sync::db::category_proposals::{self as cp, CategoryProposalRow};
+    use pocketsmith_sync::review::Status;
+
+    let conn = initialize_in_memory().unwrap();
+    conn.execute(
+        "INSERT INTO categories (id, title) VALUES (2, '_Groceries')",
+        [],
+    )
+    .unwrap();
+    cp::upsert(
+        &conn,
+        &CategoryProposalRow {
+            merchant_key: "woolworths strathfield".into(),
+            proposed_category: Some(2),
+            proposed_labels: vec!["supermarket".into()],
+            place_type: Some("supermarket".into()),
+            txn_count: 5,
+            status: Status::Pending,
+        },
+    )
+    .unwrap();
+    let state = Arc::new(Mutex::new(AppState::new(conn)));
+
+    let html = crate::categorise::views::render_page_shell(&state).into_string();
+    contains_all(
+        &html,
+        &[
+            "class=\"tab-bar\"",
+            "class=\"tab active\">Categorise",
+            "href=\"/normalise/\"",
+            "id=\"queue\"",
+            "id=\"detail\"",
+            "id=\"activity\"",
+            // The proposal's category + label appear.
+            "_Groceries",
+            "supermarket",
+            // Detail action buttons wired to the categorise endpoints.
+            "data-action-base=\"/categorise/item/",
+            "[Y] Confirm",
+            "[N] Reject",
+            // Apply button.
+            "/categorise/apply",
+        ],
+    );
+}

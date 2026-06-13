@@ -1,4 +1,5 @@
 mod css;
+mod categorise;
 mod dashboard;
 mod freshness;
 mod helpers;
@@ -160,6 +161,45 @@ fn handle_request(mut request: Request, state: Arc<Mutex<AppState>>) {
         (Method::Post, "/normalise/apply") => {
             normalise::handlers::apply(&state);
             normalise::views::render_page_shell(&state)
+        }
+
+        // --- Categorise tab (final stage: category + label proposals)
+        (Method::Get, "/categorise" | "/categorise/") => categorise::views::render_page_shell(&state),
+        (Method::Get, p) if p.starts_with("/categorise/item/") => {
+            let enc = p.trim_start_matches("/categorise/item/");
+            match categorise::views::decode_key(enc) {
+                Some(key) => categorise::views::render_detail_fragment(&state, &key),
+                None => html! { div.empty-state { p { "Bad proposal id." } } },
+            }
+        }
+        (Method::Get, p) if p.starts_with("/categorise/queue?") => {
+            let params = p.strip_prefix("/categorise/queue?").unwrap_or("");
+            let filter = extract_param(params, "filter").unwrap_or_else(|| "all".to_string());
+            categorise::views::render_queue_fragment(&state, &filter)
+        }
+        (Method::Get, "/categorise/queue") => categorise::views::render_queue_fragment(&state, "all"),
+        (Method::Post, p) if p.starts_with("/categorise/item/") => {
+            let rest = &p["/categorise/item/".len()..];
+            let (enc, verb) = rest.split_once('/').unwrap_or((rest, ""));
+            match categorise::views::decode_key(enc) {
+                Some(key) => match verb {
+                    "confirm" => categorise::handlers::act(&state, &key, Decision::Confirm),
+                    "reject" => categorise::handlers::act(&state, &key, Decision::Reject),
+                    "skip" => categorise::handlers::act(&state, &key, Decision::Skip),
+                    "undo" | "unskip" => categorise::handlers::undo(&state, &key),
+                    _ => {}
+                },
+                None => {}
+            }
+            categorise::views::render_page_shell(&state)
+        }
+        (Method::Post, "/categorise/clear-all-skipped") => {
+            categorise::handlers::clear_all_skipped(&state);
+            categorise::views::render_page_shell(&state)
+        }
+        (Method::Post, "/categorise/apply") => {
+            categorise::handlers::apply(&state);
+            categorise::views::render_page_shell(&state)
         }
 
         // --- Pipeline tab (rule editing)
