@@ -32,8 +32,10 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 "${{ secrets.SPRITE_SSH_HOST }}" '
             set -e
             /usr/local/bin/sync
-            /usr/local/bin/transfers
-            /usr/local/bin/transfers --apply
-            /usr/local/bin/categorise
-            /usr/local/bin/push
+            # Daily run is sync-only for now. Re-enable the rest of the pipeline
+            # when ready:
+            # /usr/local/bin/transfers
+            # /usr/local/bin/transfers --apply
+            # /usr/local/bin/categorise
+            # /usr/local/bin/push
           '
