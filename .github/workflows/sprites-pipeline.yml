@@ -1,14 +1,16 @@
 name: Sprites nightly pipeline
 
 # sprites.dev VMs scale to zero (sleep when idle), so an in-VM systemd timer
-# never fires. This scheduled job wakes the Sprite over SSH and runs the full
-# pipeline. exe.dev / boxd deployments ignore this file (they use the in-VM
-# timer in deploy/systemd/).
+# never fires. This scheduled job wakes the sprite via the `sprite` CLI and
+# runs the pipeline. exe.dev / boxd deployments ignore this file (they use the
+# in-VM timer in deploy/systemd/).
 #
-# To use: copy this file to .github/workflows/ on the branch you deploy from,
-# and add repo secrets:
-#   SPRITE_SSH_HOST  - the Sprite's SSH host (e.g. pocketsmith.sprites)
-#   SPRITE_SSH_KEY   - a private key authorised on the Sprite
+# Required repo secret:
+#   SPRITE_TOKEN - a sprite auth token in the form
+#                  "<org>/<id>/<token-id>/<token-value>"
+#                  (see `sprite auth setup --token`).
+# Optional repo variable:
+#   SPRITE_NAME  - sprite name (defaults to "pocketsmith").
 
 on:
   schedule:
@@ -19,23 +21,24 @@ on:
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    env:
+      SPRITE_NAME: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
     steps:
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SPRITE_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.SPRITE_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+      - name: Install sprite CLI
+        # Use the official installer from https://docs.sprites.dev. Verify the
+        # exact install command/URL against the docs and pin if possible.
+        run: curl -fsSL https://sprites.dev/install.sh | sh
 
-      - name: Wake Sprite and run pipeline
+      - name: Authenticate
+        run: sprite auth setup --token "${{ secrets.SPRITE_TOKEN }}"
+
+      - name: Wake sprite and run sync
         run: |
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.SPRITE_SSH_HOST }}" '
-            set -e
-            /usr/local/bin/sync
-            # Daily run is sync-only for now. Re-enable the rest of the pipeline
-            # when ready:
-            # /usr/local/bin/transfers
-            # /usr/local/bin/transfers --apply
-            # /usr/local/bin/categorise
-            # /usr/local/bin/push
-          '
+          # Daily run is sync-only for now. Re-enable the rest of the pipeline
+          # when ready by adding more `sprite exec` lines (or a single chained
+          # command).
+          sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/sync
+          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers
+          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/transfers --apply
+          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/categorise
+          # sprite -s "$SPRITE_NAME" exec -- /usr/local/bin/push
