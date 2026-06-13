@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-sync-v0.1.1...pocketsmith-sync-v0.1.2) (2026-06-13)
+
+
+### Bug Fixes
+
+* **sprites:** seed DB only on first run, document re-run behaviour ([d1650dc](https://github.com/nelson/pocketsmith-rust-api/commit/d1650dc71ed8fe3aafac145c2c9da3d8dd921ec1))
+* **sprites:** single-line service create, rename to deploy-sprites.sh, auto-deploy on release ([a359560](https://github.com/nelson/pocketsmith-rust-api/commit/a35956068e1f9cf76da0b853b8967e52afbefd7c))
+* **sprites:** use sprite-env service manager instead of systemd ([c3464b5](https://github.com/nelson/pocketsmith-rust-api/commit/c3464b5c8539880a951660cd5f373ed8cfc7a5b8))
+
 ## [0.1.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-sync-v0.1.0...pocketsmith-sync-v0.1.1) (2026-06-13)
 
 
