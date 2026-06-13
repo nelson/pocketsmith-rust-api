@@ -26,13 +26,20 @@ at `/data` and is never baked into the artifact.
    opens → first release + binary tarball.
 2. `export PS_KEY=<your-pocketsmith-key>` then `bash deploy/provision-sprites.sh`
    (sprites CLI authed; `serve` listens on port **8080**).
-3. Add repo secrets `SPRITE_SSH_HOST` and `SPRITE_SSH_KEY` so
+3. Add repo secret `SPRITE_TOKEN` (a `sprite auth setup` token) so
    `.github/workflows/sprites-pipeline.yml` can wake the Sprite nightly.
 
-Scheduling note: Sprites scale to zero, so the in-VM systemd **timer never
-fires**. The nightly job is driven externally by the GitHub Actions workflow,
-which is intentionally `sync`-only right now (re-enable the rest of the chain in
-that file when ready).
+**sprites.dev has no systemd.** `provision-sprites.sh` does *not* use
+`install.sh`/`systemd/`; it talks to the sprite's own service manager
+(`sprite-env services`) over the `sprite` CLI. serve is registered as a service
+so it **auto-restarts whenever the sprite wakes** (processes started via
+`sprite exec`/`console` don't survive sleep). serve + sync auto-load `/data/.env`
+via dotenv (run with cwd `/data`).
+
+Scheduling note: Sprites scale to zero, so an in-VM timer never fires. The
+nightly job is driven externally by the GitHub Actions workflow, which is
+intentionally `sync`-only right now (re-enable the rest of the chain in that
+file when ready).
 
 ---
 
