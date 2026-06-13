@@ -7,8 +7,13 @@
 #       sprite auth setup --token "<org>/<id>/<token-id>/<token-value>"
 #   - PS_KEY exported (your PocketSmith API key).
 #
-# Idempotent: if a sprite named "$VM" already exists it is REUSED, not
-# recreated. Safe to re-run to re-provision / upgrade binaries.
+# Idempotent. Re-run this script to UPGRADE to the latest release or change
+# config. On subsequent runs it: reuses the existing sprite (no new VM),
+# rewrites /data/.env, re-downloads releases/latest and reinstalls the
+# binaries, recreates the `serve` service so it picks up the new binary, and
+# SKIPS the DB seed if /data/pocketsmith.db already exists. It never wipes the
+# DB. You do NOT run this on a schedule — the nightly sync is a separate GitHub
+# Actions workflow (sprites-pipeline.yml).
 #
 # IMPORTANT: sprites.dev has NO systemd. It runs its own service manager
 # (`sprite-env services`, executed inside the sprite). Services auto-restart
@@ -77,9 +82,17 @@ sprite-env services create pocketsmith-serve \
 echo "serve registered as a sprite service on port $PORT"
 REMOTE
 
-echo "==> Seeding the database (first sync)..."
-sprite -s "$VM" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync' || \
-  echo "    (seed skipped/failed; run manually: sprite -s $VM exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync')"
+# Seed the DB on the FIRST run only. /data persists across runs, and the
+# nightly workflow keeps it fresh, so skip if pocketsmith.db already exists.
+# (sync is incremental, so even an accidental re-run is cheap and non-destructive.)
+echo "==> Seeding the database (first run only)..."
+sprite -s "$VM" exec -- bash -c '
+  if [ -f /data/pocketsmith.db ]; then
+    echo "    /data/pocketsmith.db already exists — skipping seed."
+  else
+    cd /data && sudo -E /usr/local/bin/sync
+  fi' || \
+  echo "    (seed skipped/failed; run manually: sprite -s $VM exec -- bash -c '\''cd /data && sudo -E /usr/local/bin/sync'\'')"
 
 echo "==> Web UI URL (first hit wakes the sprite + starts the service):"
 sprite -s "$VM" url || true
