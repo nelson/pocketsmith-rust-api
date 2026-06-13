@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-sync-v0.1.0...pocketsmith-sync-v0.1.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **sprites:** provision via sprite CLI with idempotent create ([9383ee5](https://github.com/nelson/pocketsmith-rust-api/commit/9383ee525db9abadd11e181b39afa16aecc1c342))
+
 ## [0.1.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-sync-v0.1.0...pocketsmith-sync-v0.1.0) (2026-06-13)
 
 
