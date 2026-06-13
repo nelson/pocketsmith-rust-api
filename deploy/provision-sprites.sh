@@ -62,13 +62,18 @@ for b in serve sync transfers normalise categorise push; do
   [ -f "/opt/pocketsmith/\$b" ] && sudo install "/opt/pocketsmith/\$b" "/usr/local/bin/\$b" || true
 done
 
-# Register serve as a Sprite service (auto-restarts on wake, proxied to $PORT).
-# Wrapped in 'bash -c cd /data && exec serve' so dotenv finds /data/.env.
-# Idempotent: drop any prior definition first.
+# Register serve as a Sprite service (auto-restarts on wake; the proxy routes
+# the Sprite URL to --http-port and starts the service on incoming requests).
+# --dir /data makes serve run with cwd=/data so it auto-loads /data/.env
+# (dotenv) for the API key, DB path, and SERVE_HOST/PORT. --no-stream returns
+# immediately instead of streaming 5s of logs. Only one service may own the
+# HTTP port, so drop any prior definition first (idempotent re-provision).
 sprite-env services delete pocketsmith-serve >/dev/null 2>&1 || true
 sprite-env services create pocketsmith-serve \
-  --cmd bash --args '-c,cd /data && exec /usr/local/bin/serve' \
-  --http-port $PORT
+  --cmd /usr/local/bin/serve \
+  --dir /data \
+  --http-port $PORT \
+  --no-stream
 echo "serve registered as a sprite service on port $PORT"
 REMOTE
 
