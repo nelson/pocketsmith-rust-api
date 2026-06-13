@@ -1,5 +1,30 @@
 # Deploy pocketsmith-sync to a public cloud VM (exe.dev / boxd.sh / sprites.dev)
 
+## Status (implementation)
+
+**Chosen vendor: sprites.dev.** All build/authoring work is complete and pushed
+to branch `deploy/cloud-vms` → PR #41. Runtime verification (live VM, merged
+release) is still pending — see the Verification checklist at the bottom.
+
+Done:
+
+- [x] `SERVE_HOST` patch in `src/bin/serve/main.rs` (compiles with `--features web`).
+- [x] `.github/workflows/release.yml` — release-please + static-musl tarball build.
+- [x] `release-please-config.json` + `.release-please-manifest.json` (pinned 0.1.0).
+- [x] `deploy/install.sh` (owner=nelson), `deploy/systemd/*`, `deploy/provision-*.sh`.
+- [x] `.github/workflows/sprites-pipeline.yml` — external scheduler, **sync-only** daily.
+- [x] `deploy/README.md` — setup + how to switch vendors.
+- [x] Branch pushed, PR #41 opened.
+
+Deviations from the plan as written below:
+
+- Owner placeholder `<owner>` resolved to `nelson`; branch is `deploy/cloud-vms`.
+- The sprites scheduler lives at `.github/workflows/sprites-pipeline.yml` (the
+  `deploy/.github/...` template copy in §6 was removed to avoid duplication).
+- The daily sprites job runs `sync` only; the rest of the pipeline is commented
+  out in the workflow.
+
+
 ## Context
 
 Ship `pocketsmith-sync` to a public, low-maintenance cloud VM. The user wants to compare three SSH-native microVM providers and pick based on cost. This plan builds **deploy scripts for all three** so the choice is data-driven.
@@ -264,11 +289,13 @@ Since the scripts are built for all three, deploy to two and watch the first mon
 
 ## Verification
 
-- [ ] `cargo build --release --features web --target x86_64-unknown-linux-musl` produces static binaries locally.
+Runtime checks — all pending until PR #41 is merged and a Sprite is provisioned.
+
+- [~] `cargo build --release --features web --target x86_64-unknown-linux-musl` produces static binaries locally. *(Runs in CI on `ubuntu-latest`; can't cross-compile on this aarch64-darwin/nix machine. Native `--features web` build verified instead.)*
 - [ ] A merged PR triggers release-please → GitHub Release with `pocketsmith-sync-x86_64-linux-musl.tar.gz` attached.
 - [ ] `bash deploy/install.sh` on a fresh VM installs binaries + units; `systemctl status pocketsmith-serve` is active.
-- [ ] Web UI loads at the vendor URL (`*.exe.xyz` / `*.boxd.sh` / Sprite URL) behind its auth.
-- [ ] exe.dev/boxd: `systemctl list-timers pocketsmith-pipeline.timer` shows next run; a manual `systemctl start pocketsmith-pipeline.service` runs the full chain cleanly (`journalctl -u pocketsmith-pipeline`).
-- [ ] sprites: the scheduled GH workflow wakes the Sprite and completes the pipeline.
+- [ ] Web UI loads at the Sprite URL (port 8080) behind its auth.
+- [ ] sprites: the scheduled GH workflow wakes the Sprite and runs `sync` (sync-only for now).
+- [ ] exe.dev/boxd *(only if you add them later)*: `systemctl list-timers pocketsmith-pipeline.timer` shows next run; manual `systemctl start pocketsmith-pipeline.service` runs the full chain (`journalctl -u pocketsmith-pipeline`).
 - [ ] Make a review decision in the UI, restart `serve`, decision persists (DB on `/data`).
-- [ ] After ~1 month, compare `billing usage` across the providers you trialled.
+- [ ] After ~1 month, compare `billing usage`.
