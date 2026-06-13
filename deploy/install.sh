@@ -51,7 +51,7 @@ sudo systemctl enable --now pocketsmith-serve.service
 
 # The timer fires only on always-on VMs (exe.dev / boxd). On sprites the VM
 # sleeps, so the timer never fires; scheduling is driven externally by the
-# GitHub Actions workflow in deploy/github/sprites-pipeline.yml instead.
+# GitHub Actions workflow in .github/workflows/sprites-pipeline.yml instead.
 # Enabling it here is harmless on sprites.
 sudo systemctl enable --now pocketsmith-pipeline.timer
 
