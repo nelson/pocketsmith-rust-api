@@ -11,7 +11,7 @@
 //! match; the three loop stages (prefix / suffix / expand) don't surface
 //! a single "winning rule", so they carry no per-rule impact number.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use rusqlite::Connection;
@@ -96,7 +96,7 @@ pub fn attribute(conn: &Connection, payees: &[PayeeSample]) -> Result<Vec<RuleIm
         // payee/txns once).
         for s in LOOP_STAGES {
             let name = loop_trace_name(s);
-            let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+            let mut seen: HashSet<&str> = HashSet::new();
             for entry in result.trace.iter().filter(|t| t.stage == name) {
                 for pat in &entry.fired {
                     if !seen.insert(pat.as_str()) {
