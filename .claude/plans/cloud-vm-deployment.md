@@ -1,28 +1,42 @@
 # Deploy pocketsmith-sync to a public cloud VM (exe.dev / boxd.sh / sprites.dev)
 
-## Status (implementation)
+## Status (implementation): LIVE on sprites.dev
 
-**Chosen vendor: sprites.dev.** All build/authoring work is complete and pushed
-to branch `deploy/cloud-vms` → PR #41. Runtime verification (live VM, merged
-release) is still pending — see the Verification checklist at the bottom.
+**Chosen vendor: sprites.dev — deployed and serving.** All build work is merged
+(PRs #41, #43, #46), release **v0.1.2** is published, and the sprite is running:
+`serve` is registered as a wake-on-request service on 8080, the DB is seeded
+(~22.3k txns), the web UI loads behind sprite auth, and the nightly `sync`
+workflow is confirmed working.
 
 Done:
 
-- [x] `SERVE_HOST` patch in `src/bin/serve/main.rs` (compiles with `--features web`).
-- [x] `.github/workflows/release.yml` — release-please + static-musl tarball build.
-- [x] `release-please-config.json` + `.release-please-manifest.json` (pinned 0.1.0).
-- [x] `deploy/install.sh` (owner=nelson), `deploy/systemd/*`, `deploy/provision-*.sh`.
-- [x] `.github/workflows/sprites-pipeline.yml` — external scheduler, **sync-only** daily.
-- [x] `deploy/README.md` — setup + how to switch vendors.
-- [x] Branch pushed, PR #41 opened.
+- [x] `SERVE_HOST` patch in `src/bin/serve/main.rs` (configurable bind host).
+- [x] `.github/workflows/release.yml` — release-please + **Cargo.toml-driven**
+  (`--bins`) static-musl tarball build + a `deploy-sprites` auto-deploy job.
+- [x] `release-please-config.json` + `.release-please-manifest.json`.
+- [x] Conventional Commits mandated in `AGENTS.md` (release-please depends on it).
+- [x] `deploy/install.sh` + `deploy/systemd/*` + `deploy/provision-{exe,boxd}.sh`
+  (the always-on / systemd path for exe.dev & boxd).
+- [x] `deploy/deploy-sprites.sh` — sprites install **and** upgrade via the
+  `sprite-env` service manager (no systemd); idempotent.
+- [x] `.github/workflows/sprites-pipeline.yml` — nightly `sync` over the sprite CLI.
+- [x] `deploy/README.md` + root README deployment section.
+- [x] Release **v0.1.2** with `pocketsmith-sync-x86_64-linux-musl.tar.gz` attached.
+- [x] `SPRITE_TOKEN` secret set → nightly sync + release auto-deploy enabled.
 
 Deviations from the plan as written below:
 
-- Owner placeholder `<owner>` resolved to `nelson`; branch is `deploy/cloud-vms`.
-- The sprites scheduler lives at `.github/workflows/sprites-pipeline.yml` (the
-  `deploy/.github/...` template copy in §6 was removed to avoid duplication).
-- The daily sprites job runs `sync` only; the rest of the pipeline is commented
-  out in the workflow.
+- Owner `<owner>` → `nelson`. Merged via PRs #41, #43, #46.
+- **sprites.dev has no systemd.** It uses its own service manager
+  (`sprite-env services`), so the sprites path does NOT use `install.sh`/
+  `systemd/` — those remain for the always-on vendors (exe.dev / boxd) only.
+- `provision-sprites.sh` was **renamed to `deploy-sprites.sh`** (install +
+  upgrade entrypoint); env write + DB seed are first-run-only.
+- The release build is **Cargo.toml-driven** (`--bins`); `categorise` ships
+  automatically once PR #40 merges its `[[bin]]`.
+- **Auto-deploy on release**: the `deploy-sprites` job in `release.yml` upgrades
+  the sprite on every release (skips if `SPRITE_TOKEN` is unset).
+- The sprites scheduler is a single file; the daily job is `sync`-only.
 
 
 ## Context
@@ -289,13 +303,15 @@ Since the scripts are built for all three, deploy to two and watch the first mon
 
 ## Verification
 
-Runtime checks — all pending until PR #41 is merged and a Sprite is provisioned.
+Live status — the sprites.dev deployment is up; remaining unchecked items are optional/follow-ups.
 
-- [~] `cargo build --release --features web --target x86_64-unknown-linux-musl` produces static binaries locally. *(Runs in CI on `ubuntu-latest`; can't cross-compile on this aarch64-darwin/nix machine. Native `--features web` build verified instead.)*
-- [ ] A merged PR triggers release-please → GitHub Release with `pocketsmith-sync-x86_64-linux-musl.tar.gz` attached.
-- [ ] `bash deploy/install.sh` on a fresh VM installs binaries + units; `systemctl status pocketsmith-serve` is active.
-- [ ] Web UI loads at the Sprite URL (port 8080) behind its auth.
-- [ ] sprites: the scheduled GH workflow wakes the Sprite and runs `sync` (sync-only for now).
-- [ ] exe.dev/boxd *(only if you add them later)*: `systemctl list-timers pocketsmith-pipeline.timer` shows next run; manual `systemctl start pocketsmith-pipeline.service` runs the full chain (`journalctl -u pocketsmith-pipeline`).
+- [x] Static musl binaries build in CI (`v0.1.2` build succeeded on `ubuntu-latest`). *(Can't cross-compile locally on aarch64-darwin/nix; native `--features web` build verified.)*
+- [x] A merged PR triggers release-please → GitHub Release with `pocketsmith-sync-x86_64-linux-musl.tar.gz` attached.
+- [x] `deploy/deploy-sprites.sh` installs binaries and registers `serve` with the sprite service manager (`sprite-env services list` confirmed); DB seeded (~22.3k txns).
+- [x] Web UI loads at the Sprite URL (port 8080) behind its auth.
+- [x] Nightly `sprites-pipeline.yml` wakes the sprite and runs `sync` (confirmed; `SPRITE_TOKEN` set).
+- [ ] Release auto-deploy (`deploy-sprites` job) upgrades the sprite on a new release. *(`SPRITE_TOKEN` set; runs on the next release.)*
+- [ ] exe.dev/boxd *(only if you add them later)*: `systemctl list-timers pocketsmith-pipeline.timer` shows next run; manual `systemctl start pocketsmith-pipeline.service` runs the full chain.
 - [ ] Make a review decision in the UI, restart `serve`, decision persists (DB on `/data`).
-- [ ] After ~1 month, compare `billing usage`.
+- [ ] `categorise` ships in a release once PR #40 merges (Cargo.toml-driven build picks it up).
+- [ ] ~~After ~1 month, compare `billing usage`.~~ *(skipped by choice.)*

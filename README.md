@@ -271,6 +271,27 @@ Runs the normalise binary in dry-run mode, presents coverage metrics, then walks
 
 This is a review-only skill - it does not modify source files or the database.
 
+## Deployment
+
+The app is **deployed and live** on a public **sprites.dev** microVM, behind the
+vendor's built-in URL auth. Deployment is automated end to end:
+
+- **Releases** are cut by [release-please](https://github.com/googleapis/release-please)
+  from [Conventional Commits](https://www.conventionalcommits.org) (`feat:` /
+  `fix:`) — see `AGENTS.md`. Each release builds a static
+  `x86_64-unknown-linux-musl` tarball and attaches it to the GitHub Release.
+- **Deploy** (`deploy/deploy-sprites.sh`) installs/upgrades the binaries on the
+  sprite and registers `serve` with the sprite service manager (`sprite-env
+  services`, which auto-restarts on wake). Releases auto-deploy via the
+  `deploy-sprites` job in `.github/workflows/release.yml`.
+- **Automation**: a nightly GitHub Actions job (`sprites-pipeline.yml`) wakes the
+  sprite and runs `sync`.
+
+Full instructions — first install, upgrades, the nightly job, cost notes, and how
+to switch to exe.dev / boxd.sh — are in **[`deploy/README.md`](./deploy/README.md)**.
+The design rationale, vendor comparison, and live status are in
+[`.claude/plans/cloud-vm-deployment.md`](./.claude/plans/cloud-vm-deployment.md).
+
 ## Testing
 
 ```
