@@ -30,6 +30,7 @@ pub fn render_tab_bar(active: &str) -> Markup {
         ("pipeline", "Pipeline", "/pipeline/"),
         ("transfers", "Transfers", "/transfers/"),
         ("normalise", "Normalise", "/normalise/"),
+        ("categorise", "Categorise", "/categorise/"),
     ];
     html! {
         nav.tab-bar {
@@ -191,7 +192,7 @@ mod tests {
     #[test]
     fn tab_bar_renders_five_tabs_in_canonical_order() {
         let html = render_tab_bar("dashboard").into_string();
-        let positions: Vec<usize> = ["Dashboard", "Transactions", "Pipeline", "Transfers", "Normalise"]
+        let positions: Vec<usize> = ["Dashboard", "Transactions", "Pipeline", "Transfers", "Normalise", "Categorise"]
             .iter()
             .map(|label| {
                 html.find(label)
@@ -243,7 +244,7 @@ mod tests {
     /// rendered HTML.
     #[test]
     fn tab_bar_active_slug_is_exclusive() {
-        for active in ["dashboard", "transactions", "pipeline", "transfers", "normalise"] {
+        for active in ["dashboard", "transactions", "pipeline", "transfers", "normalise", "categorise"] {
             let html = render_tab_bar(active).into_string();
             let count = html.matches("class=\"tab active\"").count();
             assert_eq!(
