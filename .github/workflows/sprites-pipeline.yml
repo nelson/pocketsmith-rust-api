@@ -38,6 +38,6 @@ jobs:
           # auto-load /data/.env (dotenv) for POCKETSMITH_API_KEY + the DB path;
           # sudo -E because serve owns /data as the service user.
           # Re-enable later stages by extending the && chain.
-          sprite -s "$SPRITE_NAME" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/sync'
-          # ... && sudo -E /usr/local/bin/transfers && sudo -E /usr/local/bin/transfers --apply \
-          # ... && sudo -E /usr/local/bin/categorise && sudo -E /usr/local/bin/push
+          sprite -s "$SPRITE_NAME" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/pocketsmith sync'
+          # ... && sudo -E /usr/local/bin/pocketsmith transfers && sudo -E /usr/local/bin/pocketsmith transfers --apply \
+          # ... && sudo -E /usr/local/bin/pocketsmith categorise && sudo -E /usr/local/bin/pocketsmith push

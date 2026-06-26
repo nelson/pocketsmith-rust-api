@@ -21,17 +21,15 @@ echo "==> Downloading latest release from $REPO"
 curl -fsSL "https://github.com/$REPO/releases/latest/download/$TARBALL" \
   | sudo tar -xz -C /opt/pocketsmith
 
-echo "==> Installing binaries"
-# Install whichever binaries the release tarball actually contains, so a
-# release built before `categorise` (or any future bin) merged still installs
-# the rest. The set of binaries is driven by Cargo.toml via the release build.
-for b in serve sync transfers normalise categorise push; do
-  if [ -f "/opt/pocketsmith/$b" ]; then
-    sudo install "/opt/pocketsmith/$b" "/usr/local/bin/$b"
-  else
-    echo "    (skipping $b — not in this release)"
-  fi
-done
+echo "==> Installing binary"
+# The toolkit now ships as a single `pocketsmith` binary; every former command
+# (sync, transfers, normalise, serve, push, dump, rule) is a subcommand.
+if [ -f /opt/pocketsmith/pocketsmith ]; then
+  sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
+else
+  echo "ERROR: pocketsmith binary missing from release tarball" >&2
+  exit 1
+fi
 
 if [ ! -f /data/pocketsmith.env ]; then
   echo "ERROR: /data/pocketsmith.env missing (needs POCKETSMITH_API_KEY)" >&2

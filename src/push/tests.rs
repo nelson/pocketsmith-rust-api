@@ -1210,7 +1210,7 @@ fn re_edit_after_push_picks_up_only_new_change() {
     assert_eq!(first.pushed, 1);
 
     // Simulate sync absorbing the server's bumped updated_at — production
-    // does this on the next `cargo run --bin sync`. We need it because the
+    // does this on the next `pocketsmith sync`. We need it because the
     // stub stamped a new updated_at into its remote view.
     *api.next_updated_at.borrow_mut() = "2024-07-01T00:00:00Z".into();
     api.set_remote(remote_matching(1, "2024-07-01T00:00:00Z"));
