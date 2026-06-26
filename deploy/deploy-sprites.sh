@@ -57,25 +57,23 @@ else
   echo "/data/.env exists; keeping existing config"
 fi
 
-# Download + install whichever binaries the release contains (single line: no
-# fragile backslash-continuations inside the heredoc).
+# Download + install the single `pocketsmith` binary (every former command is
+# now a subcommand). Single line: no fragile backslash-continuations.
 curl -fsSL $AUTH_HEADER "https://github.com/$REPO/releases/latest/download/pocketsmith-sync-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
-for b in serve sync transfers normalise categorise push; do
-  [ -f "/opt/pocketsmith/\$b" ] && sudo install "/opt/pocketsmith/\$b" "/usr/local/bin/\$b" || true
-done
+sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
 
 # Register serve as a Sprite service (single line). --dir /data => cwd=/data so
 # serve auto-loads /data/.env. --no-stream returns immediately. Only one service
 # may own the HTTP port, so drop any prior definition first.
 sprite-env services delete pocketsmith-serve >/dev/null 2>&1 || true
-sprite-env services create pocketsmith-serve --cmd /usr/local/bin/serve --dir /data --http-port $PORT --no-stream
+sprite-env services create pocketsmith-serve --cmd "/usr/local/bin/pocketsmith serve" --dir /data --http-port $PORT --no-stream
 echo "serve registered as a sprite service on port $PORT"
 REMOTE
 
 # 3. Seed the DB on FIRST install only (skip if it already exists; the nightly
 #    workflow keeps it fresh thereafter). Single-line remote command.
 echo "==> Seeding the database (first run only)..."
-sprite -s "$VM" exec -- bash -c 'if [ -f /data/pocketsmith.db ]; then echo "    /data/pocketsmith.db exists — skipping seed."; else cd /data && sudo -E /usr/local/bin/sync; fi' || \
+sprite -s "$VM" exec -- bash -c 'if [ -f /data/pocketsmith.db ]; then echo "    /data/pocketsmith.db exists — skipping seed."; else cd /data && sudo -E /usr/local/bin/pocketsmith sync; fi' || \
   echo "    (seed skipped/failed; seed manually later)"
 
 echo "==> Web UI URL (first hit wakes the sprite + starts the service):"

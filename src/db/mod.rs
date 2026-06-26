@@ -15,21 +15,58 @@ pub use users::upsert_user;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 
-/// Default DB filename used by the binaries when `POCKETSMITH_DB` is
-/// unset. Lives alongside `cwd` so a developer running `cargo run` from
-/// the project root will hit the production DB by default.
-pub const DEFAULT_DB_PATH: &str = "pocketsmith.db";
+/// SQLite filename stored under the XDG data directory when
+/// `POCKETSMITH_DB` is unset.
+pub const DEFAULT_DB_FILE: &str = "pocketsmith.db";
 
-/// Pick the SQLite database path each binary should open. Reads the
-/// `POCKETSMITH_DB` env var if set, otherwise falls back to
-/// [`DEFAULT_DB_PATH`]. Every binary calls this rather than
-/// hard-coding the filename so smoke / dev runs can point at an
-/// isolated file (e.g. `POCKETSMITH_DB=/tmp/test.db cargo run --bin serve`).
+/// XDG sub-directory the long-lived database lives in by default.
+pub const APP_DATA_DIR: &str = "pocketsmith";
+
+/// Default database path when `POCKETSMITH_DB` is unset:
+/// `$XDG_DATA_HOME/pocketsmith/pocketsmith.db`, falling back to
+/// `$HOME/.local/share/pocketsmith/pocketsmith.db`. This keeps the
+/// long-lived, daily-synced DB in the user data dir rather than tied to
+/// whatever cwd a command happens to run from.
+fn default_db_path() -> String {
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .filter(|v| !v.is_empty())
+                .map(|home| std::path::PathBuf::from(home).join(".local").join("share"))
+        });
+
+    match base {
+        Some(dir) => dir.join(APP_DATA_DIR).join(DEFAULT_DB_FILE).to_string_lossy().into_owned(),
+        // No HOME/XDG_DATA_HOME (unusual): fall back to the cwd-relative file
+        // rather than panicking, preserving a usable default.
+        None => DEFAULT_DB_FILE.to_string(),
+    }
+}
+
+/// Pick the SQLite database path each command should open. Reads the
+/// `POCKETSMITH_DB` env var if set, otherwise falls back to the XDG data
+/// dir (see [`default_db_path`]). Every command calls this rather than
+/// hard-coding the filename so smoke / dev runs can point at an isolated
+/// file (e.g. `POCKETSMITH_DB=/tmp/test.db cargo run -- serve`).
 pub fn path_from_env() -> String {
-    std::env::var("POCKETSMITH_DB").unwrap_or_else(|_| DEFAULT_DB_PATH.to_string())
+    std::env::var("POCKETSMITH_DB")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(default_db_path)
 }
 
 pub fn initialize(path: &str) -> Result<Connection> {
+    // Ensure the parent directory exists (e.g. the XDG data dir on a fresh
+    // machine). `Connection::open` won't create it, so first run would
+    // otherwise fail with "unable to open database file".
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create database directory {}", parent.display()))?;
+        }
+    }
     let conn = Connection::open(path).context("Failed to open database")?;
 
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;

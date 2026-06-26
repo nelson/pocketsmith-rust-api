@@ -176,7 +176,7 @@ fn test_transaction_lifecycle() {
 // --- push pipeline lifecycle (real client, in-memory DB) ---
 
 /// End-to-end: drive `push::push` against the real PocketSmith API for a
-/// single dummy transaction. Mirrors what `cargo run --bin push` does for
+/// single dummy transaction. Mirrors what `pocketsmith push` does for
 /// one of the 1000+ pending normalise-apply rows in production, but on a
 /// transaction we own and clean up.
 ///

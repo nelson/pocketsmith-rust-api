@@ -1,8 +1,10 @@
 # pocketsmith-sync
 
-Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Includes CLI binaries for sync / normalisation / transfer detection / push-to-Pocketsmith, and a local web UI for reviewing transfer pairs.
+Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Everything ships as a single `pocketsmith` binary whose first argument is a subcommand — `sync`, `transfers`, `normalise`, `push`, `dump`, `rule`, and `serve` (the local web UI for reviewing transfer pairs). Run `pocketsmith help` for the command list and `pocketsmith version` for the current release.
 
-Most data — including review decisions (confirm/reject) — lives locally in `pocketsmith.db`. The `push` binary is the only path that writes back to PocketSmith; it is opt-in and currently limited to confirmed transfer pairs (Stage 1 of the push rollout — see `.claude/plans/push-overview.md`).
+The database is long-lived and synced daily. By default it lives at `$XDG_DATA_HOME/pocketsmith/pocketsmith.db` (falling back to `~/.local/share/pocketsmith/pocketsmith.db`); override the location with the `POCKETSMITH_DB` environment variable.
+
+Most data — including review decisions (confirm/reject) — lives locally in that database. The `push` subcommand is the only path that writes back to PocketSmith; it is opt-in and currently limited to confirmed transfer pairs (Stage 1 of the push rollout — see `.claude/plans/push-overview.md`).
 
 ## Setup
 
@@ -25,7 +27,7 @@ If `cargo` isn't found, locate it with e.g. `find /nix/store -maxdepth 3 -name c
 Pull all transactions, accounts, and categories from PocketSmith into `pocketsmith.db`:
 
 ```
-cargo run --bin sync
+cargo run -- sync
 ```
 
 Subsequent runs fetch only transactions updated since the last sync.
@@ -39,13 +41,13 @@ Detects internal transfers between your own accounts - paired transactions with 
 Runs the pairing algorithm, inserts new pairs into the DB, and auto-confirms high-confidence matches:
 
 ```
-cargo run --bin transfers
+cargo run -- transfers
 ```
 
 Use `--no-auto` to insert all pairs as `pending` (no auto-confirm):
 
 ```
-cargo run --bin transfers -- --no-auto
+cargo run -- transfers --no-auto
 ```
 
 ### Review (web UI)
@@ -53,10 +55,10 @@ cargo run --bin transfers -- --no-auto
 To review pending pairs, run the local web server (feature-gated behind `web`):
 
 ```
-cargo run --bin serve --features web
+cargo run --features web -- serve
 ```
 
-Then open <http://127.0.0.1:3141>. Override the port with `SERVE_PORT=4000 cargo run --bin serve --features web`.
+Then open <http://127.0.0.1:3141>. Override the port with `SERVE_PORT=4000 cargo run --features web -- serve`.
 
 The server hosts the tabs **Dashboard · Transactions · Pipeline · Transfers · Normalise**. Dashboard, Transactions, Pipeline, Transfers and Normalise are implemented today; the Review tab has a plan in `.claude/plans/review-tab-mvp.md` and is not yet built.
 
@@ -70,7 +72,7 @@ The original surface, for reviewing pending transfer pairs:
 - **Detail (right)** — side-by-side transaction cards for the selected pair, prior transfer history for the two accounts, and **Y confirm / N reject / S skip** action buttons (also bound to keyboard shortcuts).
 - **Activity (bottom)** — running log of decisions made this session with per-row undo, plus confirmed/rejected/skipped/undone counts and a "clear all skipped" action.
 
-Confirm and Reject write straight to the `transfer_pairs.status` column in `pocketsmith.db`. Skip is in-memory only (not persisted) and is forgotten when the server restarts. The web UI does **not** apply confirmed pairs to the `transactions` table — run `cargo run --bin transfers -- --apply` for that step.
+Confirm and Reject write straight to the `transfer_pairs.status` column in `pocketsmith.db`. Skip is in-memory only (not persisted) and is forgotten when the server restarts. The web UI does **not** apply confirmed pairs to the `transactions` table — run `cargo run -- transfers --apply` for that step.
 
 This is a graphical alternative to the now-removed `--review` CLI flag.
 
@@ -102,7 +104,7 @@ Both are created idempotently by `db::initialize` (see `src/db/schema.rs`). On a
 Applies all confirmed pairs - sets `category_id` to `_Transfer`, `is_transfer = 1`, and appends a `[paired:<other_id>]` backreference to each leg's `memo` (preserving any existing memo content, idempotent). Changes are tracked via `_operations` with reason `"transfers"`:
 
 ```
-cargo run --bin transfers -- --apply
+cargo run -- transfers --apply
 ```
 
 ### Backfill paired-marker memos
@@ -110,9 +112,9 @@ cargo run --bin transfers -- --apply
 One-shot retroactive command: appends `[paired:<other_id>]` to the memos of every transfer pair that was applied *before* this feature shipped (re-derives pair identity from `is_transfer=1` transactions using the same matching rules as `find_pairs`, since `transfer_pairs` rows are deleted at apply time). Idempotent across re-runs. After running this, `push` will pick the memo edits up like any other transfer-side change.
 
 ```
-cargo run --bin transfers -- --annotate-existing
-cargo run --bin push -- --dry-run   # verify the PUTs look right
-cargo run --bin push                # actually send them
+cargo run -- transfers --annotate-existing
+cargo run -- push --dry-run   # verify the PUTs look right
+cargo run -- push                # actually send them
 ```
 
 ### Confidence scoring
@@ -153,13 +155,13 @@ This is the Stage 3 push surface (all six locally-mutated fields: `payee`, `cate
 Lists the work without issuing any PUTs:
 
 ```
-cargo run --bin push -- --dry-run
+cargo run -- push --dry-run
 ```
 
 ### Apply
 
 ```
-cargo run --bin push
+cargo run -- push
 ```
 
 Optional flags:
@@ -198,10 +200,10 @@ Dedicated regression tests live in `tests/schema_conventions.rs` (`transactions_
 ### Typical workflow
 
 ```
-cargo run --bin transfers -- --apply   # write local is_transfer + category_id
-cargo run --bin push -- --dry-run      # preview
-cargo run --bin push                   # actually PUT
-cargo run --bin sync                   # pulls the server-bumped updated_at
+cargo run -- transfers --apply   # write local is_transfer + category_id
+cargo run -- push --dry-run      # preview
+cargo run -- push                   # actually PUT
+cargo run -- sync                   # pulls the server-bumped updated_at
 ```
 
 The explicit `sync` after `push` is the supported pattern for keeping the local mirror in step with what the server now reports.
@@ -215,7 +217,7 @@ Cleans raw bank payee strings (e.g. `"WOOLWORTHS 1624 STRATHF, Card xx9172 Value
 Preview what the normalisation would produce without writing to the database. Prints a summary report showing classification breakdown, merchant coverage metrics, and the top gaps:
 
 ```
-cargo run --bin normalise -- --dry-run
+cargo run -- normalise --dry-run
 ```
 
 Example output:
@@ -247,7 +249,7 @@ Total transactions: 21353
 Run the pipeline and write normalised payee strings to `transactions.payee`. All changes are tracked via `_operations` with reason `"normalisation"`. Only rows where the payee actually changes are written (unchanged values are skipped to avoid polluting the history table):
 
 ```
-cargo run --bin normalise
+cargo run -- normalise
 ```
 
 Formatting rules:

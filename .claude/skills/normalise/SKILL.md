@@ -14,7 +14,7 @@ Run the Rust normalisation pipeline on all original_payee values in the database
 ### Step 1: Dry-run the normalise binary
 
 ```bash
-cargo run --bin normalise -- --dry-run 2>&1
+cargo run -- normalise --dry-run 2>&1
 ```
 
 Parse the output sections:

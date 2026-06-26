@@ -5,7 +5,7 @@ After=network.target
 [Service]
 EnvironmentFile=/etc/default/pocketsmith
 EnvironmentFile=/data/pocketsmith.env
-ExecStart=/usr/local/bin/serve
+ExecStart=/usr/local/bin/pocketsmith serve
 Restart=always
 RestartSec=2
 

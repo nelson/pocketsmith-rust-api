@@ -41,19 +41,15 @@ jobs:
       - name: Install musl tools
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Build static binaries
-        # `--bins` builds every [[bin]] declared in Cargo.toml whose
-        # required-features are satisfied. The set of shipped binaries is
-        # therefore driven entirely by Cargo.toml — add a [[bin]] there and it
-        # is released automatically (e.g. `categorise` once that work lands on
-        # master), with no edit to this workflow.
+      - name: Build static binary
+        # Builds the single `pocketsmith` binary (with the web UI). Every former
+        # command (sync, transfers, normalise, serve, push, dump, rule) is now a
+        # subcommand of this one binary.
         run: |
           cargo build --release --features web --target x86_64-unknown-linux-musl --bins
 
       - name: Package tarball
-        # Copy every binary cargo actually produced (top-level executables in
-        # the target dir), not a hardcoded list, so the tarball always matches
-        # Cargo.toml's [[bin]] declarations.
+        # Copy the single executable cargo produced plus the rules dir.
         run: |
           mkdir -p dist/rules
           cp -r rules/* dist/rules/

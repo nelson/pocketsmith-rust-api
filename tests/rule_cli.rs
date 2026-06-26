@@ -239,13 +239,15 @@ impl Cli {
     }
 
     fn run(&self, args: &[&str]) -> Output {
-        let out = Command::new(env!("CARGO_BIN_EXE_rule"))
+        // Unified binary: invoke the `rule` subcommand of `pocketsmith`.
+        let out = Command::new(env!("CARGO_BIN_EXE_pocketsmith"))
+            .arg("rule")
             .args(args)
             .env("POCKETSMITH_DB", &self.db)
             .env("POCKETSMITH_RULES_DIR", &self.rules_dir)
             .env_remove("NO_COLOR")
             .output()
-            .expect("run rule binary");
+            .expect("run pocketsmith rule binary");
         Output {
             code: out.status.code().unwrap_or(-1),
             stdout: String::from_utf8_lossy(&out.stdout).into_owned(),

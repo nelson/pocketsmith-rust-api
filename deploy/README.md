@@ -90,7 +90,7 @@ and **how the nightly pipeline is scheduled**.
    **disable** `.github/workflows/sprites-pipeline.yml`. Scale-to-zero vendor
    (sprites) → keep the external GitHub Actions schedule and the
    `SPRITE_SSH_*` secrets.
-3. Seed the DB once: `ssh <vm> /usr/local/bin/sync`, or
+3. Seed the DB once: `ssh <vm> /usr/local/bin/pocketsmith sync`, or
    `scp pocketsmith.db <vm>:/data/pocketsmith.db` before first start.
 4. Adjust the nightly time: the in-VM timer uses local VM time
    (`OnCalendar` in `systemd/pocketsmith-pipeline.timer`, set the VM timezone);
