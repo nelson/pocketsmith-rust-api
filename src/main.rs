@@ -20,6 +20,8 @@ mod rule;
 mod serve;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_COMMIT: &str = env!("GIT_COMMIT");
+const BUILD_DATE: &str = env!("BUILD_DATE");
 
 fn main() -> ExitCode {
     dotenvy::dotenv().ok();
@@ -82,7 +84,7 @@ fn to_code(result: anyhow::Result<()>) -> ExitCode {
 }
 
 fn print_version() {
-    println!("pocketsmith {VERSION}");
+    println!("pocketsmith {VERSION} (commit {GIT_COMMIT}, built {BUILD_DATE})");
 }
 
 fn print_help() {
