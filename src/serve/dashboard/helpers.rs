@@ -181,7 +181,7 @@ pub fn pretty_month(ym: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db;
+    use pocketsmith::db;
     use rusqlite::params;
 
     #[test]

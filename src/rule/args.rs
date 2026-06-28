@@ -4,8 +4,8 @@
 
 use std::collections::HashMap;
 
-use pocketsmith_sync::rules::model::RuleError;
-use pocketsmith_sync::rules::Stage;
+use pocketsmith::rules::model::RuleError;
+use pocketsmith::rules::Stage;
 
 use crate::rule::AppError;
 

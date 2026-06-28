@@ -10,13 +10,13 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::scan;
-use pocketsmith_sync::normalise::NormalisationResult;
-use pocketsmith_sync::rules::crud;
-use pocketsmith_sync::rules::impact::{compute_buckets_with_base, test_one, PayeeSample};
-use pocketsmith_sync::rules::model::{MoveTarget, Mutation, RuleData};
-use pocketsmith_sync::rules::validate::validate_draft;
-use pocketsmith_sync::rules::{commit, Stage};
+use pocketsmith::normalise::scan;
+use pocketsmith::normalise::NormalisationResult;
+use pocketsmith::rules::crud;
+use pocketsmith::rules::impact::{compute_buckets_with_base, test_one, PayeeSample};
+use pocketsmith::rules::model::{MoveTarget, Mutation, RuleData};
+use pocketsmith::rules::validate::validate_draft;
+use pocketsmith::rules::{commit, Stage};
 
 use super::editor::{self, Card, Mode};
 use super::form::{build_rule_data, parse_urlencoded};
@@ -335,8 +335,8 @@ fn empty_card_markup() -> Markup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::initialize_in_memory;
-    use pocketsmith_sync::test_support::{seed_account, seed_txn};
+    use pocketsmith::db::initialize_in_memory;
+    use pocketsmith::test_support::{seed_account, seed_txn};
 
     fn tmpdir() -> std::path::PathBuf {
         use std::sync::atomic::{AtomicU64, Ordering};

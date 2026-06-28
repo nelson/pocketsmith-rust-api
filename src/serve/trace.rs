@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::{MatchInfo, NormalisationResult, TraceEntry};
+use pocketsmith::normalise::{MatchInfo, NormalisationResult, TraceEntry};
 
 /// Render the per-stage transformation trace for a normalisation result.
 /// One row per pipeline stage that changed the string, attached a
@@ -117,7 +117,7 @@ fn render_match_line(mi: &MatchInfo) -> Markup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::normalise::PayeeClass;
+    use pocketsmith::normalise::PayeeClass;
 
     fn diff_entry() -> TraceEntry {
         TraceEntry {

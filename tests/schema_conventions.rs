@@ -7,7 +7,7 @@
 //   tables (whether locally sourced like `transfer_pairs` or remotely sourced
 //   like `transactions`) have no prefix.
 
-use pocketsmith_sync::db;
+use pocketsmith::db;
 use rusqlite::Connection;
 
 fn open() -> Connection {

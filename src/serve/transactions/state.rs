@@ -26,7 +26,7 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
-use pocketsmith_sync::review::Status;
+use pocketsmith::review::Status;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PairState {
@@ -171,9 +171,9 @@ pub fn derive_cat_state(category_id: Option<i64>) -> CatState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::{initialize_in_memory, transfer_pairs, with_operation};
-    use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
-    use pocketsmith_sync::transfers::{Confidence, TransferPair};
+    use pocketsmith::db::{initialize_in_memory, transfer_pairs, with_operation};
+    use pocketsmith::test_support::{seed_account, seed_pn, seed_txn};
+    use pocketsmith::transfers::{Confidence, TransferPair};
 
     fn fresh() -> Connection {
         let conn = initialize_in_memory().unwrap();

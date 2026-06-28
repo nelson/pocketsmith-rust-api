@@ -131,7 +131,7 @@ pub fn header_chips(conn: &Connection) -> Markup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::{initialize_in_memory, with_operation};
+    use pocketsmith::db::{initialize_in_memory, with_operation};
 
     #[test]
     fn bucket_boundaries() {

@@ -11,8 +11,8 @@
 
 use std::collections::HashMap;
 
-use pocketsmith_sync::rules::model::{LocationKind, RuleData};
-use pocketsmith_sync::rules::Stage;
+use pocketsmith::rules::model::{LocationKind, RuleData};
+use pocketsmith::rules::Stage;
 
 /// A decoded form: field name → value. Repeated keys keep the last value
 /// (checkboxes only ever submit once).

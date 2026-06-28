@@ -38,7 +38,7 @@ subcommand form (`pocketsmith-rust-api sync`, …) and deploy assets get updated
     → `pub fn run() -> Result<()>`; blanket-rewrite `crate::` → `crate::serve::`.
     Gated `#[cfg(feature = "web")]` so the binary still builds without `web`;
     the `serve` arm errors with a helpful message when built without `web`.
-- All old bins use only `pocketsmith_sync::…` (lib) for real logic, so moving the
+- All old bins use only `pocketsmith::…` (lib) for real logic, so moving the
   thin shells is mechanical. `crate::` inside serve/rule only ever refers to
   sibling bin modules, so the blanket prefix rewrite is safe.
 
@@ -108,7 +108,7 @@ to master) rather than building/tagging locally.
   install a single binary.
 
 ## Reuse (existing code, no rewrites)
-- All real logic stays in the library: `pocketsmith_sync::{sync,transfers,
+- All real logic stays in the library: `pocketsmith::{sync,transfers,
   normalise,push,rules,db,client}`.
 - `db::open_app_db` / `open_app_db_at` / `path_from_env` already centralise DB
   opening for every command — only the default-path branch changes.

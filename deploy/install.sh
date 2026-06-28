@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# In-VM bootstrap for pocketsmith-sync. Vendor-agnostic: run this on a fresh
+# In-VM bootstrap for pocketsmith. Vendor-agnostic: run this on a fresh
 # exe.dev / boxd.sh / sprites.dev VM. Downloads the latest release tarball,
 # installs the binaries + rules, writes systemd units, and starts `serve`.
 #
@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO="${REPO:-nelson/pocketsmith-rust-api}"   # GitHub owner/repo
 PORT="${SERVE_PORT:-3141}"
-TARBALL="pocketsmith-sync-x86_64-linux-musl.tar.gz"
+TARBALL="pocketsmith-x86_64-linux-musl.tar.gz"
 
 sudo mkdir -p /data /opt/pocketsmith
 

@@ -24,7 +24,7 @@ use anyhow::Result;
 use maud::html;
 use tiny_http::{Header, Method, Request, Response, Server};
 
-use pocketsmith_sync::db;
+use pocketsmith::db;
 
 use crate::serve::helpers::extract_param;
 use crate::serve::state::{AppState, Decision};

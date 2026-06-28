@@ -7,9 +7,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use pocketsmith_sync::db::payee_normalisations as pn;
-use pocketsmith_sync::normalise::apply as norm_apply;
-use pocketsmith_sync::transfers::Status;
+use pocketsmith::db::payee_normalisations as pn;
+use pocketsmith::normalise::apply as norm_apply;
+use pocketsmith::transfers::Status;
 
 use crate::serve::state::{AppState, Decision, NormActivityEntry};
 
@@ -116,8 +116,8 @@ pub fn apply(state: &Arc<Mutex<AppState>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::initialize_in_memory;
-    use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
+    use pocketsmith::db::initialize_in_memory;
+    use pocketsmith::test_support::{seed_account, seed_pn, seed_txn};
 
     fn make_state() -> Arc<Mutex<AppState>> {
         let conn = initialize_in_memory().unwrap();

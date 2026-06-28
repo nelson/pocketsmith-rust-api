@@ -19,7 +19,7 @@ use std::process::ExitCode;
 
 use serde_json::json;
 
-use pocketsmith_sync::rules::model::RuleError;
+use pocketsmith::rules::model::RuleError;
 
 mod args;
 mod colours;

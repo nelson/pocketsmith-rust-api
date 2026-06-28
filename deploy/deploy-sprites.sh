@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install / upgrade pocketsmith-sync on sprites.dev using the `sprite` CLI.
+# Install / upgrade pocketsmith on sprites.dev using the `sprite` CLI.
 #
 # This is the deploy entrypoint for sprites. It is idempotent and serves both
 # the first install and every later upgrade:
@@ -59,7 +59,7 @@ fi
 
 # Download + install the single `pocketsmith` binary (every former command is
 # now a subcommand). Single line: no fragile backslash-continuations.
-curl -fsSL $AUTH_HEADER "https://github.com/$REPO/releases/latest/download/pocketsmith-sync-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
+curl -fsSL $AUTH_HEADER "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
 sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
 
 # Register serve as a Sprite service (single line). --dir /data => cwd=/data so

@@ -2,8 +2,8 @@
 
 use anyhow::{Context, Result};
 
-use pocketsmith_sync::client::PocketSmithClient;
-use pocketsmith_sync::db;
+use pocketsmith::client::PocketSmithClient;
+use pocketsmith::db;
 
 pub fn run(_args: &[String]) -> Result<()> {
     let api_key = std::env::var("POCKETSMITH_API_KEY")
@@ -12,5 +12,5 @@ pub fn run(_args: &[String]) -> Result<()> {
     let client = PocketSmithClient::new(api_key);
     let conn = db::open_app_db()?;
 
-    pocketsmith_sync::sync::pull(&client, &conn)
+    pocketsmith::sync::pull(&client, &conn)
 }

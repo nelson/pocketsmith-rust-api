@@ -326,9 +326,9 @@ pub fn filtered_transactions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::initialize_in_memory;
-    use pocketsmith_sync::db::with_operation;
-    use pocketsmith_sync::test_support::seed_account;
+    use pocketsmith::db::initialize_in_memory;
+    use pocketsmith::db::with_operation;
+    use pocketsmith::test_support::seed_account;
 
     /// Insert a transaction row with a custom date and amount. Wraps
     /// `with_operation` so the `_transaction_changes_insert` trigger
@@ -503,10 +503,10 @@ mod tests {
 #[cfg(test)]
 mod filter_tests {
     use super::*;
-    use pocketsmith_sync::db::{initialize_in_memory, transfer_pairs, with_operation};
-    use pocketsmith_sync::review::Status;
-    use pocketsmith_sync::test_support::{seed_account, seed_pn};
-    use pocketsmith_sync::transfers::{Confidence, TransferPair};
+    use pocketsmith::db::{initialize_in_memory, transfer_pairs, with_operation};
+    use pocketsmith::review::Status;
+    use pocketsmith::test_support::{seed_account, seed_pn};
+    use pocketsmith::transfers::{Confidence, TransferPair};
 
     fn insert_txn(
         conn: &Connection,

@@ -3,10 +3,10 @@
 
 use rusqlite::Connection;
 
-use pocketsmith_sync::rules::impact;
-use pocketsmith_sync::rules::model::{Mutation, MoveTarget, RuleError};
-use pocketsmith_sync::rules::validate::validate_draft;
-use pocketsmith_sync::rules::{commit, crud, rules_dir, DumpPolicy, Stage};
+use pocketsmith::rules::impact;
+use pocketsmith::rules::model::{Mutation, MoveTarget, RuleError};
+use pocketsmith::rules::validate::validate_draft;
+use pocketsmith::rules::{commit, crud, rules_dir, DumpPolicy, Stage};
 
 use crate::rule::args::Flags;
 use crate::rule::helpers::{build_rule_data, open_db, timestamps};

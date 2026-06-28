@@ -10,10 +10,10 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::db::payee_normalisations as pn;
-use pocketsmith_sync::rules::impact::SAMPLE_LIMIT;
-use pocketsmith_sync::rules::model::{LocationKind, Rule, RuleData};
-use pocketsmith_sync::rules::{self, crud, Stage};
+use pocketsmith::db::payee_normalisations as pn;
+use pocketsmith::rules::impact::SAMPLE_LIMIT;
+use pocketsmith::rules::model::{LocationKind, Rule, RuleData};
+use pocketsmith::rules::{self, crud, Stage};
 
 use super::editor::{self, Card, Mode};
 use super::regex_hl;
@@ -461,7 +461,7 @@ fn empty_detail() -> Markup {
 /// the add/edit/delete colour vocabulary).
 fn render_activity(st: &AppState) -> Markup {
     let count = st.pipeline_activity.len();
-    let dirty = pocketsmith_sync::rules::dirty::would_restage(&st.conn).unwrap_or(0);
+    let dirty = pocketsmith::rules::dirty::would_restage(&st.conn).unwrap_or(0);
     html! {
         div.activity-header {
             @if dirty > 0 {
@@ -550,8 +550,8 @@ mod tests {
 
     #[test]
     fn detail_shows_stage_name_and_count() {
-        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
-        pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+        let conn = pocketsmith::db::initialize_in_memory().unwrap();
+        pocketsmith::rules::load_into_db(&conn).unwrap();
         let html = render_detail(&conn, Stage::Persons, None, empty_card()).into_string();
         assert!(html.contains("Persons"), "{html}");
         assert!(html.contains("118 rules"), "{html}");
@@ -559,8 +559,8 @@ mod tests {
 
     #[test]
     fn detail_renders_rule_list_with_headers_and_rows() {
-        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
-        pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+        let conn = pocketsmith::db::initialize_in_memory().unwrap();
+        pocketsmith::rules::load_into_db(&conn).unwrap();
         let html = render_detail(&conn, Stage::Merchants, None, empty_card()).into_string();
         // Two-column detail with the rule list + an [A] Add button.
         assert!(html.contains("rule-list"), "{html}");
@@ -575,10 +575,10 @@ mod tests {
 
     #[test]
     fn detail_marks_active_rule_selected() {
-        let conn = pocketsmith_sync::db::initialize_in_memory().unwrap();
-        let id = pocketsmith_sync::rules::crud::insert_rule(
+        let conn = pocketsmith::db::initialize_in_memory().unwrap();
+        let id = pocketsmith::rules::crud::insert_rule(
             &conn,
-            &pocketsmith_sync::rules::model::RuleData::Merchant {
+            &pocketsmith::rules::model::RuleData::Merchant {
                 canonical: "Uber".into(),
                 pattern: "(?i)UBER".into(),
                 note: None,

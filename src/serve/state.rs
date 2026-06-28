@@ -151,8 +151,8 @@ impl RuleChangeKind {
 /// don't change between them) so each re-evaluate runs only the scratch
 /// pass. Invalidated (dropped) on any commit / re-scan.
 pub struct PipelineBase {
-    pub payees: Vec<pocketsmith_sync::rules::impact::PayeeSample>,
-    pub results: Vec<pocketsmith_sync::normalise::NormalisationResult>,
+    pub payees: Vec<pocketsmith::rules::impact::PayeeSample>,
+    pub results: Vec<pocketsmith::normalise::NormalisationResult>,
 }
 
 pub struct AppState {
@@ -161,7 +161,7 @@ pub struct AppState {
     /// Process-lifetime compiled-rule cache for the normalisation
     /// pipeline (editable-rules-v3 §7). Borrowed alongside `conn` to
     /// build a `PipelineCtx` when rendering pipeline traces.
-    pub rule_cache: pocketsmith_sync::normalise::RuleCache,
+    pub rule_cache: pocketsmith::normalise::RuleCache,
 
     // --- Transfers tab ---
     pub transfers: TabState<(i64, i64), ActivityEntry>,
@@ -219,7 +219,7 @@ impl AppState {
     pub fn new(conn: rusqlite::Connection) -> Self {
         Self {
             conn,
-            rule_cache: pocketsmith_sync::normalise::RuleCache::new(),
+            rule_cache: pocketsmith::normalise::RuleCache::new(),
             transfers: TabState::default(),
             status_filter: "all".to_string(),
             confidence_filter: "all".to_string(),
@@ -262,8 +262,8 @@ impl AppState {
     pub fn ensure_pipeline_base(&mut self) {
         if self.pipeline_base.is_none() {
             let payees =
-                pocketsmith_sync::rules::impact::load_payees(&self.conn).unwrap_or_default();
-            let results = pocketsmith_sync::rules::impact::run_base(&self.conn, &payees);
+                pocketsmith::rules::impact::load_payees(&self.conn).unwrap_or_default();
+            let results = pocketsmith::rules::impact::run_base(&self.conn, &payees);
             self.pipeline_base = Some(PipelineBase { payees, results });
         }
     }
@@ -282,14 +282,14 @@ impl AppState {
     /// mirror. Production has a file-backed DB → background dump (no
     /// blocked HTTP response); in-memory test DBs dump synchronously into
     /// an injected dir so the assertion is deterministic + isolated.
-    pub fn rule_dump_policy(&self) -> pocketsmith_sync::rules::DumpPolicy {
-        use pocketsmith_sync::rules::DumpPolicy;
+    pub fn rule_dump_policy(&self) -> pocketsmith::rules::DumpPolicy {
+        use pocketsmith::rules::DumpPolicy;
         match &self.db_path {
             Some(p) => DumpPolicy::Background { db_path: p.clone() },
             None => DumpPolicy::Sync(
                 self.rules_dir_override
                     .clone()
-                    .unwrap_or_else(pocketsmith_sync::rules::rules_dir),
+                    .unwrap_or_else(pocketsmith::rules::rules_dir),
             ),
         }
     }

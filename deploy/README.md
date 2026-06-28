@@ -1,4 +1,4 @@
-# Deploying pocketsmith-sync
+# Deploying pocketsmith
 
 Zero-setup deployment to SSH-native microVM providers. The build artifact is a
 single **static `x86_64-unknown-linux-musl` binary tarball** published to GitHub
@@ -10,7 +10,7 @@ Releases — no registry, no system dependencies on the VM.
 
 | Piece | Role |
 |---|---|
-| `.github/workflows/release.yml` | On merge to `master`, release-please cuts a version + builds/attaches `pocketsmith-sync-x86_64-linux-musl.tar.gz` to the GitHub Release. |
+| `.github/workflows/release.yml` | On merge to `master`, release-please cuts a version + builds/attaches `pocketsmith-x86_64-linux-musl.tar.gz` to the GitHub Release. |
 | `install.sh` | Vendor-agnostic in-VM bootstrap: downloads the latest release, installs binaries + `rules/`, writes systemd units, starts `serve`. Only `SERVE_PORT` differs per vendor. |
 | `systemd/pocketsmith-serve.service` | Runs the web UI. |
 | `systemd/pocketsmith-pipeline.{service,timer}` | Nightly `sync → transfers → categorise → push`. **Fires only on always-on VMs** (exe.dev / boxd). |

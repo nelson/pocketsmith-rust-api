@@ -3,9 +3,9 @@
 
 use std::collections::HashMap;
 
-use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::transfers::{self, Confidence};
+use pocketsmith::db::transfer_pairs::{self, TransferPairRow};
+use pocketsmith::review::Status;
+use pocketsmith::transfers::{self, Confidence};
 
 use crate::serve::state::Decision;
 
