@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx};
+use pocketsmith::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx};
 
 use crate::serve::helpers::{format_dollars, format_dollars_compact, format_short_date};
 use crate::serve::state::{AppState, Decision};

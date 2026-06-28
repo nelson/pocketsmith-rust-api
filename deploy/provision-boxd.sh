@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provision pocketsmith-sync on boxd.sh. Run from your laptop.
+# Provision pocketsmith on boxd.sh. Run from your laptop.
 # Requires: PS_KEY exported (your PocketSmith API key).
 set -euo pipefail
 : "${PS_KEY:?export PS_KEY=your-pocketsmith-api-key first}"

@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use rusqlite::Connection;
 
-use pocketsmith_sync::db::payee_normalisations::{self as pn, PayeeNormalisationRow};
-use pocketsmith_sync::transfers::Status;
+use pocketsmith::db::payee_normalisations::{self as pn, PayeeNormalisationRow};
+use pocketsmith::transfers::Status;
 
 use crate::serve::state::Decision;
 
@@ -196,7 +196,7 @@ pub fn get_filtered_normalisations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::initialize_in_memory;
+    use pocketsmith::db::initialize_in_memory;
 
     fn upsert(
         conn: &Connection,

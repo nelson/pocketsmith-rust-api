@@ -26,11 +26,11 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
 
-use pocketsmith_sync::db::{self, payee_normalisations as pn, with_operation};
-use pocketsmith_sync::models::{Category, Transaction, TransactionUpdate};
-use pocketsmith_sync::normalise::{apply as norm_apply, scan as norm_scan};
-use pocketsmith_sync::push::{self, PushApi, PushOpts};
-use pocketsmith_sync::review::Status;
+use pocketsmith::db::{self, payee_normalisations as pn, with_operation};
+use pocketsmith::models::{Category, Transaction, TransactionUpdate};
+use pocketsmith::normalise::{apply as norm_apply, scan as norm_scan};
+use pocketsmith::push::{self, PushApi, PushOpts};
+use pocketsmith::review::Status;
 
 // ---------------------------------------------------------------------------
 // Stub PushApi — implements the public trait from outside the crate. Records
@@ -159,7 +159,7 @@ fn fresh_db() -> Connection {
     let conn = db::initialize_in_memory().unwrap();
     // The normalisation pipeline reads its rules from the DB; seed them so
     // norm_scan produces the same proposals it did with const rules.
-    pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+    pocketsmith::rules::load_into_db(&conn).unwrap();
     conn
 }
 

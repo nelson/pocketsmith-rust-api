@@ -6,11 +6,11 @@
 
 use std::sync::{Arc, Mutex};
 
-use pocketsmith_sync::db::initialize_in_memory;
-use pocketsmith_sync::normalise::{format_payee, normalise, PipelineCtx, RuleCache};
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::rules::{crud, Stage};
-use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
+use pocketsmith::db::initialize_in_memory;
+use pocketsmith::normalise::{format_payee, normalise, PipelineCtx, RuleCache};
+use pocketsmith::review::Status;
+use pocketsmith::rules::{crud, Stage};
+use pocketsmith::test_support::{seed_account, seed_pn, seed_txn};
 
 use crate::serve::pipeline::{handlers, views};
 use crate::serve::state::AppState;
@@ -177,7 +177,7 @@ fn rule_impact_cache_is_scan_only() {
         seed_txn(&st.conn, 2, 1, "BUNNINGS WAREHOUSE", "BUNNINGS WAREHOUSE").unwrap();
         crud::insert_rule(
             &st.conn,
-            &pocketsmith_sync::rules::model::RuleData::Merchant {
+            &pocketsmith::rules::model::RuleData::Merchant {
                 canonical: "Bunnings".into(),
                 pattern: "(?i)BUNNINGS".into(),
                 note: None,
@@ -207,7 +207,7 @@ fn rule_impact_cache_is_scan_only() {
 
     // Confirm the cached row is unchanged in the table directly.
     let st = state.lock().unwrap();
-    let cached = pocketsmith_sync::rules::impact::load_for_stage(&st.conn, Stage::Merchants).unwrap();
+    let cached = pocketsmith::rules::impact::load_for_stage(&st.conn, Stage::Merchants).unwrap();
     assert_eq!(cached.get(&id).unwrap().0, 2);
 }
 
@@ -219,7 +219,7 @@ fn commit_invalidates_the_base_cache() {
         seed_txn(&st.conn, 1, 1, "UBER TRIP", "UBER TRIP").unwrap();
         crud::insert_rule(
             &st.conn,
-            &pocketsmith_sync::rules::model::RuleData::Merchant {
+            &pocketsmith::rules::model::RuleData::Merchant {
                 canonical: "Uber".into(),
                 pattern: "(?i)UBER".into(),
                 note: None,
@@ -247,7 +247,7 @@ fn selecting_a_rule_lists_matching_payees_from_scan_cache() {
         seed_txn(&st.conn, 2, 1, "WOOLWORTHS METRO", "WOOLWORTHS METRO").unwrap();
         crud::insert_rule(
             &st.conn,
-            &pocketsmith_sync::rules::model::RuleData::Merchant {
+            &pocketsmith::rules::model::RuleData::Merchant {
                 canonical: "Bunnings".into(),
                 pattern: "(?i)BUNNINGS".into(),
                 note: None,

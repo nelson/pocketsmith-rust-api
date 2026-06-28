@@ -9,11 +9,11 @@ use std::process::Command;
 
 use rusqlite::Connection;
 
-use pocketsmith_sync::db;
-use pocketsmith_sync::rules::crud;
-use pocketsmith_sync::rules::impact::{self, Buckets};
-use pocketsmith_sync::rules::model::{Mutation, RuleData};
-use pocketsmith_sync::rules::{commit, dump_stage_to_string, DumpPolicy, Stage};
+use pocketsmith::db;
+use pocketsmith::rules::crud;
+use pocketsmith::rules::impact::{self, Buckets};
+use pocketsmith::rules::model::{Mutation, RuleData};
+use pocketsmith::rules::{commit, dump_stage_to_string, DumpPolicy, Stage};
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -95,8 +95,8 @@ fn edit_a_rule_end_to_end_in_memory() {
 }
 
 fn seed_txn(conn: &Connection, id: i64, original_payee: &str) {
-    pocketsmith_sync::test_support::seed_account(conn, 1, "Acct").ok();
-    pocketsmith_sync::test_support::seed_txn(conn, id, 1, original_payee, original_payee).unwrap();
+    pocketsmith::test_support::seed_account(conn, 1, "Acct").ok();
+    pocketsmith::test_support::seed_txn(conn, id, 1, original_payee, original_payee).unwrap();
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn move_apply_changes_apply_order_and_live_pipeline() {
     let m = Mutation::Move {
         stage: Stage::Expansions,
         id: second,
-        target: pocketsmith_sync::rules::model::MoveTarget::Before(first),
+        target: pocketsmith::rules::model::MoveTarget::Before(first),
     };
     commit::commit(&conn, &m, DumpPolicy::Sync(dump_dir()), None).unwrap();
     let order: Vec<i64> =
@@ -169,7 +169,7 @@ fn sync_and_background_commits_are_byte_identical() {
 
     // DB B: serve-style background dump + warm cache invalidation.
     let conn_b = db::initialize_in_memory().unwrap();
-    let cache = pocketsmith_sync::normalise::RuleCache::new();
+    let cache = pocketsmith::normalise::RuleCache::new();
     commit::commit(
         &conn_b,
         &m,

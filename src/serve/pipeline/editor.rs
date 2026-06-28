@@ -16,9 +16,9 @@ use std::collections::HashMap;
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::normalise::BankingOperation;
-use pocketsmith_sync::rules::model::RuleData;
-use pocketsmith_sync::rules::Stage;
+use pocketsmith::normalise::BankingOperation;
+use pocketsmith::rules::model::RuleData;
+use pocketsmith::rules::Stage;
 
 use super::regex_hl;
 
@@ -212,7 +212,7 @@ fn base(stage: Stage) -> String {
 /// A blank [`RuleData`] for `stage` — every text field empty, flags off —
 /// used to prefill the New-rule card.
 pub fn empty(stage: Stage) -> RuleData {
-    use pocketsmith_sync::rules::model::LocationKind;
+    use pocketsmith::rules::model::LocationKind;
     match stage {
         Stage::Prefixes => RuleData::Prefix {
             pattern: String::new(),

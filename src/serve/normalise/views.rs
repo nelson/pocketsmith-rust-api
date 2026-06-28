@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::db::payee_normalisations::PayeeNormalisationRow;
-use pocketsmith_sync::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx};
-use pocketsmith_sync::review::Status;
+use pocketsmith::db::payee_normalisations::PayeeNormalisationRow;
+use pocketsmith::normalise::{normalise as run_normalise, NormalisationResult, PipelineCtx};
+use pocketsmith::review::Status;
 
 use crate::serve::helpers::{format_dollars, format_short_date};
 use crate::serve::render::render_actions;
@@ -56,7 +56,7 @@ pub fn render_queue_fragment(
 pub fn render_detail_fragment(state: &Arc<Mutex<AppState>>, slug: &str) -> Markup {
     let mut st = state.lock().unwrap();
     st.normalise.active = Some(slug.to_string());
-    match pocketsmith_sync::db::payee_normalisations::get_by_slug(&st.conn, slug) {
+    match pocketsmith::db::payee_normalisations::get_by_slug(&st.conn, slug) {
         Ok(Some(row)) => {
             let txns = matching_transactions(&st.conn, &row.original_payee);
             let is_skipped = st.normalise.decisions.get(&row.original_payee) == Some(&Decision::Skip);

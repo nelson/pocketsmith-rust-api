@@ -7,7 +7,7 @@
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::rules::impact::{BucketCount, Buckets, TestResult, SAMPLE_LIMIT};
+use pocketsmith::rules::impact::{BucketCount, Buckets, TestResult, SAMPLE_LIMIT};
 
 use crate::serve::helpers::format_dollars_compact;
 
@@ -243,7 +243,7 @@ fn commas(n: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::rules::impact::BucketSample;
+    use pocketsmith::rules::impact::BucketSample;
 
     fn sample(payee: &str, txns: i64) -> BucketSample {
         BucketSample {

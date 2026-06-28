@@ -8,16 +8,16 @@
 
 use rusqlite::{params, Connection};
 
-use pocketsmith_sync::db::{self, payee_normalisations as pn};
-use pocketsmith_sync::normalise::{apply as norm_apply, scan as norm_scan};
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::test_support::{seed_account, seed_txn};
+use pocketsmith::db::{self, payee_normalisations as pn};
+use pocketsmith::normalise::{apply as norm_apply, scan as norm_scan};
+use pocketsmith::review::Status;
+use pocketsmith::test_support::{seed_account, seed_txn};
 
 fn fresh_db() -> Connection {
     let conn = db::initialize_in_memory().unwrap();
     seed_account(&conn, 1, "Test").unwrap();
     // The normalisation pipeline reads its rules from the DB; seed them.
-    pocketsmith_sync::rules::load_into_db(&conn).unwrap();
+    pocketsmith::rules::load_into_db(&conn).unwrap();
     conn
 }
 

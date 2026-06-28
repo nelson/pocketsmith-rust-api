@@ -1,7 +1,7 @@
-use pocketsmith_sync::client::PocketSmithClient;
-use pocketsmith_sync::db::{self, with_operation};
-use pocketsmith_sync::models::*;
-use pocketsmith_sync::push::{self, PushOpts};
+use pocketsmith::client::PocketSmithClient;
+use pocketsmith::db::{self, with_operation};
+use pocketsmith::models::*;
+use pocketsmith::push::{self, PushOpts};
 
 fn make_client() -> PocketSmithClient {
     let key = std::env::var("POCKETSMITH_API_KEY")

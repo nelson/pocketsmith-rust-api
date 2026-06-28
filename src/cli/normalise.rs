@@ -15,10 +15,10 @@
 
 use anyhow::{bail, Result};
 
-use pocketsmith_sync::db;
-use pocketsmith_sync::db::payee_normalisations as pn;
-use pocketsmith_sync::normalise::{apply, scan};
-use pocketsmith_sync::transfers::Status;
+use pocketsmith::db;
+use pocketsmith::db::payee_normalisations as pn;
+use pocketsmith::normalise::{apply, scan};
+use pocketsmith::transfers::Status;
 
 pub fn run(args: &[String]) -> Result<()> {
     let mut apply_mode = false;

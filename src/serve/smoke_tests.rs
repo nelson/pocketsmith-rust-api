@@ -14,10 +14,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use pocketsmith_sync::db::{initialize_in_memory, transfer_pairs, with_operation};
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::test_support::{seed_account, seed_pn, seed_txn};
-use pocketsmith_sync::transfers::{Confidence, TransferPair};
+use pocketsmith::db::{initialize_in_memory, transfer_pairs, with_operation};
+use pocketsmith::review::Status;
+use pocketsmith::test_support::{seed_account, seed_pn, seed_txn};
+use pocketsmith::transfers::{Confidence, TransferPair};
 
 use crate::serve::state::AppState;
 fn fresh_state() -> Arc<Mutex<AppState>> {
@@ -200,7 +200,7 @@ fn transactions_detail_panel_renders_action_buttons_on_norm_pending_card() {
     let state = fresh_state();
     {
         let st = state.lock().unwrap();
-        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+        pocketsmith::db::with_operation(&st.conn, "test-seed", |c| {
             c.execute(
                 "INSERT INTO transactions
                    (id, transaction_account_id, date, amount,
@@ -239,7 +239,7 @@ fn transactions_activity_panel_shows_recent_decisions_with_undo_btn() {
         // Seed a non-transfer txn whose original_payee matches the
         // pre-seeded pn. Then confirm to push an activity entry.
         let st = state.lock().unwrap();
-        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+        pocketsmith::db::with_operation(&st.conn, "test-seed", |c| {
             c.execute(
                 "INSERT INTO transactions
                    (id, transaction_account_id, date, amount,
@@ -274,7 +274,7 @@ fn transactions_queue_emoji_is_clickable_to_undo_when_decided() {
     let state = fresh_state();
     {
         let st = state.lock().unwrap();
-        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+        pocketsmith::db::with_operation(&st.conn, "test-seed", |c| {
             c.execute(
                 "INSERT INTO transactions
                    (id, transaction_account_id, date, amount,
@@ -314,7 +314,7 @@ fn transactions_detail_renders_pipeline_trace_and_siblings() {
         // (which the fresh_state fixture already pn-stages as 'Woolworths').
         // The first becomes the active row; the second is the sibling.
         let st = state.lock().unwrap();
-        pocketsmith_sync::db::with_operation(&st.conn, "test-seed", |c| {
+        pocketsmith::db::with_operation(&st.conn, "test-seed", |c| {
             c.execute(
                 "INSERT INTO transactions
                    (id, transaction_account_id, date, amount, original_payee, payee, is_transfer)
@@ -349,7 +349,7 @@ fn pipeline_page_renders_eight_stages_with_counts_and_nav() {
     // Seed the rule tables so the queue shows non-zero counts.
     {
         let st = state.lock().unwrap();
-        pocketsmith_sync::rules::load_into_db(&st.conn).unwrap();
+        pocketsmith::rules::load_into_db(&st.conn).unwrap();
     }
     let html = crate::serve::pipeline::views::render_page_shell(&state).into_string();
     contains_all(
@@ -383,7 +383,7 @@ fn pipeline_detail_fragment_selects_stage() {
     let state = fresh_state();
     {
         let st = state.lock().unwrap();
-        pocketsmith_sync::rules::load_into_db(&st.conn).unwrap();
+        pocketsmith::rules::load_into_db(&st.conn).unwrap();
     }
     let html = crate::serve::pipeline::views::render_detail_fragment(&state, "persons").into_string();
     assert!(html.contains("Persons"), "{html}");

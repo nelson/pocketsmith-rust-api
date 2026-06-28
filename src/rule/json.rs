@@ -4,9 +4,9 @@
 
 use serde_json::{json, Value};
 
-use pocketsmith_sync::rules::impact::{BucketCount, Buckets};
-use pocketsmith_sync::rules::model::{MoveTarget, Mutation, Rule};
-use pocketsmith_sync::rules::{crud, CommitResult, Stage};
+use pocketsmith::rules::impact::{BucketCount, Buckets};
+use pocketsmith::rules::model::{MoveTarget, Mutation, Rule};
+use pocketsmith::rules::{crud, CommitResult, Stage};
 
 pub(crate) fn list(stage: Stage, rules: &[Rule]) -> Value {
     let arr: Vec<Value> = rules.iter().map(rule_summary).collect();

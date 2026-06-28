@@ -2,9 +2,9 @@
 
 use anyhow::{bail, Result};
 
-use pocketsmith_sync::db;
-use pocketsmith_sync::db::transfer_pairs;
-use pocketsmith_sync::transfers::{self, Status};
+use pocketsmith::db;
+use pocketsmith::db::transfer_pairs;
+use pocketsmith::transfers::{self, Status};
 
 pub fn run(args: &[String]) -> Result<()> {
     if args.iter().any(|a| a == "--apply") {

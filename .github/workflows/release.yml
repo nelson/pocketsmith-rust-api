@@ -55,13 +55,13 @@ jobs:
           cp -r rules/* dist/rules/
           find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -executable \
             ! -name '*.d' -exec cp {} dist/ \;
-          tar -C dist -czf pocketsmith-sync-x86_64-linux-musl.tar.gz .
+          tar -C dist -czf pocketsmith-x86_64-linux-musl.tar.gz .
 
       - name: Attach to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
-          files: pocketsmith-sync-x86_64-linux-musl.tar.gz
+          files: pocketsmith-x86_64-linux-musl.tar.gz
 
   deploy-sprites:
     # Auto-deploy (upgrade) to the sprites.dev VM on every real release, after

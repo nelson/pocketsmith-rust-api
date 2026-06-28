@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use pocketsmith_sync::db::transfer_pairs;
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::transfers;
+use pocketsmith::db::transfer_pairs;
+use pocketsmith::review::Status;
+use pocketsmith::transfers;
 
 use super::helpers::{get_filtered_pairs, pairs_eligible_for_bulk};
 use crate::serve::state::{ActivityEntry, AppState, Decision};
@@ -24,7 +24,7 @@ fn activity_for(state: &AppState, key: (i64, i64), decision: Decision) -> Option
 }
 
 /// Re-fetch the visible pair set with the current filters.
-fn visible_pairs(state: &AppState) -> Vec<pocketsmith_sync::db::transfer_pairs::TransferPairRow> {
+fn visible_pairs(state: &AppState) -> Vec<pocketsmith::db::transfer_pairs::TransferPairRow> {
     get_filtered_pairs(
         &state.conn,
         &state.status_filter,
@@ -159,12 +159,12 @@ pub fn apply(state: &Arc<Mutex<AppState>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pocketsmith_sync::db::{
+    use pocketsmith::db::{
         initialize_in_memory, transfer_pairs as tp, upsert_category, upsert_transaction,
         upsert_transaction_account, with_operation,
     };
-    use pocketsmith_sync::models::{Category, Transaction, TransactionAccount};
-    use pocketsmith_sync::transfers::{Confidence, TransferPair};
+    use pocketsmith::models::{Category, Transaction, TransactionAccount};
+    use pocketsmith::transfers::{Confidence, TransferPair};
     use std::collections::HashMap;
 
     fn mk_account(id: i64, name: &str) -> TransactionAccount {
@@ -249,7 +249,7 @@ mod tests {
                 txn_id_b: 2,
                 amount_cents: 50000,
                 confidence: Confidence::High,
-                status: pocketsmith_sync::transfers::Status::Confirmed,
+                status: pocketsmith::transfers::Status::Confirmed,
             },
         )
         .unwrap();

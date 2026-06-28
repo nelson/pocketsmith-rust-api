@@ -7,9 +7,9 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 
-use pocketsmith_sync::client::PocketSmithClient;
-use pocketsmith_sync::db;
-use pocketsmith_sync::push::{self, PushOpts};
+use pocketsmith::client::PocketSmithClient;
+use pocketsmith::db;
+use pocketsmith::push::{self, PushOpts};
 
 pub fn run(args: &[String]) -> ExitCode {
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();

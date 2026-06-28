@@ -3,10 +3,10 @@
 
 use rusqlite::Connection;
 
-use pocketsmith_sync::db;
-use pocketsmith_sync::rules::model::{LocationKind, RuleData, RuleError};
-use pocketsmith_sync::rules::validate::StageSchema;
-use pocketsmith_sync::rules::Stage;
+use pocketsmith::db;
+use pocketsmith::rules::model::{LocationKind, RuleData, RuleError};
+use pocketsmith::rules::validate::StageSchema;
+use pocketsmith::rules::Stage;
 
 use crate::rule::args::Flags;
 use crate::rule::AppError;

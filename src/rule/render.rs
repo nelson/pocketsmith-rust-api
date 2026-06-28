@@ -3,9 +3,9 @@
 
 use serde_json::to_string_pretty;
 
-use pocketsmith_sync::rules::impact::{BucketCount, Buckets, TestResult, SAMPLE_LIMIT};
-use pocketsmith_sync::rules::model::{Mutation, MoveTarget, Rule, RuleData};
-use pocketsmith_sync::rules::{crud, CommitResult, Stage};
+use pocketsmith::rules::impact::{BucketCount, Buckets, TestResult, SAMPLE_LIMIT};
+use pocketsmith::rules::model::{Mutation, MoveTarget, Rule, RuleData};
+use pocketsmith::rules::{crud, CommitResult, Stage};
 
 use crate::rule::args::Flags;
 use crate::rule::colours::{highlight_regex, Style};

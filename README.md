@@ -1,4 +1,4 @@
-# pocketsmith-sync
+# pocketsmith
 
 Syncs PocketSmith data to a local SQLite database and provides tools for transaction analysis. Everything ships as a single `pocketsmith` binary whose first argument is a subcommand — `sync`, `transfers`, `normalise`, `push`, `dump`, `rule`, and `serve` (the local web UI for reviewing transfer pairs). Run `pocketsmith help` for the command list and `pocketsmith version` for the current release.
 

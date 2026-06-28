@@ -42,9 +42,9 @@ use std::sync::{Arc, Mutex};
 
 use maud::{html, Markup};
 
-use pocketsmith_sync::db::transfer_pairs::{self, TransferPairRow};
-use pocketsmith_sync::review::Status;
-use pocketsmith_sync::transfers;
+use pocketsmith::db::transfer_pairs::{self, TransferPairRow};
+use pocketsmith::review::Status;
+use pocketsmith::transfers;
 
 use super::helpers::{
     confidence_class, confidence_reason, count_confirmed_in_db, derive_decision,

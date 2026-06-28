@@ -14,7 +14,7 @@
 //! `POCKETSMITH_RULES_DIR`.
 
 use anyhow::Result;
-use pocketsmith_sync::{db, rules};
+use pocketsmith::{db, rules};
 
 pub fn run(_args: &[String]) -> Result<()> {
     let db_path = db::path_from_env();
