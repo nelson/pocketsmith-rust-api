@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.0.0...pocketsmith-v1.1.0) (2026-06-30)
+
+
+### Features
+
+* **version:** include git commit and build date in version output ([f907f73](https://github.com/nelson/pocketsmith-rust-api/commit/f907f7321ac427bd65eb04a4cf6701a54c0f4f89))
+
 ## [1.0.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-sync-v0.1.2...pocketsmith-sync-v1.0.0) (2026-06-26)
 
 
