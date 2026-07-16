@@ -24,7 +24,7 @@ const GIT_COMMIT: &str = env!("GIT_COMMIT");
 const BUILD_DATE: &str = env!("BUILD_DATE");
 
 fn main() -> ExitCode {
-    dotenvy::dotenv().ok();
+    load_env();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(String::as_str);
@@ -69,6 +69,42 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// Load environment variables from `.env` files, most-specific first.
+///
+/// Precedence (a variable already set is never overridden by dotenvy):
+///   1. real process environment (e.g. exported by launchd/shell)
+///   2. `.env` in the cwd or a parent dir (dev convenience)
+///   3. `$XDG_CONFIG_HOME/pocketsmith/env`, falling back to
+///      `$HOME/.config/pocketsmith/env`
+///
+/// The XDG fallback lets scheduled jobs (which run from an arbitrary cwd)
+/// pick up secrets like `POCKETSMITH_API_KEY` from a fixed user-config file,
+/// so the key never has to be baked into the launchd job definition.
+fn load_env() {
+    // 2. cwd-relative .env (walks up parent dirs). Ignore if absent.
+    dotenvy::dotenv().ok();
+
+    // 3. Fixed user-config fallback.
+    if let Some(path) = config_env_path() {
+        dotenvy::from_path(&path).ok();
+    }
+}
+
+/// Path to the user-config env file: `$XDG_CONFIG_HOME/pocketsmith/env`,
+/// falling back to `$HOME/.config/pocketsmith/env`. Returns `None` only when
+/// neither `XDG_CONFIG_HOME` nor `HOME` is set.
+fn config_env_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .filter(|v| !v.is_empty())
+                .map(|home| std::path::PathBuf::from(home).join(".config"))
+        })?;
+    Some(base.join("pocketsmith").join("env"))
 }
 
 /// Map an `anyhow::Result<()>` command outcome to a process exit code,
