@@ -31,6 +31,16 @@ fn main() -> ExitCode {
     // Tokens after the subcommand, forwarded to that command's parser.
     let rest = if args.is_empty() { &[][..] } else { &args[1..] };
 
+    // Emit a version banner (to stderr) for actual subcommands so run logs
+    // record which build executed. The bare/help/version arms below print
+    // the banner to stdout themselves, so skip those here to avoid dupes.
+    if !matches!(
+        cmd,
+        None | Some("help" | "--help" | "-h" | "version" | "--version" | "-V")
+    ) {
+        eprintln!("pocketsmith {VERSION} (commit {GIT_COMMIT}, built {BUILD_DATE})");
+    }
+
     match cmd {
         // No command: show the version banner and usage (exit 0).
         None => {
