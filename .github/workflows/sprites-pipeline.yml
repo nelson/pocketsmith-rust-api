@@ -4,6 +4,12 @@ name: Sprites sync pipeline
 # remains on the Sprite's persistent disk at /data/pocketsmith.db.
 
 on:
+  # A workflow-only change also exercises the repaired path immediately,
+  # instead of waiting up to six hours for the next scheduled run.
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/sprites-pipeline.yml"
   schedule:
     # Four refreshes per day. Using a six-hour UTC cadence avoids DST gaps and
     # leaves several recovery opportunities if GitHub drops or delays one run.
