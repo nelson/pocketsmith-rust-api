@@ -1,43 +1,127 @@
-name: Sprites nightly pipeline
+name: Sprites sync pipeline
 
-# sprites.dev VMs scale to zero (sleep when idle), so an in-VM systemd timer
-# never fires. This scheduled job wakes the sprite via the `sprite` CLI and
-# runs the pipeline. exe.dev / boxd deployments ignore this file (they use the
-# in-VM timer in deploy/systemd/).
-#
-# Required repo secret:
-#   SPRITE_TOKEN - a sprite auth token in the form
-#                  "<org>/<id>/<token-id>/<token-value>"
-#                  (see `sprite auth setup --token`).
-# Optional repo variable:
-#   SPRITE_NAME  - sprite name (defaults to "pocketsmith").
+# Sprites scale to zero, so the schedule must run outside the VM. The database
+# remains on the Sprite's persistent disk at /data/pocketsmith.db.
 
 on:
   schedule:
-    # 03:30 Australia/Sydney is 17:30 UTC (AEST, UTC+10). Adjust for DST.
-    - cron: "30 17 * * *"
+    # Four refreshes per day. Using a six-hour UTC cadence avoids DST gaps and
+    # leaves several recovery opportunities if GitHub drops or delays one run.
+    - cron: "17 0,6,12,18 * * *"
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprites-pocketsmith-sync
+  cancel-in-progress: false
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       SPRITE_NAME: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
+      # Keep the CLI and invocation syntax in lockstep. Update this pin
+      # deliberately after reviewing Sprites release notes.
+      SPRITE_CLI_VERSION: v0.0.1-rc48
     steps:
-      - name: Install sprite CLI
-        # Use the official installer from https://docs.sprites.dev. Verify the
-        # exact install command/URL against the docs and pin if possible.
-        run: curl -fsSL https://sprites.dev/install.sh | sh
+      - name: Install pinned Sprite CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/sprite-linux-amd64.tar.gz"
+          checksum="$archive.sha256"
+          bin_dir="$RUNNER_TEMP/sprite-bin"
+          base_url="https://sprites-binaries.t3.storage.dev/client/$SPRITE_CLI_VERSION"
+
+          mkdir -p "$bin_dir"
+          curl -fsSL --retry 3 --retry-all-errors \
+            "$base_url/sprite-linux-amd64.tar.gz" -o "$archive"
+          curl -fsSL --retry 3 --retry-all-errors \
+            "$base_url/sprite-linux-amd64.tar.gz.sha256" -o "$checksum"
+          (cd "$RUNNER_TEMP" && sha256sum -c "$(basename "$checksum")")
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/sprite" "$bin_dir/sprite"
+          echo "$bin_dir" >> "$GITHUB_PATH"
+          "$bin_dir/sprite" --help >/dev/null
 
       - name: Authenticate
-        run: sprite auth setup --token "${{ secrets.SPRITE_TOKEN }}"
-
-      - name: Wake sprite and run sync
+        env:
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          # Daily run is sync-only for now. Run with cwd=/data so the binaries
-          # auto-load /data/.env (dotenv) for POCKETSMITH_API_KEY + the DB path;
-          # sudo -E because serve owns /data as the service user.
-          # Re-enable later stages by extending the && chain.
-          sprite -s "$SPRITE_NAME" exec -- bash -c 'cd /data && sudo -E /usr/local/bin/pocketsmith sync'
-          # ... && sudo -E /usr/local/bin/pocketsmith transfers && sudo -E /usr/local/bin/pocketsmith transfers --apply \
-          # ... && sudo -E /usr/local/bin/pocketsmith categorise && sudo -E /usr/local/bin/pocketsmith push
+          set -euo pipefail
+          if [ -z "$SPRITE_TOKEN" ]; then
+            echo "::error::SPRITE_TOKEN is not configured"
+            exit 1
+          fi
+          sprite auth setup --token "$SPRITE_TOKEN"
+
+      - name: Wake Sprite and sync
+        run: |
+          set -euo pipefail
+          succeeded=false
+
+          for attempt in 1 2 3; do
+            echo "Sync attempt $attempt of 3"
+            # Current CLI syntax places the target flag on the exec command.
+            # Run from /data so dotenv loads the persistent PocketSmith config.
+            if sprite exec -s "$SPRITE_NAME" -- \
+              bash -lc 'cd /data && sudo -E /usr/local/bin/pocketsmith sync'; then
+              succeeded=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+
+          if [ "$succeeded" != true ]; then
+            echo "::error::PocketSmith sync failed after three attempts"
+            exit 1
+          fi
+
+      - name: Validate persistent database
+        run: |
+          set -euo pipefail
+          sprite exec -s "$SPRITE_NAME" -- sudo -E python3 - <<'PY'
+          import sqlite3
+
+          connection = sqlite3.connect(
+              "file:/data/pocketsmith.db?mode=ro",
+              uri=True,
+              timeout=10,
+          )
+          try:
+              integrity = connection.execute("PRAGMA quick_check").fetchone()[0]
+              if integrity != "ok":
+                  raise RuntimeError(f"SQLite quick_check failed: {integrity}")
+
+              transaction_count = connection.execute(
+                  "SELECT COUNT(*) FROM transactions"
+              ).fetchone()[0]
+              if transaction_count <= 0:
+                  raise RuntimeError("persistent database contains no transactions")
+
+              latest_sync = connection.execute(
+                  """
+                  SELECT created_at, transactions_updated
+                  FROM _operations
+                  WHERE reason = 'sync'
+                  ORDER BY id DESC
+                  LIMIT 1
+                  """
+              ).fetchone()
+              if latest_sync is None:
+                  raise RuntimeError("persistent database has no sync operation")
+
+              print(
+                  "database healthy; "
+                  f"transactions={transaction_count}; "
+                  f"latest_sync={latest_sync[0]}; "
+                  f"updated={latest_sync[1]}"
+              )
+          finally:
+              connection.close()
+          PY
