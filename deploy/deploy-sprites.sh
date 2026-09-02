@@ -26,10 +26,9 @@ REPO="${REPO:-nelson/pocketsmith-rust-api}"
 PORT=8080
 PS_KEY="${PS_KEY:-}"
 
-# Release assets live in a (private) repo, so pass a GitHub token for download.
+# Pass a GitHub token when available so this also works if the repo becomes
+# private later. Public release downloads work without one.
 GH_TOKEN="${GH_TOKEN:-$(gh auth token --hostname github.com 2>/dev/null || true)}"
-AUTH_HEADER=""
-[ -n "$GH_TOKEN" ] && AUTH_HEADER="-H \"Authorization: Bearer $GH_TOKEN\""
 
 # 1. Create ONLY if it doesn't already exist (`sprite list` lists Sprites).
 if sprite list 2>/dev/null | grep -qw "$VM"; then
@@ -58,7 +57,11 @@ else
 fi
 
 # Download + install the single `pocketsmith` binary.
-curl -fsSL $AUTH_HEADER "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
+if [ -n "$GH_TOKEN" ]; then
+  curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
+else
+  curl -fsSL "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
+fi
 sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
 
 # Register serve as a Sprite service. --dir /data makes dotenv load /data/.env.
