@@ -32,12 +32,15 @@ fn main() -> ExitCode {
     let rest = if args.is_empty() { &[][..] } else { &args[1..] };
 
     // Emit a version banner (to stderr) for actual subcommands so run logs
-    // record which build executed. The bare/help/version arms below print
-    // the banner to stdout themselves, so skip those here to avoid dupes.
-    if !matches!(
-        cmd,
-        None | Some("help" | "--help" | "-h" | "version" | "--version" | "-V")
-    ) {
+    // record which build executed. Machine-readable rule output must remain
+    // valid JSON on its respective stream, including error responses.
+    let machine_readable_rule = cmd == Some("rule") && rest.iter().any(|arg| arg == "--json");
+    if !machine_readable_rule
+        && !matches!(
+            cmd,
+            None | Some("help" | "--help" | "-h" | "version" | "--version" | "-V")
+        )
+    {
         eprintln!("pocketsmith {VERSION} (commit {GIT_COMMIT}, built {BUILD_DATE})");
     }
 
