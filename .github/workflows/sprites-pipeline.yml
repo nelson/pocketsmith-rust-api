@@ -4,6 +4,11 @@ name: Sprites sync pipeline
 # remains on the Sprite's persistent disk at /data/pocketsmith.db.
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/sprites-pipeline.yml"
+      - ".github/workflows/release.yml"
+      - "deploy/deploy-sprites.sh"
   # A workflow-only change also exercises the repaired path immediately,
   # instead of waiting up to six hours for the next scheduled run.
   push:
