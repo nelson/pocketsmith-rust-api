@@ -38,6 +38,8 @@ jobs:
       # deliberately after reviewing Sprites release notes.
       SPRITE_CLI_VERSION: v0.0.1-rc48
     steps:
+      - uses: actions/checkout@v4
+
       - name: Install pinned Sprite CLI
         run: |
           set -euo pipefail
@@ -68,6 +70,21 @@ jobs:
             exit 1
           fi
           sprite auth setup --token "$SPRITE_TOKEN"
+
+      - name: Repair missing deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VM: ${{ env.SPRITE_NAME }}
+          PS_KEY: ${{ secrets.POCKETSMITH_API_KEY }}
+        run: |
+          set -euo pipefail
+          if sprite exec -s "$SPRITE_NAME" -- test -x /usr/local/bin/pocketsmith; then
+            echo "PocketSmith is already installed"
+            exit 0
+          fi
+
+          echo "PocketSmith is missing; restoring the latest release"
+          bash deploy/deploy-sprites.sh
 
       - name: Wake Sprite and sync
         run: |
