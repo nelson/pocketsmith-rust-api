@@ -64,25 +64,47 @@ jobs:
           files: pocketsmith-x86_64-linux-musl.tar.gz
 
   deploy-sprites:
-    # Auto-deploy (upgrade) to the sprites.dev VM on every real release, after
-    # the binary is attached. Keeps production on the latest release. Skips
-    # cleanly if SPRITE_TOKEN isn't configured. First-time install is still
-    # manual (needs PS_KEY): bash deploy/deploy-sprites.sh
+    # Auto-deploy (upgrade) to the Sprite on every real release, after the
+    # binary is attached. First-time install remains manual because it needs
+    # PS_KEY; automated upgrades reuse /data/.env and /data/pocketsmith.db.
     needs: [release-please, build-binary]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPRITE_CLI_VERSION: v0.0.1-rc48
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to sprite (skips if SPRITE_TOKEN unset)
+
+      - name: Install pinned Sprite CLI
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/sprite-linux-amd64.tar.gz"
+          checksum="$archive.sha256"
+          bin_dir="$RUNNER_TEMP/sprite-bin"
+          base_url="https://sprites-binaries.t3.storage.dev/client/$SPRITE_CLI_VERSION"
+
+          mkdir -p "$bin_dir"
+          curl -fsSL --retry 3 --retry-all-errors \
+            "$base_url/sprite-linux-amd64.tar.gz" -o "$archive"
+          curl -fsSL --retry 3 --retry-all-errors \
+            "$base_url/sprite-linux-amd64.tar.gz.sha256" -o "$checksum"
+          (cd "$RUNNER_TEMP" && sha256sum -c "$(basename "$checksum")")
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/sprite" "$bin_dir/sprite"
+          echo "$bin_dir" >> "$GITHUB_PATH"
+          "$bin_dir/sprite" --help >/dev/null
+
+      - name: Deploy to Sprite
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VM: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
         run: |
+          set -euo pipefail
           if [ -z "$SPRITE_TOKEN" ]; then
             echo "SPRITE_TOKEN not set; skipping auto-deploy."
             exit 0
           fi
-          # Install the sprite CLI (verify the URL against docs.sprites.dev).
-          curl -fsSL https://sprites.dev/install.sh | sh
           sprite auth setup --token "$SPRITE_TOKEN"
           bash deploy/deploy-sprites.sh
