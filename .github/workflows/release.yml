@@ -89,7 +89,8 @@ jobs:
             "$base_url/sprite-linux-amd64.tar.gz" -o "$archive"
           curl -fsSL --retry 3 --retry-all-errors \
             "$base_url/sprite-linux-amd64.tar.gz.sha256" -o "$checksum"
-          (cd "$RUNNER_TEMP" && sha256sum -c "$(basename "$checksum")")
+          expected_sha256="$(awk 'NR == 1 { print $1 }' "$checksum")"
+          echo "$expected_sha256  $archive" | sha256sum -c -
           tar -xzf "$archive" -C "$RUNNER_TEMP"
           install -m 0755 "$RUNNER_TEMP/sprite" "$bin_dir/sprite"
           echo "$bin_dir" >> "$GITHUB_PATH"
