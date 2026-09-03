@@ -243,18 +243,35 @@ jobs:
               -o /tmp/reporting-status.json -w "%{http_code}" \
               -H "Authorization: Bearer $REPORTING_API_TOKEN" \
               http://127.0.0.1:8080/api/v1/status)"
+            balances="$(curl -sS -o /tmp/reporting-balances.json -w "%{http_code}" \
+              -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              http://127.0.0.1:8080/api/v1/accounts/balances)"
+            query="$(curl -sS -o /tmp/reporting-query.json -w "%{http_code}" \
+              -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "{\"sql\":\"SELECT COUNT(*) AS transaction_count FROM transactions\"}" \
+              http://127.0.0.1:8080/api/v1/query)"
             unauthenticated="$(curl -sS -o /dev/null -w "%{http_code}" \
               http://127.0.0.1:8080/api/v1/status)"
             legacy_ui="$(curl -sS -o /dev/null -w "%{http_code}" \
               http://127.0.0.1:8080/)"
 
             test "$authenticated" = 200
+            test "$balances" = 200
+            test "$query" = 200
             test "$unauthenticated" = 401
             test "$legacy_ui" = 404
-            python3 -m json.tool /tmp/reporting-status.json >/dev/null
-            rm -f /tmp/reporting-status.json
+            python3 -c "import json; \
+              status=json.load(open(\"/tmp/reporting-status.json\")); \
+              balances=json.load(open(\"/tmp/reporting-balances.json\")); \
+              query=json.load(open(\"/tmp/reporting-query.json\")); \
+              assert status.get(\"status\") == \"ok\", \"reporting status is not ok\"; \
+              assert balances.get(\"accounts\"), \"reporting API returned no account balances\"; \
+              assert query.get(\"rows\") and query[\"rows\"][0][0] > 0, \
+                \"bounded query returned no transactions\""
+            rm -f /tmp/reporting-{status,balances,query}.json
           '
-          echo "Protected API verified: authenticated=200, unauthenticated=401, legacy UI=404"
+          echo "Protected API verified: status=200, balances=200, query=200, unauthenticated=401, legacy UI=404"
 
       - name: Publish protected reporting API
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
