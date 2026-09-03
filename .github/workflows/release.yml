@@ -110,3 +110,51 @@ jobs:
           fi
           sprite auth setup --token "$SPRITE_TOKEN"
           bash deploy/deploy-sprites.sh
+
+      - name: Verify released MCP endpoint
+        env:
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+          SPRITE_NAME: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SPRITE_TOKEN" ] || [ -z "$REPORTING_API_TOKEN" ]; then
+            echo "Sprite or reporting token is not configured; skipping MCP verification"
+            exit 0
+          fi
+
+          sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
+            set -euo pipefail
+            set -a
+            source /data/.env
+            set +a
+
+            initialized="$(curl -sS --retry 5 --retry-delay 2 \
+              -o /tmp/released-mcp-initialize.json -w "%{http_code}" \
+              -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"release-smoke\",\"version\":\"1.0\"}}}" \
+              http://127.0.0.1:8080/mcp)"
+            called="$(curl -sS -o /tmp/released-mcp-status.json -w "%{http_code}" \
+              -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_reporting_status\",\"arguments\":{}}}" \
+              http://127.0.0.1:8080/mcp)"
+            unauthenticated="$(curl -sS -o /dev/null -w "%{http_code}" \
+              -H "Content-Type: application/json" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"initialize\",\"params\":{}}" \
+              http://127.0.0.1:8080/mcp)"
+
+            test "$initialized" = 200
+            test "$called" = 200
+            test "$unauthenticated" = 401
+            python3 -c "import json; \
+              initialized=json.load(open(\"/tmp/released-mcp-initialize.json\")); \
+              called=json.load(open(\"/tmp/released-mcp-status.json\")); \
+              assert initialized.get(\"result\", {}).get(\"protocolVersion\") == \"2025-06-18\"; \
+              assert called.get(\"result\", {}).get(\"structuredContent\", {}).get(\"status\") == \"ok\""
+            rm -f /tmp/released-mcp-{initialize,status}.json
+          '
+          echo "Released MCP endpoint verified"

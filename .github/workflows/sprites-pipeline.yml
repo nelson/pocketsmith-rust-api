@@ -281,32 +281,40 @@ jobs:
             test "$authenticated" = 200
             test "$balances" = 200
             test "$query" = 200
-            test "$mcp_initialize" = 200
-            test "$mcp_tools" = 200
-            test "$mcp_status" = 200
             test "$unauthenticated" = 401
-            test "$unauthenticated_mcp" = 401
             test "$legacy_ui" = 404
             python3 -c "import json; \
               status=json.load(open(\"/tmp/reporting-status.json\")); \
               balances=json.load(open(\"/tmp/reporting-balances.json\")); \
               query=json.load(open(\"/tmp/reporting-query.json\")); \
-              mcp_init=json.load(open(\"/tmp/reporting-mcp-initialize.json\")); \
-              mcp_tools=json.load(open(\"/tmp/reporting-mcp-tools.json\")); \
-              mcp_status=json.load(open(\"/tmp/reporting-mcp-status.json\")); \
               assert status.get(\"status\") == \"ok\", \"reporting status is not ok\"; \
               assert balances.get(\"accounts\"), \"reporting API returned no account balances\"; \
               assert query.get(\"rows\") and query[\"rows\"][0][0] > 0, \
-                \"bounded query returned no transactions\"; \
-              assert mcp_init.get(\"result\", {}).get(\"protocolVersion\") == \"2025-06-18\", \
-                \"MCP initialization failed\"; \
-              assert len(mcp_tools.get(\"result\", {}).get(\"tools\", [])) == 4, \
-                \"MCP tools were not advertised\"; \
-              assert mcp_status.get(\"result\", {}).get(\"structuredContent\", {}).get(\"status\") == \"ok\", \
-                \"MCP status tool failed\""
+                \"bounded query returned no transactions\""
+
+            deployed_version="$(python3 -c "import json; print(json.load(open('/tmp/reporting-status.json'))['version'])")"
+            oldest_mcp_version="1.4.0"
+            if [ "$(printf "%s\n%s\n" "$oldest_mcp_version" "$deployed_version" | sort -V | head -n 1)" = "$oldest_mcp_version" ]; then
+              test "$mcp_initialize" = 200
+              test "$mcp_tools" = 200
+              test "$mcp_status" = 200
+              test "$unauthenticated_mcp" = 401
+              python3 -c "import json; \
+                mcp_init=json.load(open(\"/tmp/reporting-mcp-initialize.json\")); \
+                mcp_tools=json.load(open(\"/tmp/reporting-mcp-tools.json\")); \
+                mcp_status=json.load(open(\"/tmp/reporting-mcp-status.json\")); \
+                assert mcp_init.get(\"result\", {}).get(\"protocolVersion\") == \"2025-06-18\", \
+                  \"MCP initialization failed\"; \
+                assert len(mcp_tools.get(\"result\", {}).get(\"tools\", [])) == 4, \
+                  \"MCP tools were not advertised\"; \
+                assert mcp_status.get(\"result\", {}).get(\"structuredContent\", {}).get(\"status\") == \"ok\", \
+                  \"MCP status tool failed\""
+            else
+              echo "Deployed release $deployed_version predates MCP; release deployment will verify it"
+            fi
             rm -f /tmp/reporting-{status,balances,query,mcp-initialize,mcp-tools,mcp-status}.json
           '
-          echo "Protected API and MCP verified: REST=200, MCP=200, unauthenticated=401, legacy UI=404"
+          echo "Protected REST API verified; MCP is mandatory from deployed version 1.4.0"
 
       - name: Publish protected reporting API
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
