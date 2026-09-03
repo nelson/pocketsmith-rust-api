@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://REPLACE_WITH_SPRITE_URL"
+      "url": "https://pocketsmith-busng.sprites.app"
     }
   ],
   "security": [
