@@ -73,6 +73,7 @@ jobs:
     timeout-minutes: 20
     env:
       SPRITE_CLI_VERSION: v0.0.1-rc48
+      REPORTING_BASE_URL: ${{ vars.REPORTING_BASE_URL || 'https://pocketsmith-busng.sprites.app' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -100,6 +101,8 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
           REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+          REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
+          REPORTING_BASE_URL: ${{ env.REPORTING_BASE_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VM: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
         run: |
@@ -158,3 +161,19 @@ jobs:
             rm -f /tmp/released-mcp-{initialize,status}.json
           '
           echo "Released MCP endpoint verified"
+
+      - name: Verify released OAuth flow
+        env:
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
+          SPRITE_NAME: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SPRITE_TOKEN" ] || [ -z "$REPORTING_OAUTH_PASSWORD" ]; then
+            echo "Sprite or OAuth password is not configured; skipping OAuth verification"
+            exit 0
+          fi
+          sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
+            set -a; source /data/.env; set +a
+            python3 -
+          ' < deploy/verify-reporting-oauth.py

@@ -71,7 +71,12 @@ fn handle_request(
     let path = request.url().to_string();
     let method = request.method().clone();
 
-    if path.starts_with("/api/") || path.split('?').next() == Some("/mcp") {
+    let route = path.split('?').next().unwrap_or(&path);
+    if path.starts_with("/api/")
+        || route == "/mcp"
+        || route.starts_with("/oauth/")
+        || route.starts_with("/.well-known/")
+    {
         api::handle(request, &state, &api_config);
         return;
     }

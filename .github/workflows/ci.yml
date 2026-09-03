@@ -39,3 +39,6 @@ jobs:
       # default lib/bin tests plus the serve UI tests in one pass.
       - name: Test (web feature)
         run: cargo test --features web --locked
+
+      - name: Validate deployment smoke script
+        run: python3 -m py_compile deploy/verify-reporting-oauth.py

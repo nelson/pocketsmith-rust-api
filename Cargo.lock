@@ -580,10 +580,12 @@ name = "pocketsmith"
 version = "1.4.0"
 dependencies = [
  "anyhow",
+ "base64",
  "dotenvy",
  "maud",
  "regex",
  "reqwest",
+ "ring",
  "rusqlite",
  "serde",
  "serde_json",

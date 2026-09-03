@@ -19,8 +19,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.31", features = ["backup", "bundled", "hooks"] }
 anyhow = "1"
+base64 = "0.22"
 dotenvy = "0.15"
 regex = "1"
+ring = "0.17"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 tiny_http = { version = "0.12", optional = true }
 maud = { version = "0.26", optional = true }
