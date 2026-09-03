@@ -70,13 +70,16 @@ if [ -n "$REPORTING_API_TOKEN_B64" ]; then
   echo "configured token-protected read-only reporting mode"
 fi
 
-# Download + install the single `pocketsmith` binary.
+# Download + install the single pocketsmith binary. Keep command-substitution
+# syntax out of this unquoted heredoc: the local shell expands it before the
+# script is sent to the Sprite.
 if [ -n "$GH_TOKEN" ]; then
   curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
 else
   curl -fsSL "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
 fi
 sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
+/usr/local/bin/pocketsmith --help >/dev/null
 
 # Register serve as a Sprite service. --dir /data makes dotenv load /data/.env.
 sprite-env services delete pocketsmith-serve >/dev/null 2>&1 || true
