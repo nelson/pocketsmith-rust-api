@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.1.0...pocketsmith-v1.2.0) (2026-09-03)
+
+
+### Features
+
+* **config:** load env from $XDG_CONFIG_HOME/pocketsmith/env fallback ([554d554](https://github.com/nelson/pocketsmith-rust-api/commit/554d55408094cfe41e2bca02fa6b163550b7524b))
+* **reporting:** add protected read-only service ([8555c49](https://github.com/nelson/pocketsmith-rust-api/commit/8555c4967553e63250ced76bb3e6cbd231bad23c))
+
+
+### Bug Fixes
+
+* **cli:** keep JSON errors machine-readable ([612355c](https://github.com/nelson/pocketsmith-rust-api/commit/612355c9bb98b0faf8d38f1c2801569ce82d3816))
+* **reporting:** compile query timeout handler ([aa8ad42](https://github.com/nelson/pocketsmith-rust-api/commit/aa8ad42dc7fe9966797a667a219f8e0024d62680))
+* **sprites:** restore missing deployment before sync ([96e558f](https://github.com/nelson/pocketsmith-rust-api/commit/96e558f8a9b2438e252bb72e0127678a36bf924f))
+* **sprites:** restore release deployment with pinned CLI ([29c2147](https://github.com/nelson/pocketsmith-rust-api/commit/29c2147200dbd3a86fac0b1fb6c3e7953a70252f))
+* **sprites:** update scheduled sync for current CLI ([984c8b5](https://github.com/nelson/pocketsmith-rust-api/commit/984c8b5c930c11c5da1a0426748a3f0fbf8a2fad))
+* **sprites:** use current target flag syntax ([3642d23](https://github.com/nelson/pocketsmith-rust-api/commit/3642d230629970615b8e676bf057e0cc24db4714))
+* **sprites:** verify pinned CLI checksum by digest ([0eaf6f5](https://github.com/nelson/pocketsmith-rust-api/commit/0eaf6f514caf0df2379fb883c6a9c5cb5d7f2e1b))
+
 ## [1.1.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.0.0...pocketsmith-v1.1.0) (2026-06-30)
 
 
