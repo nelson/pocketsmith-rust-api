@@ -71,7 +71,7 @@ jobs:
           fi
           sprite auth setup --token "$SPRITE_TOKEN"
 
-      - name: Repair missing deployment
+      - name: Reconcile deployment and reporting configuration
         env:
           GH_TOKEN: ${{ github.token }}
           VM: ${{ env.SPRITE_NAME }}
@@ -79,13 +79,28 @@ jobs:
           REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
         run: |
           set -euo pipefail
-          if sprite exec -s "$SPRITE_NAME" -- test -x /usr/local/bin/pocketsmith; then
-            echo "PocketSmith is already installed"
-            exit 0
+          needs_deploy=false
+
+          if ! sprite exec -s "$SPRITE_NAME" -- test -x /usr/local/bin/pocketsmith; then
+            echo "PocketSmith is missing"
+            needs_deploy=true
           fi
 
-          echo "PocketSmith is missing; restoring the latest release"
-          bash deploy/deploy-sprites.sh
+          if [ -n "$REPORTING_API_TOKEN" ]; then
+            expected_hash="$(printf '%s' "$REPORTING_API_TOKEN" | sha256sum | awk '{print $1}')"
+            configured_hash="$(sprite exec -s "$SPRITE_NAME" -- sudo awk -F= '/^REPORTING_API_TOKEN_SHA256=/{print $2}' /data/.env | tail -n 1)"
+            if [ "$configured_hash" != "$expected_hash" ]; then
+              echo "Reporting configuration is missing or stale"
+              needs_deploy=true
+            fi
+          fi
+
+          if [ "$needs_deploy" = true ]; then
+            echo "Reconciling the latest release and service configuration"
+            bash deploy/deploy-sprites.sh
+          else
+            echo "Deployment and reporting configuration are current"
+          fi
 
       - name: Wake Sprite and sync
         run: |
@@ -207,3 +222,49 @@ jobs:
               expired.unlink()
           print(f"created {final_path}; retained {min(len(snapshots), 28)} snapshots")
           PY
+
+      - name: Verify protected read-only API
+        env:
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$REPORTING_API_TOKEN" ]; then
+            echo "Reporting token is not configured; skipping API verification"
+            exit 0
+          fi
+
+          sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
+            set -euo pipefail
+            set -a
+            source /data/.env
+            set +a
+
+            authenticated="$(curl -sS --retry 5 --retry-delay 2 \
+              -o /tmp/reporting-status.json -w "%{http_code}" \
+              -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              http://127.0.0.1:8080/api/v1/status)"
+            unauthenticated="$(curl -sS -o /dev/null -w "%{http_code}" \
+              http://127.0.0.1:8080/api/v1/status)"
+            legacy_ui="$(curl -sS -o /dev/null -w "%{http_code}" \
+              http://127.0.0.1:8080/)"
+
+            test "$authenticated" = 200
+            test "$unauthenticated" = 401
+            test "$legacy_ui" = 404
+            python3 -m json.tool /tmp/reporting-status.json >/dev/null
+            rm -f /tmp/reporting-status.json
+          '
+          echo "Protected API verified: authenticated=200, unauthenticated=401, legacy UI=404"
+
+      - name: Publish protected reporting API
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$REPORTING_API_TOKEN" ]; then
+            echo "Reporting token is not configured; keeping Sprite authentication"
+            exit 0
+          fi
+          sprite config update -s "$SPRITE_NAME" --url-auth public
+          echo "Published the Bearer-token-protected reporting API"
