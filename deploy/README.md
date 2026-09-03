@@ -15,7 +15,7 @@ Releases — no registry, no system dependencies on the VM.
 | `systemd/pocketsmith-serve.service` | Runs the web UI. |
 | `systemd/pocketsmith-pipeline.{service,timer}` | Nightly `sync → transfers → categorise → push`. **Fires only on always-on VMs** (exe.dev / boxd). |
 | `provision-*.sh` (exe/boxd), `deploy-sprites.sh` | Per-vendor deploy entrypoints. sprites uses `deploy-sprites.sh` (install **and** upgrade); exe/boxd use `provision-*.sh` + `install.sh`. |
-| `../.github/workflows/sprites-pipeline.yml` | **sprites only** — external nightly scheduler (a sleeping Sprite can't run an in-VM timer). Currently runs `sync` only. |
+| `../.github/workflows/sprites-pipeline.yml` | **sprites only** — external six-hourly scheduler (a sleeping Sprite can't run an in-VM timer). Currently runs `sync` only. |
 
 State (`pocketsmith.db`, the review decisions) lives on the VM's persistent disk
 at `/data` and is never baked into the artifact.
@@ -30,7 +30,7 @@ at `/data` and is never baked into the artifact.
    pull a newer release; it reuses the sprite, reinstalls binaries, recreates
    the service, and skips the env write + DB seed.
 3. Add repo secret `SPRITE_TOKEN` (a `sprite auth setup` token) so
-   `.github/workflows/sprites-pipeline.yml` can wake the Sprite nightly **and**
+   `.github/workflows/sprites-pipeline.yml` can wake the Sprite regularly **and**
    so releases auto-deploy (below).
 
 **Continuous deploy:** once `SPRITE_TOKEN` is set, the `deploy-sprites` job in
@@ -58,11 +58,19 @@ route—including its mutation routes. The reporting surface is then:
 - `GET /api/v1/transactions`
 - `POST /api/v1/query`
 - `GET /api/v1/openapi.json` (contract only; contains no financial data)
+- `POST /mcp` (stateless Streamable HTTP MCP transport)
 
 All data endpoints require `Authorization: Bearer <REPORTING_API_TOKEN>`. Keep
 the Sprite URL in its default `sprite` auth mode while testing. Only change it
 to public after the application token is installed and verified; public mode
 is required for clients that cannot authenticate to the Sprite proxy itself.
+
+The MCP endpoint exposes four read-only tools corresponding to reporting
+status, account balances, filtered transactions, and bounded analytical SQL.
+It uses the same independent read-only SQLite connections and resource limits
+as the REST endpoints. The Sprite workflow verifies MCP initialization, tool
+discovery, an authenticated tool call, and rejection of an unauthenticated
+request without printing financial response bodies.
 
 The scheduled workflow creates a consistent SQLite backup after every
 successful sync under `/data/snapshots`, retains the latest 28 snapshots, and
@@ -70,7 +78,7 @@ updates `/data/snapshots/latest.json`. The active database is never committed
 to Git.
 
 Scheduling note: Sprites scale to zero, so an in-VM timer never fires. The
-nightly job is driven externally by the GitHub Actions workflow, which is
+six-hourly job is driven externally by the GitHub Actions workflow, which is
 intentionally `sync`-only right now (re-enable the rest of the chain in that
 file when ready).
 
