@@ -25,6 +25,8 @@ VM="${VM:-pocketsmith}"
 REPO="${REPO:-nelson/pocketsmith-rust-api}"
 PORT=8080
 PS_KEY="${PS_KEY:-}"
+REPORTING_API_TOKEN="${REPORTING_API_TOKEN:-}"
+REPORTING_API_TOKEN_B64="$(printf '%s' "$REPORTING_API_TOKEN" | base64 | tr -d '\n')"
 
 # Pass a GitHub token when available so this also works if the repo becomes
 # private later. Public release downloads work without one.
@@ -56,6 +58,18 @@ else
   echo "/data/.env exists; keeping existing config"
 fi
 
+# Enable the externally callable surface only when a separate, least-privilege
+# reporting credential has been configured. The Sprite URL remains private
+# until an operator explicitly changes its auth mode.
+if [ -n "$REPORTING_API_TOKEN_B64" ]; then
+  reporting_token="\$(printf '%s' "$REPORTING_API_TOKEN_B64" | base64 -d)"
+  sudo awk '!/^REPORTING_API_TOKEN=|^SERVE_API_ONLY=/' /data/.env > /tmp/pocketsmith.env
+  printf '%s\n' "REPORTING_API_TOKEN=\$reporting_token" "SERVE_API_ONLY=1" | sudo tee -a /tmp/pocketsmith.env >/dev/null
+  sudo install -m 0600 /tmp/pocketsmith.env /data/.env
+  sudo rm -f /tmp/pocketsmith.env
+  echo "configured token-protected read-only reporting mode"
+fi
+
 # Download + install the single `pocketsmith` binary.
 if [ -n "$GH_TOKEN" ]; then
   curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://github.com/$REPO/releases/latest/download/pocketsmith-x86_64-linux-musl.tar.gz" | sudo tar -xz -C /opt/pocketsmith
@@ -66,7 +80,7 @@ sudo install /opt/pocketsmith/pocketsmith /usr/local/bin/pocketsmith
 
 # Register serve as a Sprite service. --dir /data makes dotenv load /data/.env.
 sprite-env services delete pocketsmith-serve >/dev/null 2>&1 || true
-sprite-env services create pocketsmith-serve --cmd "/usr/local/bin/pocketsmith serve" --dir /data --http-port $PORT --no-stream
+sprite-env services create pocketsmith-serve --cmd /usr/local/bin/pocketsmith --args serve --dir /data --http-port $PORT --no-stream
 echo "serve registered as a Sprite service on port $PORT"
 REMOTE
 

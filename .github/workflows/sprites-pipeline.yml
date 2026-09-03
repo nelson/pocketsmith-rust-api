@@ -76,6 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VM: ${{ env.SPRITE_NAME }}
           PS_KEY: ${{ secrets.POCKETSMITH_API_KEY }}
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
         run: |
           set -euo pipefail
           if sprite exec -s "$SPRITE_NAME" -- test -x /usr/local/bin/pocketsmith; then
@@ -95,8 +96,9 @@ jobs:
             echo "Sync attempt $attempt of 3"
             # Current CLI syntax places the target flag on the exec command.
             # Run from /data so dotenv loads the persistent PocketSmith config.
-            if sprite exec -s "$SPRITE_NAME" -- \
-              bash -lc 'cd /data && sudo -E /usr/local/bin/pocketsmith sync'; then
+            if sprite exec -s "$SPRITE_NAME" -- sudo -E \
+              flock -w 120 /data/pocketsmith.writer.lock \
+              bash -lc 'cd /data && /usr/local/bin/pocketsmith sync'; then
               succeeded=true
               break
             fi
@@ -153,4 +155,55 @@ jobs:
               )
           finally:
               connection.close()
+          PY
+
+      - name: Create retained database snapshot
+        run: |
+          set -euo pipefail
+          sprite exec -s "$SPRITE_NAME" -- sudo -E python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          import pathlib
+          import sqlite3
+
+          source_path = pathlib.Path("/data/pocketsmith.db")
+          snapshot_dir = pathlib.Path("/data/snapshots")
+          snapshot_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+          timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+              "%Y%m%dT%H%M%S%fZ"
+          )
+          final_path = snapshot_dir / f"pocketsmith-{timestamp}.db"
+          temporary_path = snapshot_dir / f".{final_path.name}.tmp"
+
+          source = sqlite3.connect(
+              f"file:{source_path}?mode=ro", uri=True, timeout=10
+          )
+          destination = sqlite3.connect(temporary_path)
+          try:
+              source.backup(destination)
+              check = destination.execute("PRAGMA quick_check").fetchone()[0]
+              if check != "ok":
+                  raise RuntimeError(f"snapshot quick_check failed: {check}")
+          finally:
+              destination.close()
+              source.close()
+
+          os.chmod(temporary_path, 0o600)
+          os.replace(temporary_path, final_path)
+          metadata = {
+              "created_at": datetime.datetime.now(
+                  datetime.timezone.utc
+              ).isoformat(),
+              "database": final_path.name,
+              "source": str(source_path),
+          }
+          metadata_tmp = snapshot_dir / ".latest.json.tmp"
+          metadata_tmp.write_text(json.dumps(metadata, indent=2) + "\n")
+          os.replace(metadata_tmp, snapshot_dir / "latest.json")
+
+          snapshots = sorted(snapshot_dir.glob("pocketsmith-*.db"))
+          for expired in snapshots[:-28]:
+              expired.unlink()
+          print(f"created {final_path}; retained {min(len(snapshots), 28)} snapshots")
           PY

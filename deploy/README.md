@@ -46,6 +46,29 @@ so it **auto-restarts whenever the sprite wakes** (processes started via
 `sprite exec`/`console` don't survive sleep). serve + sync auto-load `/data/.env`
 via dotenv (run with cwd `/data`).
 
+### Read-only reporting API
+
+Set a repository Actions secret named `REPORTING_API_TOKEN` to a long random
+value before deploying the reporting API. When present, deployment writes it
+to `/data/.env`, enables `SERVE_API_ONLY=1`, and disables every legacy HTML UI
+route—including its mutation routes. The reporting surface is then:
+
+- `GET /api/v1/status`
+- `GET /api/v1/accounts/balances`
+- `GET /api/v1/transactions`
+- `POST /api/v1/query`
+- `GET /api/v1/openapi.json` (contract only; contains no financial data)
+
+All data endpoints require `Authorization: Bearer <REPORTING_API_TOKEN>`. Keep
+the Sprite URL in its default `sprite` auth mode while testing. Only change it
+to public after the application token is installed and verified; public mode
+is required for clients that cannot authenticate to the Sprite proxy itself.
+
+The scheduled workflow creates a consistent SQLite backup after every
+successful sync under `/data/snapshots`, retains the latest 28 snapshots, and
+updates `/data/snapshots/latest.json`. The active database is never committed
+to Git.
+
 Scheduling note: Sprites scale to zero, so an in-VM timer never fires. The
 nightly job is driven externally by the GitHub Actions workflow, which is
 intentionally `sync`-only right now (re-enable the rest of the chain in that

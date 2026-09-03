@@ -8,5 +8,6 @@
 pub mod dump;
 pub mod normalise;
 pub mod push;
+pub mod snapshot;
 pub mod sync;
 pub mod transfers;

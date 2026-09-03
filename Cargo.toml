@@ -17,7 +17,7 @@ warnings = "deny"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.31", features = ["backup", "bundled", "hooks"] }
 anyhow = "1"
 dotenvy = "0.15"
 regex = "1"
@@ -28,4 +28,3 @@ maud = { version = "0.26", optional = true }
 [[bin]]
 name = "pocketsmith"
 path = "src/main.rs"
-
