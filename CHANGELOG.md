@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.2.0...pocketsmith-v1.2.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **sprites:** prevent local heredoc substitution ([5874ae9](https://github.com/nelson/pocketsmith-rust-api/commit/5874ae9adf76e6ac92603451b3919a20f84ca906))
+
 ## [1.2.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.1.0...pocketsmith-v1.2.0) (2026-09-03)
 
 
