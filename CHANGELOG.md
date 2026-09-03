@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.4.0...pocketsmith-v1.5.0) (2026-09-03)
+
+
+### Features
+
+* **reporting:** add single-user OAuth access ([06e5bb9](https://github.com/nelson/pocketsmith-rust-api/commit/06e5bb92b3dab370d5949bc95f54e4104d778b4f))
+
 ## [1.4.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.3.0...pocketsmith-v1.4.0) (2026-09-03)
 
 
