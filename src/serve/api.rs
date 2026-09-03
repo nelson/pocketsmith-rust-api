@@ -5,6 +5,8 @@
 //! and arbitrary analytical SQL is additionally checked with SQLite's own
 //! `sqlite3_stmt_readonly` result before execution.
 
+mod mcp;
+
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -76,6 +78,11 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
             .with_header(json_header())
             .with_header(Header::from_bytes("WWW-Authenticate", "Bearer").unwrap());
         let _ = request.respond(response);
+        return;
+    }
+
+    if path == "/mcp" {
+        mcp::handle(request, state);
         return;
     }
 
@@ -322,6 +329,7 @@ fn parse_optional_i64(query: &str, key: &str) -> Result<Option<i64>, ApiError> {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct QueryRequest {
     sql: String,
     #[serde(default)]
