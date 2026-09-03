@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.2.1...pocketsmith-v1.3.0) (2026-09-03)
+
+
+### Features
+
+* **sprites:** reconcile reporting configuration ([8f83bc4](https://github.com/nelson/pocketsmith-rust-api/commit/8f83bc486b251a063b93909d13bf8e552892aaee))
+* **sprites:** track reporting token rotations ([502e02d](https://github.com/nelson/pocketsmith-rust-api/commit/502e02d01d14a59b3c41cf686235f4330b1e3217))
+
 ## [1.2.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.2.0...pocketsmith-v1.2.1) (2026-09-03)
 
 
