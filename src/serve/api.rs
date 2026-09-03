@@ -6,6 +6,7 @@
 //! `sqlite3_stmt_readonly` result before execution.
 
 mod mcp;
+mod oauth;
 
 use std::io::Read;
 use std::sync::{Arc, Mutex};
@@ -32,6 +33,7 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(2);
 #[derive(Debug)]
 pub struct Config {
     token: Option<String>,
+    oauth: Option<oauth::Config>,
     pub api_only: bool,
 }
 
@@ -43,17 +45,33 @@ impl Config {
         let api_only = std::env::var("SERVE_API_ONLY")
             .ok()
             .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes"));
+        let oauth = oauth::Config::from_env()?;
 
-        if api_only && token.is_none() {
-            bail!("SERVE_API_ONLY requires REPORTING_API_TOKEN");
+        if api_only && token.is_none() && oauth.is_none() {
+            bail!(
+                "SERVE_API_ONLY requires REPORTING_API_TOKEN or REPORTING_OAUTH_PASSWORD"
+            );
         }
-        Ok(Self { token, api_only })
+        Ok(Self {
+            token,
+            oauth,
+            api_only,
+        })
     }
 }
 
 pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Config) {
     let url = request.url().to_string();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
+
+    if oauth::is_route(path) {
+        if let Some(oauth) = config.oauth.as_ref() {
+            oauth::handle(request, path, query, oauth);
+        } else {
+            respond_error(request, 503, "reporting OAuth is not configured");
+        }
+        return;
+    }
 
     // The contract contains no financial data and is needed while configuring
     // a client, before that client can send its bearer token.
@@ -67,16 +85,39 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
         return;
     }
 
-    let Some(expected_token) = config.token.as_deref() else {
+    let bearer = bearer_token(&request);
+    let reporting_authorized = config.token.as_deref().is_some_and(|expected_token| {
+        bearer
+            .as_deref()
+            .is_some_and(|value| constant_time_eq(value.as_bytes(), expected_token.as_bytes()))
+    });
+    let oauth_authorized = path == "/mcp"
+        && bearer
+            .as_deref()
+            .is_some_and(|value| config.oauth.as_ref().is_some_and(|oauth| oauth.authorized(value)));
+
+    if path != "/mcp" && config.token.is_none() {
         respond_error(request, 503, "reporting API is not configured");
         return;
-    };
-    if !authorized(&request, expected_token) {
+    }
+    if path == "/mcp" && config.token.is_none() && config.oauth.is_none() {
+        respond_error(request, 503, "reporting API is not configured");
+        return;
+    }
+    if !reporting_authorized && !oauth_authorized {
         let body = serde_json::to_vec(&json!({ "error": "unauthorized" })).unwrap();
-        let response = Response::from_data(body)
+        let mut response = Response::from_data(body)
             .with_status_code(StatusCode(401))
-            .with_header(json_header())
-            .with_header(Header::from_bytes("WWW-Authenticate", "Bearer").unwrap());
+            .with_header(json_header());
+        let challenge = config
+            .oauth
+            .as_ref()
+            .filter(|_| path == "/mcp")
+            .map_or_else(
+                || "Bearer".to_string(),
+                |oauth| oauth.authentication_challenge(),
+            );
+        response.add_header(Header::from_bytes("WWW-Authenticate", challenge).unwrap());
         let _ = request.respond(response);
         return;
     }
@@ -105,13 +146,13 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
     }
 }
 
-fn authorized(request: &Request, expected: &str) -> bool {
-    let supplied = request
+fn bearer_token(request: &Request) -> Option<String> {
+    request
         .headers()
         .iter()
         .find(|header| header.field.equiv("Authorization"))
-        .and_then(|header| header.value.as_str().strip_prefix("Bearer "));
-    supplied.is_some_and(|value| constant_time_eq(value.as_bytes(), expected.as_bytes()))
+        .and_then(|header| header.value.as_str().strip_prefix("Bearer "))
+        .map(str::to_string)
 }
 
 fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {

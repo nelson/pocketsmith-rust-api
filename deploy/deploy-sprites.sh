@@ -28,6 +28,10 @@ PS_KEY="${PS_KEY:-}"
 REPORTING_API_TOKEN="${REPORTING_API_TOKEN:-}"
 REPORTING_API_TOKEN_B64="$(printf '%s' "$REPORTING_API_TOKEN" | base64 | tr -d '\n')"
 REPORTING_API_TOKEN_SHA256="$(printf '%s' "$REPORTING_API_TOKEN" | sha256sum | awk '{print $1}')"
+REPORTING_OAUTH_PASSWORD="${REPORTING_OAUTH_PASSWORD:-}"
+REPORTING_OAUTH_PASSWORD_B64="$(printf '%s' "$REPORTING_OAUTH_PASSWORD" | base64 | tr -d '\n')"
+REPORTING_OAUTH_PASSWORD_SHA256="$(printf '%s' "$REPORTING_OAUTH_PASSWORD" | sha256sum | awk '{print $1}')"
+REPORTING_BASE_URL="${REPORTING_BASE_URL:-}"
 
 # Pass a GitHub token when available so this also works if the repo becomes
 # private later. Public release downloads work without one.
@@ -69,6 +73,22 @@ if [ -n "$REPORTING_API_TOKEN_B64" ]; then
   sudo install -m 0600 /tmp/pocketsmith.env /data/.env
   sudo rm -f /tmp/pocketsmith.env
   echo "configured token-protected read-only reporting mode"
+fi
+
+# OAuth is optional until the owner creates the separate login password. It
+# uses its own persistent database so the financial SQLite file remains
+# read-only to every reporting request.
+if [ -n "$REPORTING_OAUTH_PASSWORD_B64" ]; then
+  if [ -z "$REPORTING_BASE_URL" ]; then
+    echo "ERROR: REPORTING_OAUTH_PASSWORD requires REPORTING_BASE_URL" >&2
+    exit 1
+  fi
+  oauth_password="\$(printf '%s' "$REPORTING_OAUTH_PASSWORD_B64" | base64 -d)"
+  sudo awk '!/^REPORTING_OAUTH_PASSWORD=|^REPORTING_OAUTH_PASSWORD_SHA256=|^REPORTING_BASE_URL=|^REPORTING_OAUTH_DB=/' /data/.env > /tmp/pocketsmith.env
+  printf '%s\n' "REPORTING_OAUTH_PASSWORD=\$oauth_password" "REPORTING_OAUTH_PASSWORD_SHA256=$REPORTING_OAUTH_PASSWORD_SHA256" "REPORTING_BASE_URL=$REPORTING_BASE_URL" "REPORTING_OAUTH_DB=/data/reporting-oauth.db" | sudo tee -a /tmp/pocketsmith.env >/dev/null
+  sudo install -m 0600 /tmp/pocketsmith.env /data/.env
+  sudo rm -f /tmp/pocketsmith.env
+  echo "configured single-user OAuth reporting access"
 fi
 
 # Download + install the single pocketsmith binary. Keep command-substitution

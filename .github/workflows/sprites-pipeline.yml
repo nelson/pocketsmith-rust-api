@@ -37,6 +37,7 @@ jobs:
       # Keep the CLI and invocation syntax in lockstep. Update this pin
       # deliberately after reviewing Sprites release notes.
       SPRITE_CLI_VERSION: v0.0.1-rc48
+      REPORTING_BASE_URL: ${{ vars.REPORTING_BASE_URL || 'https://pocketsmith-busng.sprites.app' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +78,8 @@ jobs:
           VM: ${{ env.SPRITE_NAME }}
           PS_KEY: ${{ secrets.POCKETSMITH_API_KEY }}
           REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+          REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
+          REPORTING_BASE_URL: ${{ env.REPORTING_BASE_URL }}
         run: |
           set -euo pipefail
           needs_deploy=false
@@ -91,6 +94,15 @@ jobs:
             configured_hash="$(sprite exec -s "$SPRITE_NAME" -- sudo awk -F= '/^REPORTING_API_TOKEN_SHA256=/{print $2}' /data/.env | tail -n 1)"
             if [ "$configured_hash" != "$expected_hash" ]; then
               echo "Reporting configuration is missing or stale"
+              needs_deploy=true
+            fi
+          fi
+
+          if [ -n "$REPORTING_OAUTH_PASSWORD" ]; then
+            expected_oauth_hash="$(printf '%s' "$REPORTING_OAUTH_PASSWORD" | sha256sum | awk '{print $1}')"
+            configured_oauth_hash="$(sprite exec -s "$SPRITE_NAME" -- sudo awk -F= '/^REPORTING_OAUTH_PASSWORD_SHA256=/{print $2}' /data/.env | tail -n 1)"
+            if [ "$configured_oauth_hash" != "$expected_oauth_hash" ]; then
+              echo "OAuth configuration is missing or stale"
               needs_deploy=true
             fi
           fi
@@ -316,15 +328,43 @@ jobs:
           '
           echo "Protected REST API verified; MCP is mandatory from deployed version 1.4.0"
 
+      - name: Verify OAuth flow when deployed
+        env:
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+          REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$REPORTING_OAUTH_PASSWORD" ]; then
+            echo "OAuth password is not configured; skipping OAuth verification"
+            exit 0
+          fi
+
+          deployed_version="$(sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
+            set -a; source /data/.env; set +a
+            curl -fsS -H "Authorization: Bearer $REPORTING_API_TOKEN" \
+              http://127.0.0.1:8080/api/v1/status
+          ' | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          oldest_oauth_version="1.5.0"
+          if [ "$(printf "%s\n%s\n" "$oldest_oauth_version" "$deployed_version" | sort -V | head -n 1)" != "$oldest_oauth_version" ]; then
+            echo "Deployed release $deployed_version predates OAuth; release deployment will verify it"
+            exit 0
+          fi
+
+          sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
+            set -a; source /data/.env; set +a
+            python3 -
+          ' < deploy/verify-reporting-oauth.py
+
       - name: Publish protected reporting API
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
+          REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "$REPORTING_API_TOKEN" ]; then
-            echo "Reporting token is not configured; keeping Sprite authentication"
+          if [ -z "$REPORTING_API_TOKEN" ] && [ -z "$REPORTING_OAUTH_PASSWORD" ]; then
+            echo "Reporting authentication is not configured; keeping Sprite authentication"
             exit 0
           fi
           sprite config update -s "$SPRITE_NAME" --url-auth public
-          echo "Published the Bearer-token-protected reporting API"
+          echo "Published the application-authenticated reporting API"

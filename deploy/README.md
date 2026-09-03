@@ -60,10 +60,13 @@ route—including its mutation routes. The reporting surface is then:
 - `GET /api/v1/openapi.json` (contract only; contains no financial data)
 - `POST /mcp` (stateless Streamable HTTP MCP transport)
 
-All data endpoints require `Authorization: Bearer <REPORTING_API_TOKEN>`. Keep
-the Sprite URL in its default `sprite` auth mode while testing. Only change it
-to public after the application token is installed and verified; public mode
-is required for clients that cannot authenticate to the Sprite proxy itself.
+The REST data endpoints require
+`Authorization: Bearer <REPORTING_API_TOKEN>`. The MCP endpoint accepts that
+same credential for operational checks and OAuth access tokens for ChatGPT.
+Keep the Sprite URL in its default `sprite` auth mode while testing. Only
+change it to public after application authentication is installed and
+verified; public mode is required for clients that cannot authenticate to the
+Sprite proxy itself.
 
 The MCP endpoint exposes four read-only tools corresponding to reporting
 status, account balances, filtered transactions, and bounded analytical SQL.
@@ -71,6 +74,34 @@ It uses the same independent read-only SQLite connections and resource limits
 as the REST endpoints. The Sprite workflow verifies MCP initialization, tool
 discovery, an authenticated tool call, and rejection of an unauthenticated
 request without printing financial response bodies.
+
+### ChatGPT OAuth connection
+
+Create a second repository Actions secret named `REPORTING_OAUTH_PASSWORD`.
+Use a unique password of at least 20 characters that you retain in your
+password manager; this is the password entered once in the authorization page
+when connecting ChatGPT. It must not be the PocketSmith API key or the
+operational `REPORTING_API_TOKEN`.
+
+`REPORTING_BASE_URL` defaults in the workflows to
+`https://pocketsmith-busng.sprites.app`. Set a repository variable with that
+name if the Sprite hostname changes. Deployment stores OAuth clients,
+short-lived authorization codes, and only SHA-256 hashes of access and refresh
+tokens in `/data/reporting-oauth.db`. The financial database remains separate
+and read-only to the reporting service.
+
+The OAuth server supports dynamic client registration, authorization code +
+PKCE, one-hour access tokens, rotating 30-day refresh tokens, and only the
+`reporting:read` scope. Once deployed:
+
+1. Enable Developer mode under ChatGPT **Settings → Security and login**.
+2. Open the ChatGPT Plugins page and create a developer-mode connection.
+3. Enter `https://pocketsmith-busng.sprites.app/mcp` and choose OAuth with
+   dynamic client registration.
+4. On the PocketSmith authorization page, verify the callback shown belongs
+   to ChatGPT, then enter `REPORTING_OAUTH_PASSWORD`.
+
+Never paste either reporting secret into a chat or scheduled-task prompt.
 
 The scheduled workflow creates a consistent SQLite backup after every
 successful sync under `/data/snapshots`, retains the latest 28 snapshots, and
