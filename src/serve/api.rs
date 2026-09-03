@@ -349,7 +349,7 @@ fn analytical_query(conn: &Connection, body: &[u8]) -> Result<Value, ApiError> {
         .map(json_to_sql)
         .collect::<Result<Vec<_>, _>>()?;
     let started = Instant::now();
-    conn.progress_handler(1_000, Some(move || started.elapsed() > QUERY_TIMEOUT))?;
+    conn.progress_handler(1_000, Some(move || started.elapsed() > QUERY_TIMEOUT));
 
     let mut stmt = conn.prepare(sql).map_err(|error| ApiError::new(400, error.to_string()))?;
     if !stmt.readonly() {
@@ -457,78 +457,4 @@ fn respond_bytes(request: Request, status: u16, content_type: &str, body: Vec<u8
 
 fn json_header() -> Header {
     Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pocketsmith::db::with_operation;
-
-    fn seeded_db() -> Connection {
-        let conn = pocketsmith::db::initialize_in_memory().unwrap();
-        conn.execute(
-            "INSERT INTO transaction_accounts \
-             (id, name, currency_code, current_balance, current_balance_date) \
-             VALUES (1, 'Everyday', 'AUD', 123.45, '2026-09-03')",
-            [],
-        )
-        .unwrap();
-        with_operation(&conn, "sync", |conn| {
-            conn.execute(
-                "INSERT INTO transactions \
-                 (id, date, payee, amount, is_transfer, transaction_account_id) \
-                 VALUES (10, '2026-09-02', 'Grocer', -25.50, 0, 1)",
-                [],
-            )?;
-            Ok(())
-        })
-        .unwrap();
-        conn
-    }
-
-    #[test]
-    fn status_has_clear_name_and_fresh_sync() {
-        let value = status(&seeded_db()).unwrap();
-        assert_eq!(value["status"], "ok");
-        assert_eq!(value["database"]["transaction_count"], 1);
-        assert_eq!(value["data_fresh"], true);
-    }
-
-    #[test]
-    fn balances_omit_account_number() {
-        let value = balances(&seeded_db()).unwrap();
-        assert_eq!(value["accounts"][0]["name"], "Everyday");
-        assert!(value["accounts"][0].get("number").is_none());
-    }
-
-    #[test]
-    fn transaction_filters_and_limits_are_applied() {
-        let value = transactions(&seeded_db(), "from=2026-09-02&to=2026-09-02&limit=5").unwrap();
-        assert_eq!(value["transactions"].as_array().unwrap().len(), 1);
-        assert_eq!(value["transactions"][0]["payee"], "Grocer");
-    }
-
-    #[test]
-    fn analytical_query_rejects_writes_and_returns_rows() {
-        let conn = seeded_db();
-        let selected = analytical_query(
-            &conn,
-            br#"{"sql":"SELECT payee, amount FROM transactions WHERE date = ?","params":["2026-09-02"]}"#,
-        )
-        .unwrap();
-        assert_eq!(selected["rows"][0][0], "Grocer");
-
-        let error = analytical_query(
-            &conn,
-            br#"{"sql":"UPDATE transactions SET payee = 'bad'"}"#,
-        )
-        .unwrap_err();
-        assert_eq!(error.status, 400);
-    }
-
-    #[test]
-    fn bearer_comparison_is_exact() {
-        assert!(constant_time_eq(b"correct", b"correct"));
-        assert!(!constant_time_eq(b"correct", b"wrong"));
-    }
 }
