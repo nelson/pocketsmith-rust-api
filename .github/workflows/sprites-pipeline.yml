@@ -292,7 +292,7 @@ jobs:
               assert query.get(\"rows\") and query[\"rows\"][0][0] > 0, \
                 \"bounded query returned no transactions\""
 
-            deployed_version="$(python3 -c "import json; print(json.load(open('/tmp/reporting-status.json'))['version'])")"
+            deployed_version="$(python3 -c "import json; print(json.load(open(\"/tmp/reporting-status.json\"))[\"version\"])")"
             oldest_mcp_version="1.4.0"
             if [ "$(printf "%s\n%s\n" "$oldest_mcp_version" "$deployed_version" | sort -V | head -n 1)" = "$oldest_mcp_version" ]; then
               test "$mcp_initialize" = 200
