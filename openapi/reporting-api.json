@@ -1,0 +1,177 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PocketSmith Read-only Reporting API",
+    "version": "1.0.0",
+    "description": "Authenticated read-only access to a private PocketSmith SQLite mirror. All monetary values are decimal currency units, not cents."
+  },
+  "servers": [
+    {
+      "url": "https://REPLACE_WITH_SPRITE_URL"
+    }
+  ],
+  "security": [
+    {
+      "reportingToken": []
+    }
+  ],
+  "paths": {
+    "/api/v1/status": {
+      "get": {
+        "operationId": "getReportingStatus",
+        "summary": "Check database integrity and data freshness",
+        "responses": {
+          "200": {
+            "description": "Current service, database and sync status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/balances": {
+      "get": {
+        "operationId": "getAccountBalances",
+        "summary": "List account balances without account numbers",
+        "responses": {
+          "200": {
+            "description": "Balances from the latest successful sync",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transactions": {
+      "get": {
+        "operationId": "findTransactions",
+        "summary": "Find transactions using bounded filters",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching transactions, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/query": {
+      "post": {
+        "operationId": "queryFinancialDatabase",
+        "summary": "Run one bounded read-only SQLite SELECT query",
+        "description": "Accepts SELECT or WITH queries only. The server independently opens SQLite read-only, rejects writable statements, interrupts queries after two seconds, and returns at most 500 rows or 1 MiB.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sql"
+                ],
+                "properties": {
+                  "sql": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "default": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Column names and row arrays",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "reportingToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque read-only token"
+      }
+    }
+  }
+}

@@ -99,6 +99,7 @@ jobs:
       - name: Deploy to Sprite
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VM: ${{ vars.SPRITE_NAME || 'pocketsmith' }}
         run: |

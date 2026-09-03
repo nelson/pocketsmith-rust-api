@@ -7,6 +7,7 @@
 //!   pocketsmith normalise [...]      scan/apply payee normalisations
 //!   pocketsmith push [...]           push confirmed changes to PocketSmith
 //!   pocketsmith dump                 export rule tables to rules/*.sql
+//!   pocketsmith snapshot             create a consistent retained DB snapshot
 //!   pocketsmith rule <verb> [...]    view/edit normalisation rules
 //!   pocketsmith serve                run the local web UI (web feature)
 //!   pocketsmith version              print the current release version
@@ -65,6 +66,7 @@ fn main() -> ExitCode {
         Some("normalise") => to_code(cli::normalise::run(rest)),
         Some("push") => cli::push::run(rest),
         Some("dump") => to_code(cli::dump::run(rest)),
+        Some("snapshot") => to_code(cli::snapshot::run(rest)),
         Some("rule") => rule::run_main(rest),
         #[cfg(feature = "web")]
         Some("serve") => to_code(serve::run(rest)),
@@ -146,6 +148,7 @@ fn print_help() {
          normalise [...]    Scan / apply payee normalisations\n  \
          push [...]         Push confirmed local changes to PocketSmith\n  \
          dump               Export the live rule tables to rules/*.sql\n  \
+         snapshot           Create and retain a consistent SQLite snapshot\n  \
          rule <verb> [...]  View / edit normalisation rules (try `rule --help`)\n  \
          serve              Run the local web review UI (requires the `web` feature)\n  \
          version            Print the current release version\n  \

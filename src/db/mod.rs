@@ -13,7 +13,10 @@ pub use transactions::{update_payee, upsert_transaction};
 pub use users::upsert_user;
 
 use anyhow::{Context, Result};
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
+use std::time::Duration;
+
+const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// SQLite filename stored under the XDG data directory when
 /// `POCKETSMITH_DB` is unset.
@@ -69,6 +72,7 @@ pub fn initialize(path: &str) -> Result<Connection> {
     }
     let conn = Connection::open(path).context("Failed to open database")?;
 
+    conn.busy_timeout(BUSY_TIMEOUT)?;
     conn.execute_batch("PRAGMA journal_mode = WAL;")?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA).context("Failed to create tables")?;
@@ -101,9 +105,21 @@ pub fn open_app_db_at(path: &str) -> Result<Connection> {
 
 pub fn initialize_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory().context("Failed to open in-memory database")?;
+    conn.busy_timeout(BUSY_TIMEOUT)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(schema::SCHEMA)?;
     migrate_and_seed(&conn)?;
+    Ok(conn)
+}
+
+/// Open the live database through a connection that SQLite itself will refuse
+/// to use for writes. Reporting HTTP handlers use this instead of borrowing
+/// the web UI's writable connection.
+pub fn open_read_only(path: &str) -> Result<Connection> {
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .context("Failed to open database read-only")?;
+    conn.busy_timeout(BUSY_TIMEOUT)?;
+    conn.execute_batch("PRAGMA query_only = ON; PRAGMA foreign_keys = ON;")?;
     Ok(conn)
 }
 

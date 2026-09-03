@@ -1,3 +1,4 @@
+mod api;
 mod css;
 mod dashboard;
 mod freshness;
@@ -46,6 +47,7 @@ pub fn run(_args: &[String]) -> Result<()> {
     // `rules/<stage>.sql` mirror on a background thread.
     app.db_path = Some(db::path_from_env());
     let state = Arc::new(Mutex::new(app));
+    let api_config = Arc::new(api::Config::from_env()?);
 
     let host = std::env::var("SERVE_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let addr = format!("{host}:{port}");
@@ -54,15 +56,33 @@ pub fn run(_args: &[String]) -> Result<()> {
 
     for request in server.incoming_requests() {
         let state = Arc::clone(&state);
-        handle_request(request, state);
+        let api_config = Arc::clone(&api_config);
+        handle_request(request, state, api_config);
     }
 
     Ok(())
 }
 
-fn handle_request(mut request: Request, state: Arc<Mutex<AppState>>) {
+fn handle_request(
+    mut request: Request,
+    state: Arc<Mutex<AppState>>,
+    api_config: Arc<api::Config>,
+) {
     let path = request.url().to_string();
     let method = request.method().clone();
+
+    if path.starts_with("/api/") {
+        api::handle(request, &state, &api_config);
+        return;
+    }
+
+    // A public reporting deployment must not accidentally expose the legacy
+    // HTML UI's mutation routes. Local/private deployments keep the UI.
+    if api_config.api_only {
+        let resp = Response::from_string("Not found").with_status_code(404);
+        let _ = request.respond(resp);
+        return;
+    }
 
     // `/` redirects to the dashboard tab. Each tab is its own page tree.
     if method == Method::Get && (path == "/" || path.is_empty()) {
