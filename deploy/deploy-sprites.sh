@@ -27,6 +27,7 @@ PORT=8080
 PS_KEY="${PS_KEY:-}"
 REPORTING_API_TOKEN="${REPORTING_API_TOKEN:-}"
 REPORTING_API_TOKEN_B64="$(printf '%s' "$REPORTING_API_TOKEN" | base64 | tr -d '\n')"
+REPORTING_API_TOKEN_SHA256="$(printf '%s' "$REPORTING_API_TOKEN" | sha256sum | awk '{print $1}')"
 
 # Pass a GitHub token when available so this also works if the repo becomes
 # private later. Public release downloads work without one.
@@ -63,8 +64,8 @@ fi
 # until an operator explicitly changes its auth mode.
 if [ -n "$REPORTING_API_TOKEN_B64" ]; then
   reporting_token="\$(printf '%s' "$REPORTING_API_TOKEN_B64" | base64 -d)"
-  sudo awk '!/^REPORTING_API_TOKEN=|^SERVE_API_ONLY=/' /data/.env > /tmp/pocketsmith.env
-  printf '%s\n' "REPORTING_API_TOKEN=\$reporting_token" "SERVE_API_ONLY=1" | sudo tee -a /tmp/pocketsmith.env >/dev/null
+  sudo awk '!/^REPORTING_API_TOKEN=|^REPORTING_API_TOKEN_SHA256=|^SERVE_API_ONLY=/' /data/.env > /tmp/pocketsmith.env
+  printf '%s\n' "REPORTING_API_TOKEN=\$reporting_token" "REPORTING_API_TOKEN_SHA256=$REPORTING_API_TOKEN_SHA256" "SERVE_API_ONLY=1" | sudo tee -a /tmp/pocketsmith.env >/dev/null
   sudo install -m 0600 /tmp/pocketsmith.env /data/.env
   sudo rm -f /tmp/pocketsmith.env
   echo "configured token-protected read-only reporting mode"
