@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.3.0...pocketsmith-v1.4.0) (2026-09-03)
+
+
+### Features
+
+* **reporting:** expose read-only MCP tools ([ce0e6bf](https://github.com/nelson/pocketsmith-rust-api/commit/ce0e6bf8dd4054477e795f59411607382afc81ba))
+
+
+### Bug Fixes
+
+* **ci:** preserve version probe quoting ([65e407a](https://github.com/nelson/pocketsmith-rust-api/commit/65e407a38d58220102aa6654af5e092646280f97))
+* **ci:** verify MCP after release deployment ([466a5b8](https://github.com/nelson/pocketsmith-rust-api/commit/466a5b8c7e6b76e89958a1001d5c063a60d5e5fe))
+
 ## [1.3.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.2.1...pocketsmith-v1.3.0) (2026-09-03)
 
 
