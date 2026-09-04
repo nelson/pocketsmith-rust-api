@@ -62,7 +62,7 @@ def main() -> None:
 
             slow = socket.create_connection(("127.0.0.1", PORT), timeout=1)
             slow.sendall(
-                b"POST /mcp HTTP/1.1\r\n"
+                b"POST /api/v1/mcp HTTP/1.1\r\n"
                 b"Host: 127.0.0.1\r\n"
                 b"Authorization: Bearer mcp-responsiveness-test-token\r\n"
                 b"Content-Type: application/json\r\n"
