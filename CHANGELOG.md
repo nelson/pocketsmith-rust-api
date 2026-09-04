@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.0...pocketsmith-v1.5.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **oauth:** allow registered callback in form CSP ([b0b7f1d](https://github.com/nelson/pocketsmith-rust-api/commit/b0b7f1df4377e9d08c2740bfda3dd93c0e131848))
+
 ## [1.5.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.4.0...pocketsmith-v1.5.0) (2026-09-03)
 
 
