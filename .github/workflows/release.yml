@@ -175,5 +175,5 @@ jobs:
           fi
           sprite exec -s "$SPRITE_NAME" -- sudo -E bash -lc '
             set -a; source /data/.env; set +a
-            python3 -
+            REQUIRE_CALLBACK_FORM_ACTION=1 python3 -
           ' < deploy/verify-reporting-oauth.py
