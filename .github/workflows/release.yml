@@ -51,7 +51,7 @@ jobs:
             echo "Tag $tag_name already exists; refusing recovery" >&2
             exit 1
           fi
-          git tag -a "$tag_name" "$GITHUB_SHA" -m "pocketsmith: v$version"
+          git tag "$tag_name" "$GITHUB_SHA"
           git push origin "refs/tags/$tag_name"
           echo "release_created=true" >> "$GITHUB_OUTPUT"
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
