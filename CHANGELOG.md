@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.2...pocketsmith-v1.5.3) (2026-09-04)
+
+
+### Bug Fixes
+
+* **release:** run after connector-mediated merges ([e333a18](https://github.com/nelson/pocketsmith-rust-api/commit/e333a18d992a6566ba1672f084f5ac4b6bdffc48))
+
 ## [1.5.2](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.1...pocketsmith-v1.5.2) (2026-09-04)
 
 
