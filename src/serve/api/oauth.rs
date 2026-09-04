@@ -4,6 +4,7 @@
 //! financial database remains read-only to every reporting and MCP request.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -274,7 +275,7 @@ fn register_client(config: &Config, registration: RegistrationRequest) -> Result
         .iter()
         .any(|uri| !valid_redirect_uri(uri))
     {
-        bail!("redirect URIs must be HTTPS URLs without fragments");
+        bail!("redirect URIs must be HTTPS URLs or HTTP loopback URLs without fragments");
     }
     if registration.token_endpoint_auth_method.as_deref().unwrap_or("none") != "none" {
         bail!("only public clients using token_endpoint_auth_method=none are supported");
@@ -698,9 +699,17 @@ fn valid_redirect_uri(value: &str) -> bool {
     let Ok(url) = reqwest::Url::parse(value) else {
         return false;
     };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let secure_transport = url.scheme() == "https"
+        || (url.scheme() == "http"
+            && (host == "localhost"
+                || host
+                    .parse::<IpAddr>()
+                    .is_ok_and(|address| address.is_loopback())));
     value.len() <= 2048
-        && url.scheme() == "https"
-        && url.host_str().is_some()
+        && secure_transport
         && url.fragment().is_none()
         && url.username().is_empty()
         && url.password().is_none()
@@ -920,5 +929,21 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(path.with_extension("db-shm"));
         let _ = std::fs::remove_file(path.with_extension("db-wal"));
+    }
+
+    #[test]
+    fn accepts_native_app_loopback_redirects_only_over_http() {
+        assert!(valid_redirect_uri("https://chatgpt.com/oauth/callback"));
+        assert!(valid_redirect_uri("http://127.0.0.1/callback"));
+        assert!(valid_redirect_uri(
+            "http://localhost:4321/callback/server-id"
+        ));
+        assert!(valid_redirect_uri("http://[::1]:4321/callback"));
+
+        assert!(!valid_redirect_uri("http://example.com/callback"));
+        assert!(!valid_redirect_uri("http://localhost.example/callback"));
+        assert!(!valid_redirect_uri(
+            "http://127.0.0.1@attacker.example/callback"
+        ));
     }
 }

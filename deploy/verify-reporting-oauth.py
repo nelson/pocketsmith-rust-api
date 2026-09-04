@@ -14,7 +14,7 @@ ORIGIN = "http://127.0.0.1:8080"
 EXTERNAL_ORIGIN = os.environ["REPORTING_BASE_URL"].rstrip("/")
 RESOURCE = f"{EXTERNAL_ORIGIN}/mcp"
 PASSWORD = os.environ["REPORTING_OAUTH_PASSWORD"]
-CALLBACK = "https://chatgpt.com/oauth/callback"
+CALLBACK = "http://127.0.0.1/callback"
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
