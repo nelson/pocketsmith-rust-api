@@ -196,6 +196,7 @@ fn tool_definitions() -> Value {
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
             "outputSchema": { "type": "object", "additionalProperties": true },
             "securitySchemes": security_schemes,
+            "_meta": { "securitySchemes": security_schemes },
             "annotations": annotations
         },
         {
@@ -205,6 +206,7 @@ fn tool_definitions() -> Value {
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
             "outputSchema": { "type": "object", "additionalProperties": true },
             "securitySchemes": security_schemes,
+            "_meta": { "securitySchemes": security_schemes },
             "annotations": annotations
         },
         {
@@ -224,6 +226,7 @@ fn tool_definitions() -> Value {
             },
             "outputSchema": { "type": "object", "additionalProperties": true },
             "securitySchemes": security_schemes,
+            "_meta": { "securitySchemes": security_schemes },
             "annotations": annotations
         },
         {
@@ -245,6 +248,7 @@ fn tool_definitions() -> Value {
             },
             "outputSchema": { "type": "object", "additionalProperties": true },
             "securitySchemes": security_schemes,
+            "_meta": { "securitySchemes": security_schemes },
             "annotations": annotations
         }
     ])
@@ -296,6 +300,9 @@ mod tests {
         assert!(tools.iter().all(|tool| {
             tool["securitySchemes"]
                 == json!([{ "type": "oauth2", "scopes": ["reporting:read"] }])
+        }));
+        assert!(tools.iter().all(|tool| {
+            tool["_meta"]["securitySchemes"] == tool["securitySchemes"]
         }));
     }
 
