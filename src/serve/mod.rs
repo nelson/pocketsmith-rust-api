@@ -121,7 +121,7 @@ fn handle_request(
 
     let route = path.split('?').next().unwrap_or(&path);
     if path.starts_with("/api/")
-        || route == "/mcp"
+        || api::is_mcp_route(route)
         || route.starts_with("/oauth/")
         || route.starts_with("/.well-known/")
     {
