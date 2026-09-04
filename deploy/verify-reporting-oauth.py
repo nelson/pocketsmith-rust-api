@@ -128,12 +128,69 @@ mcp_headers = {
     "Content-Type": "application/json",
     "Accept": "application/json, text/event-stream",
 }
-result = json.load(
+initialized = json.load(
     request(
         "/mcp",
         data={
             "jsonrpc": "2.0",
             "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "release-smoke", "version": "1.0"},
+            },
+        },
+        headers=mcp_headers,
+    )
+)
+assert initialized["result"]["protocolVersion"] == "2025-06-18"
+
+notification = request(
+    "/mcp",
+    data={
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {},
+    },
+    headers=mcp_headers,
+    expected=202,
+)
+assert notification.read() == b""
+
+listed = json.load(
+    request(
+        "/mcp",
+        data={
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {},
+        },
+        headers=mcp_headers,
+    )
+)
+tools = listed["result"]["tools"]
+assert {tool["name"] for tool in tools} == {
+    "get_reporting_status",
+    "get_account_balances",
+    "find_transactions",
+    "query_financial_database",
+}
+for tool in tools:
+    assert tool["inputSchema"]["type"] == "object"
+    assert tool["annotations"]["readOnlyHint"] is True
+    assert tool["annotations"]["destructiveHint"] is False
+    assert tool["securitySchemes"] == [
+        {"type": "oauth2", "scopes": ["reporting:read"]}
+    ]
+
+result = json.load(
+    request(
+        "/mcp",
+        data={
+            "jsonrpc": "2.0",
+            "id": 3,
             "method": "tools/call",
             "params": {"name": "get_reporting_status", "arguments": {}},
         },
