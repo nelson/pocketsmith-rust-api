@@ -15,6 +15,7 @@ EXTERNAL_ORIGIN = os.environ["REPORTING_BASE_URL"].rstrip("/")
 RESOURCE = f"{EXTERNAL_ORIGIN}/mcp"
 PASSWORD = os.environ["REPORTING_OAUTH_PASSWORD"]
 CALLBACK = "https://chatgpt.com/oauth/callback"
+REQUIRE_CALLBACK_FORM_ACTION = os.environ.get("REQUIRE_CALLBACK_FORM_ACTION") == "1"
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -42,8 +43,11 @@ def request(path, *, data=None, headers=None, expected=200, no_redirect=False):
         response = opener.open(req, timeout=10)
     except urllib.error.HTTPError as error:
         response = error
-    if response.status != expected:
-        raise RuntimeError(f"{path} returned HTTP {response.status}, expected {expected}")
+    expected_statuses = (expected,) if isinstance(expected, int) else expected
+    if response.status not in expected_statuses:
+        raise RuntimeError(
+            f"{path} returned HTTP {response.status}, expected {expected_statuses}"
+        )
     return response
 
 
@@ -84,13 +88,18 @@ authorization = {
 }
 
 query = urllib.parse.urlencode(authorization)
-request(f"/oauth/authorize?{query}")
+authorization_page = request(f"/oauth/authorize?{query}")
+if REQUIRE_CALLBACK_FORM_ACTION:
+    policy = authorization_page.headers["Content-Security-Policy"]
+    callback_origin = urllib.parse.urlsplit(CALLBACK)
+    expected_origin = f"{callback_origin.scheme}://{callback_origin.netloc}"
+    assert f"form-action 'self' {expected_origin};" in policy
 authorization["password"] = PASSWORD
 redirect = request(
     "/oauth/authorize",
     data=authorization,
     headers={"Content-Type": "application/x-www-form-urlencoded"},
-    expected=302,
+    expected=303 if REQUIRE_CALLBACK_FORM_ACTION else (302, 303),
     no_redirect=True,
 )
 location = redirect.headers["Location"]

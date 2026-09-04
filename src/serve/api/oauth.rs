@@ -596,7 +596,7 @@ fn respond_authorization_form(
         html_escape(&authorization.redirect_uri),
         authorization_fields(authorization)
     );
-    respond_html(request, status, body);
+    respond_html_with_callback(request, status, body, Some(&authorization.redirect_uri));
 }
 
 fn authorization_fields(authorization: &AuthorizationRequest) -> String {
@@ -632,20 +632,47 @@ fn respond_html_error(request: Request, status: u16, error: &anyhow::Error) {
 }
 
 fn respond_redirect(request: Request, location: &str) {
-    let response = Response::empty(StatusCode(302))
+    // A successful form POST must become a GET to the OAuth callback. 303 is
+    // explicit about that transition, unlike the historically ambiguous 302.
+    let response = Response::empty(StatusCode(303))
         .with_header(Header::from_bytes("Location", location).unwrap())
         .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap());
     let _ = request.respond(response);
 }
 
 fn respond_html(request: Request, status: u16, body: String) {
+    respond_html_with_callback(request, status, body, None);
+}
+
+fn respond_html_with_callback(
+    request: Request,
+    status: u16,
+    body: String,
+    callback_uri: Option<&str>,
+) {
+    let csp = authorization_content_security_policy(callback_uri);
     let response = Response::from_string(body)
         .with_status_code(StatusCode(status))
         .with_header(Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap())
         .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap())
         .with_header(Header::from_bytes("X-Content-Type-Options", "nosniff").unwrap())
-        .with_header(Header::from_bytes("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'").unwrap());
+        .with_header(Header::from_bytes("Content-Security-Policy", csp).unwrap());
     let _ = request.respond(response);
+}
+
+fn authorization_content_security_policy(callback_uri: Option<&str>) -> String {
+    let callback_origin = callback_uri
+        .and_then(|value| reqwest::Url::parse(value).ok())
+        .map(|url| url.origin().ascii_serialization())
+        .filter(|origin| origin != "null");
+    let form_action = callback_origin.map_or_else(
+        || "'self'".to_string(),
+        |origin| format!("'self' {origin}"),
+    );
+    format!(
+        "default-src 'none'; style-src 'unsafe-inline'; form-action {form_action}; \
+         frame-ancestors 'none'; base-uri 'none'"
+    )
 }
 
 fn respond_json(request: Request, status: u16, value: Value) {
@@ -814,6 +841,18 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    #[test]
+    fn authorization_csp_allows_only_the_registered_callback_origin() {
+        let policy = authorization_content_security_policy(Some(
+            "https://chatgpt.com/connector_platform_oauth_redirect",
+        ));
+        assert!(policy.contains("form-action 'self' https://chatgpt.com;"));
+        assert!(!policy.contains("attacker.example"));
+
+        let invalid = authorization_content_security_policy(Some("not a URL"));
+        assert!(invalid.contains("form-action 'self';"));
     }
 
     #[test]
