@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.5](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.4...pocketsmith-v1.5.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mcp:** restore responsive tool discovery ([2eb1fdf](https://github.com/nelson/pocketsmith-rust-api/commit/2eb1fdf02a6e682ddca4389d0207ecdff4dc40c7))
+* **release:** skip unavailable label management ([2908d52](https://github.com/nelson/pocketsmith-rust-api/commit/2908d52fb13c4b7af13d99a697f1b795eb8b4c90))
+
 ## [1.5.4](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.3...pocketsmith-v1.5.4) (2026-09-04)
 
 
