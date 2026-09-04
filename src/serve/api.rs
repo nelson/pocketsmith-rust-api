@@ -29,6 +29,12 @@ const MAX_SQL_BYTES: usize = 16 * 1024;
 const MAX_ROWS: usize = 500;
 const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 const QUERY_TIMEOUT: Duration = Duration::from_secs(2);
+pub(super) const MCP_PATH: &str = "/api/v1/mcp";
+pub(super) const LEGACY_MCP_PATH: &str = "/mcp";
+
+pub(super) fn is_mcp_route(path: &str) -> bool {
+    matches!(path, MCP_PATH | LEGACY_MCP_PATH)
+}
 
 #[derive(Debug)]
 pub struct Config {
@@ -97,7 +103,8 @@ pub fn handle(
             .as_deref()
             .is_some_and(|value| constant_time_eq(value.as_bytes(), expected_token.as_bytes()))
     });
-    let oauth_authorized = path == "/mcp"
+    let mcp_route = is_mcp_route(path);
+    let oauth_authorized = mcp_route
         && bearer
             .as_deref()
             .is_some_and(|value| config.oauth.as_ref().is_some_and(|oauth| oauth.authorized(value)));
@@ -107,11 +114,11 @@ pub fn handle(
         reporting_authorized || oauth_authorized
     );
 
-    if path != "/mcp" && config.token.is_none() {
+    if !mcp_route && config.token.is_none() {
         respond_error(request, 503, "reporting API is not configured");
         return;
     }
-    if path == "/mcp" && config.token.is_none() && config.oauth.is_none() {
+    if mcp_route && config.token.is_none() && config.oauth.is_none() {
         respond_error(request, 503, "reporting API is not configured");
         return;
     }
@@ -124,7 +131,7 @@ pub fn handle(
         let challenge = config
             .oauth
             .as_ref()
-            .filter(|_| path == "/mcp")
+            .filter(|_| mcp_route)
             .map_or_else(
                 || "Bearer".to_string(),
                 |oauth| oauth.authentication_challenge(),
@@ -134,7 +141,7 @@ pub fn handle(
         return;
     }
 
-    if path == "/mcp" {
+    if mcp_route {
         mcp::handle(request, state, request_id);
         return;
     }
@@ -518,4 +525,16 @@ fn respond_bytes(request: Request, status: u16, content_type: &str, body: Vec<u8
 
 fn json_header() -> Header {
     Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_mcp_route, LEGACY_MCP_PATH, MCP_PATH};
+
+    #[test]
+    fn canonical_and_legacy_mcp_paths_are_routed() {
+        assert!(is_mcp_route(MCP_PATH));
+        assert!(is_mcp_route(LEGACY_MCP_PATH));
+        assert!(!is_mcp_route("/api/v1/mcp-extra"));
+    }
 }
