@@ -58,7 +58,7 @@ route—including its mutation routes. The reporting surface is then:
 - `GET /api/v1/transactions`
 - `POST /api/v1/query`
 - `GET /api/v1/openapi.json` (contract only; contains no financial data)
-- `POST /mcp` (stateless Streamable HTTP MCP transport)
+- `POST /api/v1/mcp` (stateless Streamable HTTP MCP transport; `/mcp` remains a compatibility alias)
 
 The REST data endpoints require
 `Authorization: Bearer <REPORTING_API_TOKEN>`. The MCP endpoint accepts that
@@ -96,7 +96,7 @@ PKCE, one-hour access tokens, rotating 30-day refresh tokens, and only the
 
 1. Enable Developer mode under ChatGPT **Settings → Security and login**.
 2. Open the ChatGPT Plugins page and create a developer-mode connection.
-3. Enter `https://pocketsmith-busng.sprites.app/mcp` and choose OAuth with
+3. Enter `https://pocketsmith-busng.sprites.app/api/v1/mcp` and choose OAuth with
    dynamic client registration.
 4. On the PocketSmith authorization page, verify the callback shown belongs
    to ChatGPT, then enter `REPORTING_OAUTH_PASSWORD`.
