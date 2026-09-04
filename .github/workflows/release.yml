@@ -22,8 +22,8 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.rp.outputs.release_created }}
-      tag_name: ${{ steps.rp.outputs.tag_name }}
+      release_created: ${{ steps.resolve.outputs.release_created }}
+      tag_name: ${{ steps.resolve.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: rp
@@ -31,6 +31,46 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-labeling: true
+
+      - uses: actions/checkout@v4
+        if: steps.rp.outputs.release_created != 'true'
+
+      - name: Recover an explicitly requested missing release
+        id: recover
+        if: steps.rp.outputs.release_created != 'true'
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_MESSAGE" != "ci(release): recover missing release"* ]]; then
+            exit 0
+          fi
+          version="$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')"
+          tag_name="pocketsmith-v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag_name" >/dev/null 2>&1; then
+            echo "Tag $tag_name already exists; refusing recovery" >&2
+            exit 1
+          fi
+          echo "release_created=true" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release outputs
+        id: resolve
+        env:
+          RP_CREATED: ${{ steps.rp.outputs.release_created }}
+          RP_TAG: ${{ steps.rp.outputs.tag_name }}
+          RECOVERED: ${{ steps.recover.outputs.release_created }}
+          RECOVERY_TAG: ${{ steps.recover.outputs.tag_name }}
+        run: |
+          if [ "$RP_CREATED" = true ]; then
+            echo "release_created=true" >> "$GITHUB_OUTPUT"
+            echo "tag_name=$RP_TAG" >> "$GITHUB_OUTPUT"
+          elif [ "$RECOVERED" = true ]; then
+            echo "release_created=true" >> "$GITHUB_OUTPUT"
+            echo "tag_name=$RECOVERY_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_created=false" >> "$GITHUB_OUTPUT"
+          fi
 
   build-binary:
     needs: release-please
@@ -88,6 +128,7 @@ jobs:
           set -euo pipefail
           archive="$RUNNER_TEMP/sprite-linux-amd64.tar.gz"
           checksum="$archive.sha256"
+
           bin_dir="$RUNNER_TEMP/sprite-bin"
           base_url="https://sprites-binaries.t3.storage.dev/client/$SPRITE_CLI_VERSION"
 
