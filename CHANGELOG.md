@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.6](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.5...pocketsmith-v1.5.6) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mcp:** avoid suspended Sprite path ([3f50227](https://github.com/nelson/pocketsmith-rust-api/commit/3f50227b523603099048e29b5e9d2a1133f832eb))
+* **mcp:** avoid suspended Sprite path ([3392c80](https://github.com/nelson/pocketsmith-rust-api/commit/3392c801f4ace538b1eca8c46583c76759cb2e73))
+* **mcp:** avoid suspended Sprite path ([65d8535](https://github.com/nelson/pocketsmith-rust-api/commit/65d8535b53a1cb86675668c6a4ce68e7f3999a38))
+* **mcp:** avoid suspended Sprite path ([97608e3](https://github.com/nelson/pocketsmith-rust-api/commit/97608e3702b6ebfbcd28774077aeac20427ae684))
+* **mcp:** avoid suspended Sprite path ([bbd34eb](https://github.com/nelson/pocketsmith-rust-api/commit/bbd34eb02b5a739eda19fe6cb3314875956b1fa2))
+* **mcp:** avoid suspended Sprite path ([ca0a9fe](https://github.com/nelson/pocketsmith-rust-api/commit/ca0a9fe493b514b3ed6ad542c95ed4dd41318ba4))
+
 ## [1.5.5](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.4...pocketsmith-v1.5.5) (2026-09-04)
 
 
