@@ -22,6 +22,8 @@ const AUTH_CODE_LIFETIME_SECONDS: i64 = 5 * 60;
 const ACCESS_TOKEN_LIFETIME_SECONDS: i64 = 60 * 60;
 const REFRESH_TOKEN_LIFETIME_SECONDS: i64 = 30 * 24 * 60 * 60;
 const PROTECTED_RESOURCE_METADATA_PATH: &str =
+    "/.well-known/oauth-protected-resource/api/v1/mcp";
+const LEGACY_MCP_PROTECTED_RESOURCE_METADATA_PATH: &str =
     "/.well-known/oauth-protected-resource/mcp";
 const LEGACY_PROTECTED_RESOURCE_METADATA_PATH: &str =
     "/.well-known/oauth-protected-resource";
@@ -91,7 +93,7 @@ impl Config {
 
         let config = Self {
             password,
-            resource: format!("{base_url}/mcp"),
+            resource: format!("{base_url}{}", super::MCP_PATH),
             base_url,
             db_path,
         };
@@ -200,6 +202,7 @@ pub(super) fn is_route(path: &str) -> bool {
     matches!(
         path,
         PROTECTED_RESOURCE_METADATA_PATH
+            | LEGACY_MCP_PROTECTED_RESOURCE_METADATA_PATH
             | LEGACY_PROTECTED_RESOURCE_METADATA_PATH
             | "/.well-known/oauth-authorization-server"
             | "/oauth/register"
@@ -211,6 +214,7 @@ pub(super) fn is_route(path: &str) -> bool {
 pub(super) fn handle(mut request: Request, path: &str, query: &str, config: &Config) {
     match (request.method(), path) {
         (&Method::Get, PROTECTED_RESOURCE_METADATA_PATH)
+        | (&Method::Get, LEGACY_MCP_PROTECTED_RESOURCE_METADATA_PATH)
         | (&Method::Get, LEGACY_PROTECTED_RESOURCE_METADATA_PATH) => respond_json(
             request,
             200,
@@ -825,7 +829,7 @@ mod tests {
         let config = Config {
             password: "correct horse battery staple".to_string(),
             base_url: "https://finance.example.com".to_string(),
-            resource: "https://finance.example.com/mcp".to_string(),
+            resource: "https://finance.example.com/api/v1/mcp".to_string(),
             db_path: path.clone(),
         };
         config.initialize().unwrap();
@@ -854,12 +858,13 @@ mod tests {
         let (config, path) = config();
 
         assert!(is_route(PROTECTED_RESOURCE_METADATA_PATH));
+        assert!(is_route(LEGACY_MCP_PROTECTED_RESOURCE_METADATA_PATH));
         assert!(is_route(LEGACY_PROTECTED_RESOURCE_METADATA_PATH));
         assert_eq!(
             config.authentication_challenge(),
             concat!(
                 "Bearer resource_metadata=\"https://finance.example.com",
-                "/.well-known/oauth-protected-resource/mcp\", ",
+                "/.well-known/oauth-protected-resource/api/v1/mcp\", ",
                 "scope=\"reporting:read\""
             )
         );
