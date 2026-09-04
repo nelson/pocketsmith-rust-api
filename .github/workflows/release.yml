@@ -42,7 +42,7 @@ jobs:
           HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
-          if [[ "$HEAD_MESSAGE" != "ci(release): recover missing release"* ]]; then
+          if [[ "$HEAD_MESSAGE" != "ci(release): recover missing"* ]]; then
             exit 0
           fi
           version="$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')"
@@ -51,6 +51,8 @@ jobs:
             echo "Tag $tag_name already exists; refusing recovery" >&2
             exit 1
           fi
+          git tag -a "$tag_name" "$GITHUB_SHA" -m "pocketsmith: v$version"
+          git push origin "refs/tags/$tag_name"
           echo "release_created=true" >> "$GITHUB_OUTPUT"
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
 
@@ -128,7 +130,6 @@ jobs:
           set -euo pipefail
           archive="$RUNNER_TEMP/sprite-linux-amd64.tar.gz"
           checksum="$archive.sha256"
-
           bin_dir="$RUNNER_TEMP/sprite-bin"
           base_url="https://sprites-binaries.t3.storage.dev/client/$SPRITE_CLI_VERSION"
 
