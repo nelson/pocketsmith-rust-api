@@ -13,7 +13,7 @@ import urllib.request
 
 ORIGIN = "http://127.0.0.1:8080"
 EXTERNAL_ORIGIN = os.environ["REPORTING_BASE_URL"].rstrip("/")
-RESOURCE = f"{EXTERNAL_ORIGIN}/mcp"
+RESOURCE = f"{EXTERNAL_ORIGIN}/api/v1/mcp"
 PASSWORD = os.environ["REPORTING_OAUTH_PASSWORD"]
 CALLBACK = "https://chatgpt.com/oauth/callback"
 REQUIRE_CALLBACK_FORM_ACTION = os.environ.get("REQUIRE_CALLBACK_FORM_ACTION") == "1"
@@ -53,6 +53,7 @@ def request(path, *, data=None, headers=None, expected=200, no_redirect=False):
 
 
 for protected_resource_path in (
+    "/.well-known/oauth-protected-resource/api/v1/mcp",
     "/.well-known/oauth-protected-resource/mcp",
     "/.well-known/oauth-protected-resource",
 ):
@@ -135,7 +136,7 @@ mcp_headers = {
 }
 initialized = json.load(
     request(
-        "/mcp",
+        "/api/v1/mcp",
         data={
             "jsonrpc": "2.0",
             "id": 1,
@@ -152,7 +153,7 @@ initialized = json.load(
 assert initialized["result"]["protocolVersion"] == "2025-06-18"
 
 notification = request(
-    "/mcp",
+    "/api/v1/mcp",
     data={
         "jsonrpc": "2.0",
         "method": "notifications/initialized",
@@ -165,7 +166,7 @@ assert notification.read() == b""
 
 listed = json.load(
     request(
-        "/mcp",
+        "/api/v1/mcp",
         data={
             "jsonrpc": "2.0",
             "id": 2,
@@ -193,7 +194,7 @@ for tool in tools:
 
 result = json.load(
     request(
-        "/mcp",
+        "/api/v1/mcp",
         data={
             "jsonrpc": "2.0",
             "id": 3,
@@ -220,14 +221,14 @@ assert refreshed["access_token"] != access_token
 
 started = time.monotonic()
 unauthorized = request(
-    "/mcp",
+    "/api/v1/mcp",
     data={"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {}},
     headers={"Content-Type": "application/json"},
     expected=401,
 )
 assert time.monotonic() - started < 1.0
 assert "oauth-protected-resource" in unauthorized.headers["WWW-Authenticate"]
-assert "/.well-known/oauth-protected-resource/mcp" in unauthorized.headers[
+assert "/.well-known/oauth-protected-resource/api/v1/mcp" in unauthorized.headers[
     "WWW-Authenticate"
 ]
 
