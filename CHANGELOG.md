@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.1...pocketsmith-v1.5.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mcp:** declare OAuth security for reporting tools ([459e742](https://github.com/nelson/pocketsmith-rust-api/commit/459e742fbcefef33e15b58eea5aca6934d9f7b11))
+
 ## [1.5.1](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.0...pocketsmith-v1.5.1) (2026-09-04)
 
 
