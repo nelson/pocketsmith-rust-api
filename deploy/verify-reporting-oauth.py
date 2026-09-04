@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -51,9 +52,13 @@ def request(path, *, data=None, headers=None, expected=200, no_redirect=False):
     return response
 
 
-protected = json.load(request("/.well-known/oauth-protected-resource"))
-assert protected["resource"] == RESOURCE
-assert protected["scopes_supported"] == ["reporting:read"]
+for protected_resource_path in (
+    "/.well-known/oauth-protected-resource/mcp",
+    "/.well-known/oauth-protected-resource",
+):
+    protected = json.load(request(protected_resource_path))
+    assert protected["resource"] == RESOURCE
+    assert protected["scopes_supported"] == ["reporting:read"]
 
 metadata = json.load(request("/.well-known/oauth-authorization-server"))
 assert metadata["issuer"] == EXTERNAL_ORIGIN
@@ -213,12 +218,17 @@ refreshed = json.load(
 )
 assert refreshed["access_token"] != access_token
 
+started = time.monotonic()
 unauthorized = request(
     "/mcp",
     data={"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {}},
     headers={"Content-Type": "application/json"},
     expected=401,
 )
+assert time.monotonic() - started < 1.0
 assert "oauth-protected-resource" in unauthorized.headers["WWW-Authenticate"]
+assert "/.well-known/oauth-protected-resource/mcp" in unauthorized.headers[
+    "WWW-Authenticate"
+]
 
 print("OAuth discovery, PKCE, token refresh, and protected MCP call verified")

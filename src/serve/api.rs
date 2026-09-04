@@ -60,7 +60,12 @@ impl Config {
     }
 }
 
-pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Config) {
+pub fn handle(
+    mut request: Request,
+    state: &Arc<Mutex<AppState>>,
+    config: &Config,
+    request_id: u64,
+) {
     let url = request.url().to_string();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
 
@@ -85,6 +90,7 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
         return;
     }
 
+    let authentication_started = Instant::now();
     let bearer = bearer_token(&request);
     let reporting_authorized = config.token.as_deref().is_some_and(|expected_token| {
         bearer
@@ -95,6 +101,11 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
         && bearer
             .as_deref()
             .is_some_and(|value| config.oauth.as_ref().is_some_and(|oauth| oauth.authorized(value)));
+    eprintln!(
+        "http request_id={request_id} event=authentication_complete elapsed_ms={} authorized={}",
+        authentication_started.elapsed().as_millis(),
+        reporting_authorized || oauth_authorized
+    );
 
     if path != "/mcp" && config.token.is_none() {
         respond_error(request, 503, "reporting API is not configured");
@@ -105,6 +116,7 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
         return;
     }
     if !reporting_authorized && !oauth_authorized {
+        eprintln!("http request_id={request_id} event=unauthorized_challenge");
         let body = serde_json::to_vec(&json!({ "error": "unauthorized" })).unwrap();
         let mut response = Response::from_data(body)
             .with_status_code(StatusCode(401))
@@ -123,7 +135,7 @@ pub fn handle(mut request: Request, state: &Arc<Mutex<AppState>>, config: &Confi
     }
 
     if path == "/mcp" {
-        mcp::handle(request, state);
+        mcp::handle(request, state, request_id);
         return;
     }
 

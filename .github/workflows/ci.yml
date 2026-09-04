@@ -40,5 +40,22 @@ jobs:
       - name: Test (web feature)
         run: cargo test --features web --locked
 
+      - name: Reproduce blocking on the base implementation
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/mcp-base" "$BASE_SHA"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/mcp-base-target" \
+            cargo build --manifest-path "$RUNNER_TEMP/mcp-base/Cargo.toml" \
+              --features web --locked --bin pocketsmith
+          python3 deploy/verify-mcp-responsiveness.py \
+            "$RUNNER_TEMP/mcp-base-target/debug/pocketsmith" --expect blocked
+
+      - name: Verify patched server remains responsive
+        run: python3 deploy/verify-mcp-responsiveness.py target/debug/pocketsmith --expect responsive
+
       - name: Validate deployment smoke script
-        run: python3 -m py_compile deploy/verify-reporting-oauth.py
+        run: python3 -m py_compile deploy/verify-reporting-oauth.py deploy/verify-mcp-responsiveness.py

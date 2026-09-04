@@ -21,6 +21,10 @@ const READ_SCOPE: &str = "reporting:read";
 const AUTH_CODE_LIFETIME_SECONDS: i64 = 5 * 60;
 const ACCESS_TOKEN_LIFETIME_SECONDS: i64 = 60 * 60;
 const REFRESH_TOKEN_LIFETIME_SECONDS: i64 = 30 * 24 * 60 * 60;
+const PROTECTED_RESOURCE_METADATA_PATH: &str =
+    "/.well-known/oauth-protected-resource/mcp";
+const LEGACY_PROTECTED_RESOURCE_METADATA_PATH: &str =
+    "/.well-known/oauth-protected-resource";
 
 #[derive(Debug)]
 pub(super) struct Config {
@@ -186,8 +190,8 @@ impl Config {
 
     pub(super) fn authentication_challenge(&self) -> String {
         format!(
-            "Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource\", scope=\"{}\"",
-            self.base_url, READ_SCOPE
+            "Bearer resource_metadata=\"{}{PROTECTED_RESOURCE_METADATA_PATH}\", scope=\"{}\"",
+            self.base_url, READ_SCOPE,
         )
     }
 }
@@ -195,7 +199,8 @@ impl Config {
 pub(super) fn is_route(path: &str) -> bool {
     matches!(
         path,
-        "/.well-known/oauth-protected-resource"
+        PROTECTED_RESOURCE_METADATA_PATH
+            | LEGACY_PROTECTED_RESOURCE_METADATA_PATH
             | "/.well-known/oauth-authorization-server"
             | "/oauth/register"
             | "/oauth/authorize"
@@ -205,7 +210,8 @@ pub(super) fn is_route(path: &str) -> bool {
 
 pub(super) fn handle(mut request: Request, path: &str, query: &str, config: &Config) {
     match (request.method(), path) {
-        (&Method::Get, "/.well-known/oauth-protected-resource") => respond_json(
+        (&Method::Get, PROTECTED_RESOURCE_METADATA_PATH)
+        | (&Method::Get, LEGACY_PROTECTED_RESOURCE_METADATA_PATH) => respond_json(
             request,
             200,
             json!({
@@ -841,6 +847,27 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    #[test]
+    fn protected_resource_metadata_uses_the_mcp_resource_path() {
+        let (config, path) = config();
+
+        assert!(is_route(PROTECTED_RESOURCE_METADATA_PATH));
+        assert!(is_route(LEGACY_PROTECTED_RESOURCE_METADATA_PATH));
+        assert_eq!(
+            config.authentication_challenge(),
+            concat!(
+                "Bearer resource_metadata=\"https://finance.example.com",
+                "/.well-known/oauth-protected-resource/mcp\", ",
+                "scope=\"reporting:read\""
+            )
+        );
+
+        drop(config);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("db-shm"));
+        let _ = std::fs::remove_file(path.with_extension("db-wal"));
     }
 
     #[test]
