@@ -184,6 +184,7 @@ for tool in tools:
     assert tool["securitySchemes"] == [
         {"type": "oauth2", "scopes": ["reporting:read"]}
     ]
+    assert tool["_meta"]["securitySchemes"] == tool["securitySchemes"]
 
 result = json.load(
     request(
