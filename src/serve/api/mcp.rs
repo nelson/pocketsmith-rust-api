@@ -1,6 +1,7 @@
 //! Stateless Streamable HTTP transport for the reporting MCP server.
 
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -28,7 +29,11 @@ struct ToolCall {
     arguments: Value,
 }
 
-pub(super) fn handle(mut request: Request, state: &Arc<Mutex<AppState>>) {
+pub(super) fn handle(
+    mut request: Request,
+    state: &Arc<Mutex<AppState>>,
+    request_id: u64,
+) {
     if request.method() != &Method::Post {
         respond_rpc(
             request,
@@ -42,6 +47,8 @@ pub(super) fn handle(mut request: Request, state: &Arc<Mutex<AppState>>) {
         return;
     }
 
+    let body_started = Instant::now();
+    eprintln!("http request_id={request_id} event=mcp_body_read_started");
     let body = match super::read_limited_body(&mut request) {
         Ok(body) => body,
         Err(error) => {
@@ -49,6 +56,11 @@ pub(super) fn handle(mut request: Request, state: &Arc<Mutex<AppState>>) {
             return;
         }
     };
+    eprintln!(
+        "http request_id={request_id} event=mcp_body_read_complete elapsed_ms={} bytes={}",
+        body_started.elapsed().as_millis(),
+        body.len()
+    );
     let rpc: RpcRequest = match serde_json::from_slice(&body) {
         Ok(rpc) => rpc,
         Err(_) => {
@@ -75,7 +87,13 @@ pub(super) fn handle(mut request: Request, state: &Arc<Mutex<AppState>>) {
         return;
     };
 
+    let method = rpc.method.clone();
+    let dispatch_started = Instant::now();
     let result = dispatch(&rpc.method, rpc.params, state);
+    eprintln!(
+        "http request_id={request_id} event=mcp_dispatch_complete method={method} elapsed_ms={}",
+        dispatch_started.elapsed().as_millis()
+    );
     let payload = match result {
         Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
         Err((code, message)) => rpc_error(id, code, &message),

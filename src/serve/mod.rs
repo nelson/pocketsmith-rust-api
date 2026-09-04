@@ -19,7 +19,9 @@ mod smoke_tests;
 #[cfg(test)]
 mod pipeline_integration;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use anyhow::Result;
 use maud::html;
@@ -30,6 +32,10 @@ use pocketsmith::db;
 use crate::serve::helpers::extract_param;
 use crate::serve::state::{AppState, Decision};
 use crate::serve::transfers::helpers::parse_pair_id;
+
+const HTTP_WORKERS: usize = 8;
+const HTTP_QUEUE_CAPACITY: usize = 64;
+static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Entry point for the `serve` subcommand: boot the local web UI.
 /// `_args` are the tokens after the `serve` verb (currently unused;
@@ -54,10 +60,51 @@ pub fn run(_args: &[String]) -> Result<()> {
     let server = Server::http(&addr).map_err(|e| anyhow::anyhow!("{e}"))?;
     eprintln!("Serving on http://{addr}");
 
-    for request in server.incoming_requests() {
+    // A bounded worker pool prevents one slow Streamable HTTP request body
+    // from blocking discovery, without allowing unbounded thread growth.
+    let (requests, pending) =
+        mpsc::sync_channel::<(u64, Instant, Request)>(HTTP_QUEUE_CAPACITY);
+    let pending = Arc::new(Mutex::new(pending));
+    for worker in 0..HTTP_WORKERS {
+        let pending = Arc::clone(&pending);
         let state = Arc::clone(&state);
         let api_config = Arc::clone(&api_config);
-        handle_request(request, state, api_config);
+        std::thread::Builder::new()
+            .name(format!("pocketsmith-http-{worker}"))
+            .spawn(move || loop {
+                let (request_id, accepted_at, request) = {
+                    let Ok(pending) = pending.lock() else {
+                        return;
+                    };
+                    let Ok(request) = pending.recv() else {
+                        return;
+                    };
+                    request
+                };
+                let route = request.url().split('?').next().unwrap_or(request.url());
+                eprintln!(
+                    "http request_id={request_id} event=worker_started method={} route={route} queue_ms={}",
+                    request.method(),
+                    accepted_at.elapsed().as_millis()
+                );
+                handle_request(
+                    request,
+                    Arc::clone(&state),
+                    Arc::clone(&api_config),
+                    request_id,
+                );
+                eprintln!(
+                    "http request_id={request_id} event=completed total_ms={}",
+                    accepted_at.elapsed().as_millis()
+                );
+            })?;
+    }
+
+    for request in server.incoming_requests() {
+        let request_id = NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed);
+        if requests.send((request_id, Instant::now(), request)).is_err() {
+            break;
+        }
     }
 
     Ok(())
@@ -67,6 +114,7 @@ fn handle_request(
     mut request: Request,
     state: Arc<Mutex<AppState>>,
     api_config: Arc<api::Config>,
+    request_id: u64,
 ) {
     let path = request.url().to_string();
     let method = request.method().clone();
@@ -77,7 +125,7 @@ fn handle_request(
         || route.starts_with("/oauth/")
         || route.starts_with("/.well-known/")
     {
-        api::handle(request, &state, &api_config);
+        api::handle(request, &state, &api_config, request_id);
         return;
     }
 

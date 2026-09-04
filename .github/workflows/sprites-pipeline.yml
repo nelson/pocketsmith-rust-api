@@ -326,9 +326,26 @@ jobs:
             fi
             rm -f /tmp/reporting-{status,balances,query,mcp-initialize,mcp-tools,mcp-status}.json
           '
+
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            external_metadata="$(curl -sS --max-time 10 -o /tmp/external-mcp-metadata.json -w "%{http_code}" \
+              "$REPORTING_BASE_URL/.well-known/oauth-protected-resource/mcp")"
+            external_unauthenticated_mcp="$(curl -sS --max-time 3 -o /dev/null -w "%{http_code} %{time_starttransfer}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+              "$REPORTING_BASE_URL/mcp")"
+            test "$external_metadata" = 200
+            test "${external_unauthenticated_mcp%% *}" = 401
+            python3 -c 'import sys; assert float(sys.argv[1]) < 1.0, f"unauthenticated MCP response took {sys.argv[1]}s"' \
+              "${external_unauthenticated_mcp#* }"
+            python3 -c 'import json; metadata=json.load(open("/tmp/external-mcp-metadata.json")); assert metadata["resource"].endswith("/mcp")'
+            rm -f /tmp/external-mcp-metadata.json
+          fi
           echo "Protected REST API verified; MCP is mandatory from deployed version 1.4.0"
 
       - name: Verify OAuth flow when deployed
+        if: github.event_name != 'pull_request'
         env:
           REPORTING_API_TOKEN: ${{ secrets.REPORTING_API_TOKEN }}
           REPORTING_OAUTH_PASSWORD: ${{ secrets.REPORTING_OAUTH_PASSWORD }}
