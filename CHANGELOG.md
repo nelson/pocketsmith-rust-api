@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.3...pocketsmith-v1.5.4) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mcp:** mirror OAuth security metadata ([c3a1533](https://github.com/nelson/pocketsmith-rust-api/commit/c3a1533b8074435c670863bf765da2a604531cbc))
+
 ## [1.5.3](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.2...pocketsmith-v1.5.3) (2026-09-04)
 
 
