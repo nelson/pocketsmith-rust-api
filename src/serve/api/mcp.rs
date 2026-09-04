@@ -185,6 +185,9 @@ fn tool_definitions() -> Value {
         "idempotentHint": true,
         "openWorldHint": false
     });
+    let security_schemes = json!([
+        { "type": "oauth2", "scopes": ["reporting:read"] }
+    ]);
     json!([
         {
             "name": "get_reporting_status",
@@ -192,6 +195,7 @@ fn tool_definitions() -> Value {
             "description": "Check SQLite integrity, transaction count, and PocketSmith sync freshness before reporting.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
             "outputSchema": { "type": "object", "additionalProperties": true },
+            "securitySchemes": security_schemes,
             "annotations": annotations
         },
         {
@@ -200,6 +204,7 @@ fn tool_definitions() -> Value {
             "description": "List the latest balances for every PocketSmith account without exposing account numbers.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
             "outputSchema": { "type": "object", "additionalProperties": true },
+            "securitySchemes": security_schemes,
             "annotations": annotations
         },
         {
@@ -218,6 +223,7 @@ fn tool_definitions() -> Value {
                 "additionalProperties": false
             },
             "outputSchema": { "type": "object", "additionalProperties": true },
+            "securitySchemes": security_schemes,
             "annotations": annotations
         },
         {
@@ -238,6 +244,7 @@ fn tool_definitions() -> Value {
                 "additionalProperties": false
             },
             "outputSchema": { "type": "object", "additionalProperties": true },
+            "securitySchemes": security_schemes,
             "annotations": annotations
         }
     ])
@@ -286,6 +293,10 @@ mod tests {
         assert_eq!(tools.len(), 4);
         assert!(tools.iter().all(|tool| tool["annotations"]["readOnlyHint"] == true));
         assert!(tools.iter().all(|tool| tool["annotations"]["destructiveHint"] == false));
+        assert!(tools.iter().all(|tool| {
+            tool["securitySchemes"]
+                == json!([{ "type": "oauth2", "scopes": ["reporting:read"] }])
+        }));
     }
 
     #[test]
