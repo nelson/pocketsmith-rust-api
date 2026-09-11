@@ -5,6 +5,7 @@
 //!   pocketsmith sync                 pull PocketSmith data into the local DB
 //!   pocketsmith transfers [...]      detect/apply/annotate transfer pairs
 //!   pocketsmith normalise [...]      scan/apply payee normalisations
+//!   pocketsmith categorise [...]     scan/apply category + label proposals
 //!   pocketsmith push [...]           push confirmed changes to PocketSmith
 //!   pocketsmith dump                 export rule tables to rules/*.sql
 //!   pocketsmith snapshot             create a consistent retained DB snapshot
@@ -64,6 +65,7 @@ fn main() -> ExitCode {
         Some("sync") => to_code(cli::sync::run(rest)),
         Some("transfers") => to_code(cli::transfers::run(rest)),
         Some("normalise") => to_code(cli::normalise::run(rest)),
+        Some("categorise") => to_code(cli::categorise::run(rest)),
         Some("push") => cli::push::run(rest),
         Some("dump") => to_code(cli::dump::run(rest)),
         Some("snapshot") => to_code(cli::snapshot::run(rest)),
@@ -146,6 +148,7 @@ fn print_help() {
          sync               Pull PocketSmith data into the local SQLite mirror\n  \
          transfers [...]    Detect / apply / annotate transfer pairs\n  \
          normalise [...]    Scan / apply payee normalisations\n  \
+         categorise [...]   Scan / apply category + label proposals (Google Places)\n  \
          push [...]         Push confirmed local changes to PocketSmith\n  \
          dump               Export the live rule tables to rules/*.sql\n  \
          snapshot           Create and retain a consistent SQLite snapshot\n  \

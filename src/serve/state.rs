@@ -79,6 +79,14 @@ pub struct NormActivityEntry {
     pub decision: Decision,
 }
 
+/// Activity-log entry for the categorise tab. Keyed by `merchant_key`.
+pub struct CatActivityEntry {
+    pub merchant_key: String,
+    pub category_title: String,
+    pub txn_count: i64,
+    pub decision: Decision,
+}
+
 /// Activity-log entry for the transactions tab. Records a decision
 /// the user made from the Transactions detail panel so the activity
 /// panel can show recent actions and offer one-click undo.
@@ -173,6 +181,10 @@ pub struct AppState {
     pub norm_status_filter: String,
     pub norm_class_filter: String,
 
+    // --- Categorise tab ---
+    pub categorise: TabState<String, CatActivityEntry>,
+    pub cat_status_filter: String,
+
     // --- Transactions tab ---
     /// Active filter chip slug ("all", "needs-rule", "rule-pending",
     /// "orphan-transfer", "uncategorised"). Persisted across page
@@ -226,6 +238,8 @@ impl AppState {
             normalise: TabState::default(),
             norm_status_filter: "all".to_string(),
             norm_class_filter: "all".to_string(),
+            categorise: TabState::default(),
+            cat_status_filter: "all".to_string(),
             txn_filter: "all".to_string(),
             txn_active: None,
             txn_activity: Vec::new(),
