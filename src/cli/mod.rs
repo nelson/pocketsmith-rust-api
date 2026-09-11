@@ -5,6 +5,7 @@
 //! library. The dispatcher in `main.rs` routes `argv[1]` to one of these
 //! `run(args)` functions.
 
+pub mod categorise;
 pub mod dump;
 pub mod normalise;
 pub mod push;

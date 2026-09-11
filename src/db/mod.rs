@@ -1,7 +1,9 @@
 mod schema;
 
 pub mod categories;
+pub mod category_proposals;
 pub mod payee_normalisations;
+pub mod place_lookups;
 pub mod transaction_accounts;
 pub mod transactions;
 pub mod transfer_pairs;
