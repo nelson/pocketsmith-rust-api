@@ -16,6 +16,10 @@ target
 # Environment variables
 .env
 
+# Python bytecode cache (the CI py_compile step on deploy/*.py generates these)
+__pycache__/
+*.py[cod]
+
 # pi local sandbox config
 .pi/
 
