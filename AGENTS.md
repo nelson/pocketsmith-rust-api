@@ -53,30 +53,40 @@ and git tunnels SSH through a SOCKS proxy via an `nc` ProxyCommand that the
 sandbox refuses to execute (`nc … : Operation not permitted` → broken pipe).
 `ssh -T` sometimes works, but the push transport flakes — don't rely on it.
 
-**Working method: push over HTTPS with the `gh` github.com token and the
-system CA bundle.** The corporate environment injects a CA that git's
-default bundle doesn't trust, so `GIT_SSL_CAINFO=/etc/ssl/cert.pem` is
-required. Auth is username `nelson` + the token as the password.
+**Working method: push over HTTPS using `gh`'s git credential helper.**
+The corporate environment injects a CA that git's default bundle doesn't
+trust, so `GIT_SSL_CAINFO=/etc/ssl/cert.pem` is still required.
 
 ```bash
-GH_TOKEN=$(gh auth token -h github.com 2>/dev/null) \
 GIT_SSL_CAINFO=/etc/ssl/cert.pem \
-git push -u "https://nelson:${GH_TOKEN}@github.com/nelson/pocketsmith-rust-api.git" <branch>
+git -c credential.helper='!gh auth git-credential' \
+  push -u "https://github.com/nelson/pocketsmith-rust-api.git" <branch>
 ```
 
 Notes:
-- Use the **github.com** token (`gh auth token -h github.com`).
-- Username must be `nelson`; `x-access-token` is rejected ("Invalid
-  username or token").
+- **The old inline-token form no longer works.** Passing the github.com
+  token as the URL password
+  (`https://nelson:${GH_TOKEN}@github.com/...`) now fails with
+  `remote: Invalid username or token. Password authentication is not
+  supported for Git operations.` — GitHub rejects the `gh` OAuth token as a
+  raw git password. Use the `gh auth git-credential` helper instead (it
+  supplies the right credential for the transport).
+- `gh` must be logged in to github.com (`gh auth status -h github.com`).
 - For force pushes, prefer a lease and tag the old remote tip first:
   ```bash
   git tag -f backup/<name> <old-remote-sha>
-  GH_TOKEN=$(gh auth token -h github.com 2>/dev/null) GIT_SSL_CAINFO=/etc/ssl/cert.pem \
-  git push --force-with-lease=<branch>:<old-remote-sha> \
-    "https://nelson:${GH_TOKEN}@github.com/nelson/pocketsmith-rust-api.git" <branch>
+  GIT_SSL_CAINFO=/etc/ssl/cert.pem \
+  git -c credential.helper='!gh auth git-credential' \
+    push --force-with-lease=<branch>:<old-remote-sha> \
+    "https://github.com/nelson/pocketsmith-rust-api.git" <branch>
   ```
-- `git ls-remote` / `gh pr create` over HTTPS need the same `GH_TOKEN` +
-  `GIT_SSL_CAINFO` treatment.
+- `gh pr create` / `gh pr list` / `git ls-remote` over HTTPS still work with
+  the github.com token; only the **git push password** path changed:
+  ```bash
+  GH_TOKEN=$(gh auth token -h github.com 2>/dev/null) \
+  GIT_SSL_CAINFO=/etc/ssl/cert.pem \
+  gh pr create --repo nelson/pocketsmith-rust-api --base master --head <branch> ...
+  ```
 
 ## Cargo location
 
