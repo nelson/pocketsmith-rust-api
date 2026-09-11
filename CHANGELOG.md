@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.6...pocketsmith-v1.6.0) (2026-09-11)
+
+
+### Features
+
+* **categorise:** add the categorisation pipeline stage ([053fa9c](https://github.com/nelson/pocketsmith-rust-api/commit/053fa9cffd5645ee0bb4049200486df02d8ba0b6))
+
 ## [1.5.6](https://github.com/nelson/pocketsmith-rust-api/compare/pocketsmith-v1.5.5...pocketsmith-v1.5.6) (2026-09-04)
 
 
